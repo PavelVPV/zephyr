@@ -147,16 +147,16 @@ static void msg_cache_add(struct bt_mesh_net_rx *rx)
 
 static void store_net(void)
 {
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_NET_PENDING);
+	bt_mesh_settings_store_schedule("bt/mesh/Net", 0);
 }
 
 static void store_iv(bool only_duration)
 {
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_IV_PENDING);
+	bt_mesh_settings_store_schedule("bt/mesh/IV", 0);
 
 	if (!only_duration) {
 		/* Always update Seq whenever IV changes */
-		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_SEQ_PENDING);
+		bt_mesh_settings_store_schedule("bt/mesh/Seq", 0);
 	}
 }
 
@@ -167,7 +167,7 @@ static void store_seq(void)
 		return;
 	}
 
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_SEQ_PENDING);
+	bt_mesh_settings_store_schedule("bt/mesh/Seq", 0);
 }
 
 int bt_mesh_net_create(uint16_t idx, uint8_t flags, const uint8_t key[16],
@@ -917,8 +917,9 @@ static int net_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 	return 0;
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_net, "bt/mesh/Net", NULL, net_set, NULL,
-			       NULL);
+void bt_mesh_net_pending_net_store(void);
+MESH_SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_net, "bt/mesh/Net", NULL, net_set, NULL,
+			       NULL, bt_mesh_net_pending_net_store);
 
 static int iv_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 		  void *cb_arg)
@@ -954,14 +955,17 @@ static int iv_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 	return 0;
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_iv, "bt/mesh/IV", NULL, iv_set, NULL,
-			       NULL);
+void bt_mesh_net_pending_iv_store(void);
+MESH_SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_iv, "bt/mesh/IV", NULL, iv_set, NULL,
+			       NULL, bt_mesh_net_pending_iv_store);
 
 static int seq_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 		   void *cb_arg)
 {
 	struct seq_val seq;
 	int err;
+
+	(void)seq_set;
 
 	if (len_rd == 0) {
 		BT_DBG("val (null)");
@@ -997,8 +1001,9 @@ static int seq_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 	return 0;
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_seq, "bt/mesh/Seq", NULL, seq_set, NULL,
-			       NULL);
+void bt_mesh_net_pending_seq_store(void);
+MESH_SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_seq, "bt/mesh/Seq", NULL, seq_set, NULL,
+			       NULL, bt_mesh_net_pending_seq_store);
 
 static void clear_iv(void)
 {
@@ -1095,9 +1100,9 @@ void bt_mesh_net_pending_seq_store(void)
 
 void bt_mesh_net_clear(void)
 {
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_NET_PENDING);
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_IV_PENDING);
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CFG_PENDING);
+	bt_mesh_settings_store_schedule("bt/mesh/Net", 0);
+	bt_mesh_settings_store_schedule("bt/mesh/IV", 0);
+	bt_mesh_settings_store_schedule("bt/mesh/Cfg", 0);
 }
 
 void bt_mesh_net_settings_commit(void)

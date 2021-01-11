@@ -152,7 +152,7 @@ static void update_app_key_settings(uint16_t app_idx, bool store)
 	update = app_key_update_find(app_idx, &free_slot);
 	if (update) {
 		update->clear = clear;
-		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_APP_KEYS_PENDING);
+		bt_mesh_settings_store_schedule("bt/mesh/AppKey", CONFIG_BT_MESH_STORE_TIMEOUT);
 		return;
 	}
 
@@ -169,7 +169,7 @@ static void update_app_key_settings(uint16_t app_idx, bool store)
 	free_slot->key_idx = app_idx;
 	free_slot->clear = clear;
 
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_APP_KEYS_PENDING);
+	bt_mesh_settings_store_schedule("bt/mesh/AppKey", CONFIG_BT_MESH_STORE_TIMEOUT);
 }
 
 static void app_key_evt(struct app_key *app, enum bt_mesh_key_evt evt)
@@ -653,8 +653,9 @@ static int app_key_set(const char *name, size_t len_rd,
 	return 0;
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_app, "bt/mesh/AppKey", NULL,
-			       app_key_set, NULL, NULL);
+void bt_mesh_app_key_pending_store(void);
+MESH_SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_app, "bt/mesh/AppKey", NULL,
+			       app_key_set, NULL, NULL, bt_mesh_app_key_pending_store);
 
 void bt_mesh_app_key_pending_store(void)
 {

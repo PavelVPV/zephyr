@@ -44,12 +44,12 @@ static void schedule_rpl_store(struct bt_mesh_rpl *entry)
 #ifdef CONFIG_BT_SETTINGS
 	entry->store = true;
 #endif
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_RPL_PENDING);
+	bt_mesh_settings_store_schedule("bt/mesh/rpl", CONFIG_BT_MESH_RPL_STORE_TIMEOUT);
 }
 
 static void schedule_rpl_clear(void)
 {
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_RPL_PENDING);
+	bt_mesh_settings_store_schedule("bt/mesh/rpl", CONFIG_BT_MESH_RPL_STORE_TIMEOUT);
 }
 
 void bt_mesh_rpl_update(struct bt_mesh_rpl *rpl,
@@ -161,15 +161,6 @@ static struct bt_mesh_rpl *bt_mesh_rpl_alloc(uint16_t src)
 	return NULL;
 }
 
-static void bt_mesh_rpl_foreach(bt_mesh_rpl_func_t func, void *user_data)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(replay_list); i++) {
-		func(&replay_list[i], user_data);
-	}
-}
-
 void bt_mesh_rpl_reset(void)
 {
 	int i;
@@ -248,8 +239,9 @@ static int rpl_set(const char *name, size_t len_rd,
 	return 0;
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_rpl, "bt/mesh/RPL", NULL, rpl_set, NULL,
-			       NULL);
+void bt_mesh_rpl_pending_store(void);
+MESH_SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_rpl, "bt/mesh/RPL", NULL, rpl_set, NULL,
+			       NULL, bt_mesh_rpl_pending_store);
 
 static void store_rpl(struct bt_mesh_rpl *entry)
 {
@@ -273,7 +265,7 @@ static void store_rpl(struct bt_mesh_rpl *entry)
 	}
 }
 
-static void clear_rpl(struct bt_mesh_rpl *rpl, void *user_data)
+static void clear_rpl(struct bt_mesh_rpl *rpl)
 {
 	int err;
 	char path[18];
@@ -293,7 +285,7 @@ static void clear_rpl(struct bt_mesh_rpl *rpl, void *user_data)
 	(void)memset(rpl, 0, sizeof(*rpl));
 }
 
-static void store_pending_rpl(struct bt_mesh_rpl *rpl, void *user_data)
+static void store_pending_rpl(struct bt_mesh_rpl *rpl)
 {
 	BT_DBG("");
 
@@ -309,9 +301,13 @@ static void store_pending_rpl(struct bt_mesh_rpl *rpl, void *user_data)
 
 void bt_mesh_rpl_pending_store(void)
 {
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
-		bt_mesh_rpl_foreach(store_pending_rpl, NULL);
-	} else {
-		bt_mesh_rpl_foreach(clear_rpl, NULL);
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(replay_list); i++) {
+		if (atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+			store_pending_rpl(&replay_list[i]);
+		} else {
+			clear_rpl(&replay_list[i]);
+		}
 	}
 }

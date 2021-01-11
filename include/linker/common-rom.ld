@@ -107,6 +107,7 @@
 	Z_ITERABLE_SECTION_ROM(bt_mesh_app_key_cb, 4)
 
 	Z_ITERABLE_SECTION_ROM(bt_mesh_hb_cb, 4)
+	Z_ITERABLE_SECTION_ROM(bt_mesh_settings_handler, 4)
 #endif
 
 #if defined(CONFIG_BT_MESH_FRIEND)

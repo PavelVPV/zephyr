@@ -45,7 +45,7 @@ void bt_mesh_beacon_set(bool beacon)
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
 	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
-		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CFG_PENDING);
+		bt_mesh_settings_store_schedule("bt/mesh/Cfg", CONFIG_BT_MESH_STORE_TIMEOUT);
 	}
 }
 
@@ -96,7 +96,7 @@ int bt_mesh_gatt_proxy_set(enum bt_mesh_feat_state gatt_proxy)
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
 	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
-		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CFG_PENDING);
+		bt_mesh_settings_store_schedule("bt/mesh/Cfg", CONFIG_BT_MESH_STORE_TIMEOUT);
 	}
 
 	return 0;
@@ -125,7 +125,7 @@ int bt_mesh_default_ttl_set(uint8_t default_ttl)
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
 	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
-		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CFG_PENDING);
+		bt_mesh_settings_store_schedule("bt/mesh/Cfg", CONFIG_BT_MESH_STORE_TIMEOUT);
 	}
 
 	return 0;
@@ -153,7 +153,7 @@ int bt_mesh_friend_set(enum bt_mesh_feat_state friendship)
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
 	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
-		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CFG_PENDING);
+		bt_mesh_settings_store_schedule("bt/mesh/Cfg", CONFIG_BT_MESH_STORE_TIMEOUT);
 	}
 
 	if (friendship == BT_MESH_FEATURE_DISABLED) {
@@ -182,7 +182,7 @@ void bt_mesh_net_transmit_set(uint8_t xmit)
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
 	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
-		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CFG_PENDING);
+		bt_mesh_settings_store_schedule("bt/mesh/Cfg", CONFIG_BT_MESH_STORE_TIMEOUT);
 	}
 }
 
@@ -213,7 +213,7 @@ int bt_mesh_relay_set(enum bt_mesh_feat_state relay, uint8_t xmit)
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
 	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
-		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CFG_PENDING);
+		bt_mesh_settings_store_schedule("bt/mesh/Cfg", CONFIG_BT_MESH_STORE_TIMEOUT);
 	}
 
 	return 0;
@@ -313,8 +313,9 @@ static int cfg_set(const char *name, size_t len_rd,
 	return 0;
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_cfg, "bt/mesh/Cfg", NULL, cfg_set, NULL,
-			       NULL);
+void bt_mesh_cfg_pending_store(void);
+MESH_SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_cfg, "bt/mesh/Cfg", NULL, cfg_set, NULL,
+			       NULL, bt_mesh_cfg_pending_store);
 
 static void clear_cfg(void)
 {

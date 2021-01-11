@@ -1041,8 +1041,9 @@ static int sig_mod_set(const char *name, size_t len_rd,
 	return mod_set(false, name, len_rd, read_cb, cb_arg);
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_sig_mod, "bt/mesh/s", NULL, sig_mod_set,
-			       NULL, NULL);
+void bt_mesh_model_pending_store(void);
+MESH_SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_sig_mod, "bt/mesh/s", NULL, sig_mod_set,
+			       NULL, NULL, bt_mesh_model_pending_store);
 
 static int vnd_mod_set(const char *name, size_t len_rd,
 		       settings_read_cb read_cb, void *cb_arg)
@@ -1050,8 +1051,8 @@ static int vnd_mod_set(const char *name, size_t len_rd,
 	return mod_set(true, name, len_rd, read_cb, cb_arg);
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_vnd_mod, "bt/mesh/v", NULL, vnd_mod_set,
-			       NULL, NULL);
+MESH_SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_vnd_mod, "bt/mesh/v", NULL, vnd_mod_set,
+			       NULL, NULL, bt_mesh_model_pending_store);
 
 static void encode_mod_path(struct bt_mesh_model *mod, bool vnd,
 			    const char *key, char *path, size_t path_len)
@@ -1179,22 +1180,39 @@ void bt_mesh_model_pending_store(void)
 	bt_mesh_model_foreach(store_pending_mod, NULL);
 }
 
+static void schedule_mod_store(struct bt_mesh_model *mod,
+			   struct bt_mesh_elem *elem, bool vnd,
+			   bool primary, void *user_data)
+{
+	struct bt_mesh_model *mod_to_store = user_data;
+
+	if (mod != mod_to_store) {
+		return;
+	}
+
+	if (vnd) {
+		bt_mesh_settings_store_schedule("bt/mesh/v", CONFIG_BT_MESH_STORE_TIMEOUT);
+	} else {
+		bt_mesh_settings_store_schedule("bt/mesh/s", CONFIG_BT_MESH_STORE_TIMEOUT);
+	}
+}
+
 void bt_mesh_model_bind_store(struct bt_mesh_model *mod)
 {
 	mod->flags |= BT_MESH_MOD_BIND_PENDING;
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_MOD_PENDING);
+	bt_mesh_model_foreach(schedule_mod_store, mod);
 }
 
 void bt_mesh_model_sub_store(struct bt_mesh_model *mod)
 {
 	mod->flags |= BT_MESH_MOD_SUB_PENDING;
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_MOD_PENDING);
+	bt_mesh_model_foreach(schedule_mod_store, mod);
 }
 
 void bt_mesh_model_pub_store(struct bt_mesh_model *mod)
 {
 	mod->flags |= BT_MESH_MOD_PUB_PENDING;
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_MOD_PENDING);
+	bt_mesh_model_foreach(schedule_mod_store, mod);
 }
 
 int bt_mesh_model_data_store(struct bt_mesh_model *mod, bool vnd,

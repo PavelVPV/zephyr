@@ -1592,7 +1592,7 @@ void bt_mesh_rx_reset(void)
 
 static void store_va_label(void)
 {
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_VA_PENDING);
+	bt_mesh_settings_store_schedule("bt/mesh/Va", CONFIG_BT_MESH_STORE_TIMEOUT);
 }
 
 void bt_mesh_trans_reset(void)
@@ -1790,8 +1790,9 @@ static int va_set(const char *name, size_t len_rd,
 	return 0;
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_va, "bt/mesh/Va", NULL, va_set, NULL,
-			       NULL);
+void bt_mesh_va_pending_store(void);
+MESH_SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_va, "bt/mesh/Va", NULL, va_set, NULL,
+			       NULL, bt_mesh_va_pending_store);
 #endif /* CONFIG_BT_MESH_LABEL_COUNT > 0 */
 
 #define IS_VA_DEL(_label)	((_label)->ref == 0)

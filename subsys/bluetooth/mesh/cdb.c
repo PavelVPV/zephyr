@@ -524,7 +524,7 @@ static void clear_cdb_app_key(uint16_t app_idx)
 static void schedule_cdb_store(int flag)
 {
 	atomic_set_bit(bt_mesh_cdb.flags, flag);
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CDB_PENDING);
+	bt_mesh_settings_store_schedule("bt/mesh/cdb", CONFIG_BT_MESH_STORE_TIMEOUT);
 }
 
 static void update_cdb_net_settings(void)

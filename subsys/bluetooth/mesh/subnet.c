@@ -167,7 +167,7 @@ static void update_subnet_settings(uint16_t net_idx, bool store)
 	update = net_key_update_find(net_idx, &free_slot);
 	if (update) {
 		update->clear = clear;
-		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_NET_KEYS_PENDING);
+		bt_mesh_settings_store_schedule("bt/mesh/NetKey", CONFIG_BT_MESH_STORE_TIMEOUT);
 		return;
 	}
 
@@ -184,7 +184,7 @@ static void update_subnet_settings(uint16_t net_idx, bool store)
 	free_slot->key_idx = net_idx;
 	free_slot->clear = clear;
 
-	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_NET_KEYS_PENDING);
+	bt_mesh_settings_store_schedule("bt/mesh/NetKey", CONFIG_BT_MESH_STORE_TIMEOUT);
 }
 
 void bt_mesh_subnet_store(uint16_t net_idx)
@@ -821,8 +821,9 @@ static int net_key_set(const char *name, size_t len_rd,
 		(key.kr_phase != BT_MESH_KR_NORMAL) ? key.val[1] : NULL);
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_subnet, "bt/mesh/NetKey", NULL,
-			       net_key_set, NULL, NULL);
+void bt_mesh_subnet_pending_store(void);
+MESH_SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_subnet, "bt/mesh/NetKey", NULL,
+			       net_key_set, NULL, NULL, bt_mesh_subnet_pending_store);
 
 void bt_mesh_subnet_pending_store(void)
 {

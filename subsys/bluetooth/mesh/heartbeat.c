@@ -226,7 +226,7 @@ uint8_t bt_mesh_hb_pub_set(struct bt_mesh_hb_pub *new_pub)
 
 		if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
 		    bt_mesh_is_provisioned()) {
-			bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_HB_PUB_PENDING);
+			bt_mesh_settings_store_schedule("bt/mesh/HBPub", CONFIG_BT_MESH_STORE_TIMEOUT);
 		}
 
 		return STATUS_SUCCESS;
@@ -255,7 +255,7 @@ uint8_t bt_mesh_hb_pub_set(struct bt_mesh_hb_pub *new_pub)
 	}
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_HB_PUB_PENDING);
+		bt_mesh_settings_store_schedule("bt/mesh/HBPub", CONFIG_BT_MESH_STORE_TIMEOUT);
 	}
 
 	return STATUS_SUCCESS;
@@ -401,8 +401,9 @@ static int hb_pub_set(const char *name, size_t len_rd,
 	return 0;
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_hb_pub, "bt/mesh/HBPub", NULL,
-			       hb_pub_set, NULL, NULL);
+void bt_mesh_hb_pub_pending_store(void);
+MESH_SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_hb_pub, "bt/mesh/HBPub", NULL,
+			       hb_pub_set, NULL, NULL, bt_mesh_hb_pub_pending_store);
 
 void bt_mesh_hb_pub_pending_store(void)
 {

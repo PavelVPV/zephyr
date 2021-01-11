@@ -30,7 +30,8 @@
 #include "cfg.h"
 
 static struct k_delayed_work pending_store;
-static ATOMIC_DEFINE(pending_flags, BT_MESH_SETTINGS_FLAG_COUNT);
+//static ATOMIC_DEFINE(pending_flags, BT_MESH_SETTINGS_FLAG_COUNT);
+static ATOMIC_DEFINE(pending_flags, 32);
 
 int bt_mesh_settings_set(settings_read_cb read_cb, void *cb_arg,
 			 void *out, size_t read_len)
@@ -64,8 +65,11 @@ static int mesh_commit(void)
 		bt_mesh_proxy_prov_disable(true);
 	}
 
-	bt_mesh_net_settings_commit();
-	bt_mesh_model_settings_commit();
+	Z_STRUCT_SECTION_FOREACH(bt_mesh_settings_handler, ch) {
+		if (ch->h_commit) {
+			ch->h_commit();
+		}
+	}
 
 	atomic_set_bit(bt_mesh.flags, BT_MESH_VALID);
 
@@ -90,23 +94,47 @@ SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh, "bt/mesh", NULL, NULL, mesh_commit,
 			      BIT(BT_MESH_SETTINGS_CFG_PENDING)      |      \
 			      BIT(BT_MESH_SETTINGS_MOD_PENDING))
 
-void bt_mesh_settings_store_schedule(enum bt_mesh_settings_flag flag)
+int get_free_flag(void)
 {
-	int32_t timeout_ms, remaining;
-
-	atomic_set_bit(pending_flags, flag);
-
-	if (atomic_get(pending_flags) & NO_WAIT_PENDING_BITS) {
-		timeout_ms = 0;
-	} else if (atomic_test_bit(pending_flags, BT_MESH_SETTINGS_RPL_PENDING) &&
-		   (!(atomic_get(bt_mesh.flags) & GENERIC_PENDING_BITS) ||
-		    (CONFIG_BT_MESH_RPL_STORE_TIMEOUT <
-		     CONFIG_BT_MESH_STORE_TIMEOUT))) {
-		timeout_ms = CONFIG_BT_MESH_RPL_STORE_TIMEOUT * MSEC_PER_SEC;
-	} else {
-		timeout_ms = CONFIG_BT_MESH_STORE_TIMEOUT * MSEC_PER_SEC;
+	int i;
+	for (i = 0; i < 32; i++) {
+		if (!atomic_test_bit(pending_flags, i)) {
+			atomic_set_bit(pending_flags, i);
+			return i;
+		}
 	}
 
+	return -EAGAIN;
+}
+
+//void bt_mesh_settings_store_schedule(enum bt_mesh_settings_flag flag)
+void bt_mesh_settings_store_schedule(const char *tree, int32_t timeout_s)
+{
+	int flag = -1;
+	struct bt_mesh_settings_handler *handler;
+	int32_t timeout_ms, remaining;
+
+	Z_STRUCT_SECTION_FOREACH(bt_mesh_settings_handler, ch) {
+		if (!strcmp(tree, ch->name) && ch->flag == -1) {
+			flag = get_free_flag();
+			handler = ch;
+			break;
+		}
+	}
+
+	if (flag < 0) {
+		BT_ERR("No more flags available to schedule store.");
+		return;
+	}
+	BT_DBG("Got flag: %d, name: %s\n", flag, handler->name);
+	handler->flag = flag;
+
+	if (k_work_pending(&pending_store.work)) {
+		BT_DBG("No reschedule due to work pending");
+		return;
+	}
+
+	timeout_ms = timeout_s * MSEC_PER_SEC;
 	remaining = k_delayed_work_remaining_get(&pending_store);
 	if ((remaining > 0) && remaining < timeout_ms) {
 		BT_DBG("Not rescheduling due to existing earlier deadline");
@@ -122,60 +150,15 @@ static void store_pending(struct k_work *work)
 {
 	BT_DBG("");
 
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_RPL_PENDING)) {
-		bt_mesh_rpl_pending_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_NET_KEYS_PENDING)) {
-		bt_mesh_subnet_pending_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_APP_KEYS_PENDING)) {
-		bt_mesh_app_key_pending_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_NET_PENDING)) {
-		bt_mesh_net_pending_net_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_IV_PENDING)) {
-		bt_mesh_net_pending_iv_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_SEQ_PENDING)) {
-		bt_mesh_net_pending_seq_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_HB_PUB_PENDING)) {
-		bt_mesh_hb_pub_pending_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_CFG_PENDING)) {
-		bt_mesh_cfg_pending_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_MOD_PENDING)) {
-		bt_mesh_model_pending_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_VA_PENDING)) {
-		bt_mesh_va_pending_store();
-	}
-
-	if (IS_ENABLED(CONFIG_BT_MESH_CDB) &&
-	    atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_CDB_PENDING)) {
-		bt_mesh_cdb_pending_store();
+	Z_STRUCT_SECTION_FOREACH(bt_mesh_settings_handler, ch) {
+		BT_DBG("Flag: %d, name: %s\n", ch->flag, ch->name);
+		if (ch->flag != -1 &&
+		    atomic_test_and_clear_bit(pending_flags, ch->flag) &&
+		    ch->h_pending) {
+			BT_DBG("Calling h_pending()\n");
+			ch->flag = -1;
+			ch->h_pending();
+		}
 	}
 }
 
