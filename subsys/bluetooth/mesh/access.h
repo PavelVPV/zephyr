@@ -49,7 +49,7 @@ void bt_mesh_model_recv(struct bt_mesh_net_rx *rx, struct net_buf_simple *buf);
 
 int bt_mesh_comp_register(const struct bt_mesh_comp *comp);
 
-void bt_mesh_model_pending_store(void);
+void bt_mesh_model_pending_store(bt_mesh_settings_store_func store_func);
 void bt_mesh_model_bind_store(struct bt_mesh_model *mod);
 void bt_mesh_model_sub_store(struct bt_mesh_model *mod);
 void bt_mesh_model_pub_store(struct bt_mesh_model *mod);

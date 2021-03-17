@@ -248,7 +248,7 @@ static int rpl_set(const char *name, size_t len_rd,
 
 BT_MESH_SETTINGS_DEFINE(rpl, "RPL", rpl_set);
 
-static void store_rpl(struct bt_mesh_rpl *entry)
+static void store_rpl(struct bt_mesh_rpl *entry, bt_mesh_settings_store_func store_func)
 {
 	struct rpl_val rpl;
 	char path[18];
@@ -262,7 +262,7 @@ static void store_rpl(struct bt_mesh_rpl *entry)
 
 	snprintk(path, sizeof(path), "bt/mesh/RPL/%x", entry->src);
 
-	err = settings_save_one(path, &rpl, sizeof(rpl));
+	err = store_func(path, &rpl, sizeof(rpl));
 	if (err) {
 		BT_ERR("Failed to store RPL %s value", log_strdup(path));
 	} else {
@@ -270,7 +270,7 @@ static void store_rpl(struct bt_mesh_rpl *entry)
 	}
 }
 
-static void clear_rpl(struct bt_mesh_rpl *rpl)
+static void clear_rpl(struct bt_mesh_rpl *rpl, bt_mesh_settings_store_func store_func)
 {
 	int err;
 	char path[18];
@@ -280,7 +280,7 @@ static void clear_rpl(struct bt_mesh_rpl *rpl)
 	}
 
 	snprintk(path, sizeof(path), "bt/mesh/RPL/%x", rpl->src);
-	err = settings_delete(path);
+	err = store_func(path, NULL, 0);
 	if (err) {
 		BT_ERR("Failed to clear RPL");
 	} else {
@@ -291,24 +291,24 @@ static void clear_rpl(struct bt_mesh_rpl *rpl)
 	atomic_clear_bit(store, rpl_idx(rpl));
 }
 
-static void store_pending_rpl(struct bt_mesh_rpl *rpl)
+static void store_pending_rpl(struct bt_mesh_rpl *rpl, bt_mesh_settings_store_func store_func)
 {
 	BT_DBG("");
 
 	if (atomic_test_and_clear_bit(store, rpl_idx(rpl))) {
-		store_rpl(rpl);
+		store_rpl(rpl, store_func);
 	}
 }
 
-void bt_mesh_rpl_pending_store(void)
+void bt_mesh_rpl_pending_store(bt_mesh_settings_store_func store_func)
 {
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(replay_list); i++) {
 		if (atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
-			store_pending_rpl(&replay_list[i]);
+			store_pending_rpl(&replay_list[i], store_func);
 		} else {
-			clear_rpl(&replay_list[i]);
+			clear_rpl(&replay_list[i], store_func);
 		}
 	}
 }

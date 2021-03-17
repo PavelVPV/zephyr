@@ -400,7 +400,7 @@ static int cdb_set(const char *name, size_t len_rd,
 
 BT_MESH_SETTINGS_DEFINE(cdb, "cdb", cdb_set);
 
-static void store_cdb_node(const struct bt_mesh_cdb_node *node)
+static void store_cdb_node(const struct bt_mesh_cdb_node *node, bt_mesh_settings_store_func store_func)
 {
 	struct node_val val;
 	char path[30];
@@ -419,7 +419,7 @@ static void store_cdb_node(const struct bt_mesh_cdb_node *node)
 
 	snprintk(path, sizeof(path), "bt/mesh/cdb/Node/%x", node->addr);
 
-	err = settings_save_one(path, &val, sizeof(val));
+	err = store_func(path, &val, sizeof(val));
 	if (err) {
 		BT_ERR("Failed to store Node %s value", log_strdup(path));
 	} else {
@@ -427,7 +427,7 @@ static void store_cdb_node(const struct bt_mesh_cdb_node *node)
 	}
 }
 
-static void clear_cdb_node(uint16_t addr)
+static void clear_cdb_node(uint16_t addr, bt_mesh_settings_store_func store_func)
 {
 	char path[30];
 	int err;
@@ -435,7 +435,7 @@ static void clear_cdb_node(uint16_t addr)
 	BT_DBG("Node 0x%04x", addr);
 
 	snprintk(path, sizeof(path), "bt/mesh/cdb/Node/%x", addr);
-	err = settings_delete(path);
+	err = store_func(path, NULL, 0);
 	if (err) {
 		BT_ERR("Failed to clear Node 0x%04x", addr);
 	} else {
@@ -443,7 +443,7 @@ static void clear_cdb_node(uint16_t addr)
 	}
 }
 
-static void store_cdb_subnet(const struct bt_mesh_cdb_subnet *sub)
+static void store_cdb_subnet(const struct bt_mesh_cdb_subnet *sub, bt_mesh_settings_store_func store_func)
 {
 	struct net_key_val key;
 	char path[30];
@@ -467,7 +467,7 @@ static void store_cdb_subnet(const struct bt_mesh_cdb_subnet *sub)
 	}
 }
 
-static void clear_cdb_subnet(uint16_t net_idx)
+static void clear_cdb_subnet(uint16_t net_idx, bt_mesh_settings_store_func store_func)
 {
 	char path[30];
 	int err;
@@ -475,7 +475,7 @@ static void clear_cdb_subnet(uint16_t net_idx)
 	BT_DBG("NetKeyIndex 0x%03x", net_idx);
 
 	snprintk(path, sizeof(path), "bt/mesh/cdb/Subnet/%x", net_idx);
-	err = settings_delete(path);
+	err = store_func(path, NULL, 0);
 	if (err) {
 		BT_ERR("Failed to clear NetKeyIndex 0x%03x", net_idx);
 	} else {
@@ -483,7 +483,7 @@ static void clear_cdb_subnet(uint16_t net_idx)
 	}
 }
 
-static void store_cdb_app_key(const struct bt_mesh_cdb_app_key *app)
+static void store_cdb_app_key(const struct bt_mesh_cdb_app_key *app, bt_mesh_settings_store_func store_func)
 {
 	struct app_key_val key;
 	char path[30];
@@ -496,7 +496,7 @@ static void store_cdb_app_key(const struct bt_mesh_cdb_app_key *app)
 
 	snprintk(path, sizeof(path), "bt/mesh/cdb/AppKey/%x", app->app_idx);
 
-	err = settings_save_one(path, &key, sizeof(key));
+	err = store_func(path, &key, sizeof(key));
 	if (err) {
 		BT_ERR("Failed to store AppKey %s value", log_strdup(path));
 	} else {
@@ -504,13 +504,13 @@ static void store_cdb_app_key(const struct bt_mesh_cdb_app_key *app)
 	}
 }
 
-static void clear_cdb_app_key(uint16_t app_idx)
+static void clear_cdb_app_key(uint16_t app_idx, bt_mesh_settings_store_func store_func)
 {
 	char path[30];
 	int err;
 
 	snprintk(path, sizeof(path), "bt/mesh/cdb/AppKey/%x", app_idx);
-	err = settings_delete(path);
+	err = store_func(path, NULL, 0);
 	if (err) {
 		BT_ERR("Failed to clear AppKeyIndex 0x%03x", app_idx);
 	} else {
@@ -570,9 +570,9 @@ static void update_cdb_node_settings(const struct bt_mesh_cdb_node *node,
 
 	if (!free_slot) {
 		if (store) {
-			store_cdb_node(node);
+			store_cdb_node(node, settings_save_one);
 		} else {
-			clear_cdb_node(node->addr);
+			clear_cdb_node(node->addr, settings_save_one);
 		}
 		return;
 	}
@@ -629,9 +629,9 @@ static void update_cdb_subnet_settings(const struct bt_mesh_cdb_subnet *sub,
 
 	if (!free_slot) {
 		if (store) {
-			store_cdb_subnet(sub);
+			store_cdb_subnet(sub, settings_save_one);
 		} else {
-			clear_cdb_subnet(sub->net_idx);
+			clear_cdb_subnet(sub->net_idx, settings_save_one);
 		}
 		return;
 	}
@@ -661,9 +661,9 @@ static void update_cdb_app_key_settings(const struct bt_mesh_cdb_app_key *key,
 
 	if (!free_slot) {
 		if (store) {
-			store_cdb_app_key(key);
+			store_cdb_app_key(key, settings_save_one);
 		} else {
-			clear_cdb_app_key(key->app_idx);
+			clear_cdb_app_key(key->app_idx, settings_save_one);
 		}
 
 		return;
@@ -956,11 +956,11 @@ void bt_mesh_cdb_app_key_store(const struct bt_mesh_cdb_app_key *key)
 	}
 }
 
-static void clear_cdb_net(void)
+static void clear_cdb_net(bt_mesh_settings_store_func store_func)
 {
 	int err;
 
-	err = settings_delete("bt/mesh/cdb/Net");
+	err = store_func("bt/mesh/cdb/Net", NULL, 0);
 	if (err) {
 		BT_ERR("Failed to clear Network");
 	} else {
@@ -968,7 +968,7 @@ static void clear_cdb_net(void)
 	}
 }
 
-static void store_cdb_pending_net(void)
+static void store_cdb_pending_net(bt_mesh_settings_store_func store_func)
 {
 	struct net_val net;
 	int err;
@@ -979,7 +979,7 @@ static void store_cdb_pending_net(void)
 	net.iv_update = atomic_test_bit(bt_mesh_cdb.flags,
 					BT_MESH_CDB_IVU_IN_PROGRESS);
 
-	err = settings_save_one("bt/mesh/cdb/Net", &net, sizeof(net));
+	err = store_func("bt/mesh/cdb/Net", &net, sizeof(net));
 	if (err) {
 		BT_ERR("Failed to store Network value");
 	} else {
@@ -987,7 +987,7 @@ static void store_cdb_pending_net(void)
 	}
 }
 
-static void store_cdb_pending_nodes(void)
+static void store_cdb_pending_nodes(bt_mesh_settings_store_func store_func)
 {
 	int i;
 
@@ -1001,13 +1001,13 @@ static void store_cdb_pending_nodes(void)
 		BT_DBG("addr: 0x%04x, clear: %d", update->addr, update->clear);
 
 		if (update->clear) {
-			clear_cdb_node(update->addr);
+			clear_cdb_node(update->addr, store_func);
 		} else {
 			struct bt_mesh_cdb_node *node;
 
 			node = bt_mesh_cdb_node_get(update->addr);
 			if (node) {
-				store_cdb_node(node);
+				store_cdb_node(node, store_func);
 			} else {
 				BT_WARN("Node 0x%04x not found", update->addr);
 			}
@@ -1017,7 +1017,7 @@ static void store_cdb_pending_nodes(void)
 	}
 }
 
-static void store_cdb_pending_keys(void)
+static void store_cdb_pending_keys(bt_mesh_settings_store_func store_func)
 {
 	int i;
 
@@ -1030,9 +1030,9 @@ static void store_cdb_pending_keys(void)
 
 		if (update->clear) {
 			if (update->app_key) {
-				clear_cdb_app_key(update->key_idx);
+				clear_cdb_app_key(update->key_idx, store_func);
 			} else {
-				clear_cdb_subnet(update->key_idx);
+				clear_cdb_subnet(update->key_idx, store_func);
 			}
 		} else {
 			if (update->app_key) {
@@ -1040,7 +1040,7 @@ static void store_cdb_pending_keys(void)
 
 				key = bt_mesh_cdb_app_key_get(update->key_idx);
 				if (key) {
-					store_cdb_app_key(key);
+					store_cdb_app_key(key, store_func);
 				} else {
 					BT_WARN("AppKeyIndex 0x%03x not found",
 						update->key_idx);
@@ -1050,7 +1050,7 @@ static void store_cdb_pending_keys(void)
 
 				sub = bt_mesh_cdb_subnet_get(update->key_idx);
 				if (sub) {
-					store_cdb_subnet(sub);
+					store_cdb_subnet(sub, store_func);
 				} else {
 					BT_WARN("NetKeyIndex 0x%03x not found",
 						update->key_idx);
@@ -1062,25 +1062,25 @@ static void store_cdb_pending_keys(void)
 	}
 }
 
-void bt_mesh_cdb_pending_store(void)
+void bt_mesh_cdb_pending_store(bt_mesh_settings_store_func store_func)
 {
 	if (atomic_test_and_clear_bit(bt_mesh_cdb.flags,
 				      BT_MESH_CDB_SUBNET_PENDING)) {
 		if (atomic_test_bit(bt_mesh_cdb.flags,
 				    BT_MESH_CDB_VALID)) {
-			store_cdb_pending_net();
+			store_cdb_pending_net(store_func);
 		} else {
-			clear_cdb_net();
+			clear_cdb_net(store_func);
 		}
 	}
 
 	if (atomic_test_and_clear_bit(bt_mesh_cdb.flags,
 				      BT_MESH_CDB_NODES_PENDING)) {
-		store_cdb_pending_nodes();
+		store_cdb_pending_nodes(store_func);
 	}
 
 	if (atomic_test_and_clear_bit(bt_mesh_cdb.flags,
 				      BT_MESH_CDB_KEYS_PENDING)) {
-		store_cdb_pending_keys();
+		store_cdb_pending_keys(store_func);
 	}
 }

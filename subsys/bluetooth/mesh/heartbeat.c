@@ -416,7 +416,7 @@ static int hb_pub_set(const char *name, size_t len_rd,
 
 BT_MESH_SETTINGS_DEFINE(pub, "HBPub", hb_pub_set);
 
-void bt_mesh_hb_pub_pending_store(void)
+void bt_mesh_hb_pub_pending_store(bt_mesh_settings_store_func store_func)
 {
 	struct bt_mesh_hb_pub pub;
 	struct hb_pub_val val;
@@ -424,7 +424,7 @@ void bt_mesh_hb_pub_pending_store(void)
 
 	bt_mesh_hb_pub_get(&pub);
 	if (pub.dst == BT_MESH_ADDR_UNASSIGNED) {
-		err = settings_delete("bt/mesh/HBPub");
+		err = store_func("bt/mesh/HBPub", NULL, 0);
 	} else {
 		val.indefinite = (pub.count == 0xffff);
 		val.dst = pub.dst;
@@ -433,7 +433,7 @@ void bt_mesh_hb_pub_pending_store(void)
 		val.feat = pub.feat;
 		val.net_idx = pub.net_idx;
 
-		err = settings_save_one("bt/mesh/HBPub", &val, sizeof(val));
+		err = store_func("bt/mesh/HBPub", &val, sizeof(val));
 	}
 
 	if (err) {

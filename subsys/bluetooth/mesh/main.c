@@ -20,6 +20,7 @@
 #define LOG_MODULE_NAME bt_mesh_main
 #include "common/log.h"
 
+#include "settings.h"
 #include "test.h"
 #include "adv.h"
 #include "prov.h"
@@ -37,7 +38,6 @@
 #include "access.h"
 #include "foundation.h"
 #include "proxy.h"
-#include "settings.h"
 #include "mesh.h"
 
 int bt_mesh_provision(const uint8_t net_key[16], uint16_t net_idx,
@@ -135,7 +135,7 @@ int bt_mesh_provision(const uint8_t net_key[16], uint16_t net_idx,
 	}
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-		bt_mesh_net_pending_net_store();
+		bt_mesh_net_pending_net_store(settings_save_one);
 	}
 
 	bt_mesh_start();

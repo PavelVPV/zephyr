@@ -12,6 +12,8 @@
 #include <net/buf.h>
 #include <zephyr.h>
 
+#include "settings.h"
+
 #define BT_MESH_NET_FLAG_KR       BIT(0)
 #define BT_MESH_NET_FLAG_IVU      BIT(1)
 
@@ -207,6 +209,6 @@ bt_mesh_subnet_has_new_key(const struct bt_mesh_subnet *sub)
 void bt_mesh_subnet_store(uint16_t net_idx);
 
 /** @brief Store the pending Subnets in persistent storage. */
-void bt_mesh_subnet_pending_store(void);
+void bt_mesh_subnet_pending_store(bt_mesh_settings_store_func store_func);
 
 #endif /* ZEPHYR_SUBSYS_BLUETOOTH_MESH_SUBNET_H_ */

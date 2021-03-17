@@ -1818,7 +1818,7 @@ static int va_set(const char *name, size_t len_rd,
 BT_MESH_SETTINGS_DEFINE(va, "Va", va_set);
 
 #define IS_VA_DEL(_label)	((_label)->ref == 0)
-void bt_mesh_va_pending_store(void)
+void bt_mesh_va_pending_store(bt_mesh_settings_store_func store_func)
 {
 	struct virtual_addr *lab;
 	struct va_val va;
@@ -1836,13 +1836,13 @@ void bt_mesh_va_pending_store(void)
 		snprintk(path, sizeof(path), "bt/mesh/Va/%x", i);
 
 		if (IS_VA_DEL(lab)) {
-			err = settings_delete(path);
+			err = store_func(path, NULL, 0);
 		} else {
 			va.ref = lab->ref;
 			va.addr = lab->addr;
 			memcpy(va.uuid, lab->uuid, 16);
 
-			err = settings_save_one(path, &va, sizeof(va));
+			err = store_func(path, &va, sizeof(va));
 		}
 
 		if (err) {
@@ -1857,7 +1857,7 @@ void bt_mesh_va_pending_store(void)
 	}
 }
 #else
-void bt_mesh_va_pending_store(void)
+void bt_mesh_va_pending_store(bt_mesh_settings_store_func store_func)
 {
 	/* Do nothing. */
 }

@@ -7,6 +7,7 @@
  */
 
 #include "subnet.h"
+#include "settings.h"
 
 #define BT_MESH_IV_UPDATE(flags)   ((flags >> 1) & 0x01)
 #define BT_MESH_KEY_REFRESH(flags) (flags & 0x01)
@@ -285,9 +286,9 @@ uint32_t bt_mesh_next_seq(void);
 void bt_mesh_net_init(void);
 void bt_mesh_net_header_parse(struct net_buf_simple *buf,
 			      struct bt_mesh_net_rx *rx);
-void bt_mesh_net_pending_net_store(void);
-void bt_mesh_net_pending_iv_store(void);
-void bt_mesh_net_pending_seq_store(void);
+void bt_mesh_net_pending_net_store(bt_mesh_settings_store_func store_func);
+void bt_mesh_net_pending_iv_store(bt_mesh_settings_store_func store_func);
+void bt_mesh_net_pending_seq_store(bt_mesh_settings_store_func store_func);
 void bt_mesh_net_clear(void);
 void bt_mesh_net_settings_commit(void);
 

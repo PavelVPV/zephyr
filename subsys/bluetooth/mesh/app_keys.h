@@ -9,6 +9,7 @@
 
 #include <bluetooth/mesh.h>
 #include "subnet.h"
+#include "settings.h"
 
 /** @brief Reset the app keys module. */
 void bt_mesh_app_keys_reset(void);
@@ -60,6 +61,6 @@ uint16_t bt_mesh_app_key_find(bool dev_key, uint8_t aid,
 			      void *cb_data);
 
 /** @brief Store pending application keys in persistent storage. */
-void bt_mesh_app_key_pending_store(void);
+void bt_mesh_app_key_pending_store(bt_mesh_settings_store_func store_func);
 
 #endif /* ZEPHYR_SUBSYS_BLUETOOTH_MESH_APP_KEYS_H_ */

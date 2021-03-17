@@ -53,6 +53,78 @@ int bt_mesh_settings_set(settings_read_cb read_cb, void *cb_arg,
 	return 0;
 }
 
+/* Pending flags that use K_NO_WAIT as the storage timeout */
+#define NO_WAIT_PENDING_BITS (BIT(BT_MESH_SETTINGS_NET_PENDING) |           \
+			      BIT(BT_MESH_SETTINGS_IV_PENDING)  |           \
+			      BIT(BT_MESH_SETTINGS_SEQ_PENDING) |           \
+			      BIT(BT_MESH_SETTINGS_CDB_PENDING))
+
+/* Pending flags that use CONFIG_BT_MESH_STORE_TIMEOUT */
+#define GENERIC_PENDING_BITS (BIT(BT_MESH_SETTINGS_NET_KEYS_PENDING) |      \
+			      BIT(BT_MESH_SETTINGS_APP_KEYS_PENDING) |      \
+			      BIT(BT_MESH_SETTINGS_HB_PUB_PENDING)   |      \
+			      BIT(BT_MESH_SETTINGS_CFG_PENDING)      |      \
+			      BIT(BT_MESH_SETTINGS_MOD_PENDING))
+
+static void store_pending(bt_mesh_settings_store_func store_func)
+{
+	if (atomic_test_and_clear_bit(pending_flags,
+				      BT_MESH_SETTINGS_RPL_PENDING)) {
+		bt_mesh_rpl_pending_store(store_func);
+	}
+
+	if (atomic_test_and_clear_bit(pending_flags,
+				      BT_MESH_SETTINGS_NET_KEYS_PENDING)) {
+		bt_mesh_subnet_pending_store(store_func);
+	}
+
+	if (atomic_test_and_clear_bit(pending_flags,
+				      BT_MESH_SETTINGS_APP_KEYS_PENDING)) {
+		bt_mesh_app_key_pending_store(store_func);
+	}
+
+	if (atomic_test_and_clear_bit(pending_flags,
+				      BT_MESH_SETTINGS_NET_PENDING)) {
+		bt_mesh_net_pending_net_store(store_func);
+	}
+
+	if (atomic_test_and_clear_bit(pending_flags,
+				      BT_MESH_SETTINGS_IV_PENDING)) {
+		bt_mesh_net_pending_iv_store(store_func);
+	}
+
+	if (atomic_test_and_clear_bit(pending_flags,
+				      BT_MESH_SETTINGS_SEQ_PENDING)) {
+		bt_mesh_net_pending_seq_store(store_func);
+	}
+
+	if (atomic_test_and_clear_bit(pending_flags,
+				      BT_MESH_SETTINGS_HB_PUB_PENDING)) {
+		bt_mesh_hb_pub_pending_store(store_func);
+	}
+
+	if (atomic_test_and_clear_bit(pending_flags,
+				      BT_MESH_SETTINGS_CFG_PENDING)) {
+		bt_mesh_cfg_pending_store(store_func);
+	}
+
+	if (atomic_test_and_clear_bit(pending_flags,
+				      BT_MESH_SETTINGS_MOD_PENDING)) {
+		bt_mesh_model_pending_store(store_func);
+	}
+
+	if (atomic_test_and_clear_bit(pending_flags,
+				      BT_MESH_SETTINGS_VA_PENDING)) {
+		bt_mesh_va_pending_store(store_func);
+	}
+
+	if (IS_ENABLED(CONFIG_BT_MESH_CDB) &&
+	    atomic_test_and_clear_bit(pending_flags,
+				      BT_MESH_SETTINGS_CDB_PENDING)) {
+		bt_mesh_cdb_pending_store(store_func);
+	}
+}
+
 static int mesh_commit(void)
 {
 	if (!bt_mesh_subnet_next(NULL)) {
@@ -74,21 +146,18 @@ static int mesh_commit(void)
 	return 0;
 }
 
+static int mesh_export(int (*export_func)(const char *name, const void *val,
+					  size_t val_len))
+{
+	BT_DBG("");
+
+	store_pending(export_func);
+
+	return 0;
+}
+
 SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh, "bt/mesh", NULL, NULL, mesh_commit,
-			       NULL);
-
-/* Pending flags that use K_NO_WAIT as the storage timeout */
-#define NO_WAIT_PENDING_BITS (BIT(BT_MESH_SETTINGS_NET_PENDING) |           \
-			      BIT(BT_MESH_SETTINGS_IV_PENDING)  |           \
-			      BIT(BT_MESH_SETTINGS_SEQ_PENDING) |           \
-			      BIT(BT_MESH_SETTINGS_CDB_PENDING))
-
-/* Pending flags that use CONFIG_BT_MESH_STORE_TIMEOUT */
-#define GENERIC_PENDING_BITS (BIT(BT_MESH_SETTINGS_NET_KEYS_PENDING) |      \
-			      BIT(BT_MESH_SETTINGS_APP_KEYS_PENDING) |      \
-			      BIT(BT_MESH_SETTINGS_HB_PUB_PENDING)   |      \
-			      BIT(BT_MESH_SETTINGS_CFG_PENDING)      |      \
-			      BIT(BT_MESH_SETTINGS_MOD_PENDING))
+			       mesh_export);
 
 void bt_mesh_settings_store_schedule(enum bt_mesh_settings_flag flag)
 {
@@ -122,68 +191,14 @@ void bt_mesh_settings_store_schedule(enum bt_mesh_settings_flag flag)
 	}
 }
 
-static void store_pending(struct k_work *work)
+static void pending_store_timeout_handler(struct k_work *work)
 {
 	BT_DBG("");
 
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_RPL_PENDING)) {
-		bt_mesh_rpl_pending_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_NET_KEYS_PENDING)) {
-		bt_mesh_subnet_pending_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_APP_KEYS_PENDING)) {
-		bt_mesh_app_key_pending_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_NET_PENDING)) {
-		bt_mesh_net_pending_net_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_IV_PENDING)) {
-		bt_mesh_net_pending_iv_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_SEQ_PENDING)) {
-		bt_mesh_net_pending_seq_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_HB_PUB_PENDING)) {
-		bt_mesh_hb_pub_pending_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_CFG_PENDING)) {
-		bt_mesh_cfg_pending_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_MOD_PENDING)) {
-		bt_mesh_model_pending_store();
-	}
-
-	if (atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_VA_PENDING)) {
-		bt_mesh_va_pending_store();
-	}
-
-	if (IS_ENABLED(CONFIG_BT_MESH_CDB) &&
-	    atomic_test_and_clear_bit(pending_flags,
-				      BT_MESH_SETTINGS_CDB_PENDING)) {
-		bt_mesh_cdb_pending_store();
-	}
+	store_pending(settings_save_one);
 }
 
 void bt_mesh_settings_init(void)
 {
-	k_work_init_delayable(&pending_store, store_pending);
+	k_work_init_delayable(&pending_store, pending_store_timeout_handler);
 }

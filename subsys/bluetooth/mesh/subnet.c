@@ -71,7 +71,7 @@ static void subnet_evt(struct bt_mesh_subnet *sub, enum bt_mesh_key_evt evt)
 	}
 }
 
-static void clear_net_key(uint16_t net_idx)
+static void clear_net_key(uint16_t net_idx, bt_mesh_settings_store_func store_func)
 {
 	char path[20];
 	int err;
@@ -79,7 +79,7 @@ static void clear_net_key(uint16_t net_idx)
 	BT_DBG("NetKeyIndex 0x%03x", net_idx);
 
 	snprintk(path, sizeof(path), "bt/mesh/NetKey/%x", net_idx);
-	err = settings_delete(path);
+	err = store_func(path, NULL, 0);
 	if (err) {
 		BT_ERR("Failed to clear NetKeyIndex 0x%03x", net_idx);
 	} else {
@@ -87,7 +87,7 @@ static void clear_net_key(uint16_t net_idx)
 	}
 }
 
-static void store_subnet(uint16_t net_idx)
+static void store_subnet(uint16_t net_idx, bt_mesh_settings_store_func store_func)
 {
 	const struct bt_mesh_subnet *sub;
 	struct net_key_val key;
@@ -109,7 +109,7 @@ static void store_subnet(uint16_t net_idx)
 	key.kr_flag = 0U; /* Deprecated */
 	key.kr_phase = sub->kr_phase;
 
-	err = settings_save_one(path, &key, sizeof(key));
+	err = store_func(path, &key, sizeof(key));
 	if (err) {
 		BT_ERR("Failed to store NetKey value");
 	} else {
@@ -174,9 +174,9 @@ static void update_subnet_settings(uint16_t net_idx, bool store)
 
 	if (!free_slot) {
 		if (store) {
-			store_subnet(net_idx);
+			store_subnet(net_idx, settings_save_one);
 		} else {
-			clear_net_key(net_idx);
+			clear_net_key(net_idx, settings_save_one);
 		}
 		return;
 	}
@@ -820,7 +820,7 @@ static int net_key_set(const char *name, size_t len_rd,
 
 BT_MESH_SETTINGS_DEFINE(subnet, "NetKey", net_key_set);
 
-void bt_mesh_subnet_pending_store(void)
+void bt_mesh_subnet_pending_store(bt_mesh_settings_store_func store_func)
 {
 	int i;
 
@@ -832,9 +832,9 @@ void bt_mesh_subnet_pending_store(void)
 		}
 
 		if (update->clear) {
-			clear_net_key(update->key_idx);
+			clear_net_key(update->key_idx, store_func);
 		} else {
-			store_subnet(update->key_idx);
+			store_subnet(update->key_idx, store_func);
 		}
 
 		update->valid = 0U;

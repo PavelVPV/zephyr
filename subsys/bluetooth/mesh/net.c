@@ -977,11 +977,11 @@ static int seq_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 
 BT_MESH_SETTINGS_DEFINE(seq, "Seq", seq_set);
 
-static void clear_iv(void)
+static void clear_iv(bt_mesh_settings_store_func store_func)
 {
 	int err;
 
-	err = settings_delete("bt/mesh/IV");
+	err = store_func("bt/mesh/IV", NULL, 0);
 	if (err) {
 		BT_ERR("Failed to clear IV");
 	} else {
@@ -989,7 +989,7 @@ static void clear_iv(void)
 	}
 }
 
-static void store_pending_iv(void)
+static void store_pending_iv(bt_mesh_settings_store_func store_func)
 {
 	struct iv_val iv;
 	int err;
@@ -998,7 +998,7 @@ static void store_pending_iv(void)
 	iv.iv_update = atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS);
 	iv.iv_duration = bt_mesh.ivu_duration;
 
-	err = settings_save_one("bt/mesh/IV", &iv, sizeof(iv));
+	err = store_func("bt/mesh/IV", &iv, sizeof(iv));
 	if (err) {
 		BT_ERR("Failed to store IV value");
 	} else {
@@ -1006,20 +1006,20 @@ static void store_pending_iv(void)
 	}
 }
 
-void bt_mesh_net_pending_iv_store(void)
+void bt_mesh_net_pending_iv_store(bt_mesh_settings_store_func store_func)
 {
 	if (atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
-		store_pending_iv();
+		store_pending_iv(store_func);
 	} else {
-		clear_iv();
+		clear_iv(store_func);
 	}
 }
 
-static void clear_net(void)
+static void clear_net(bt_mesh_settings_store_func store_func)
 {
 	int err;
 
-	err = settings_delete("bt/mesh/Net");
+	err = store_func("bt/mesh/Net", NULL, 0);
 	if (err) {
 		BT_ERR("Failed to clear Network");
 	} else {
@@ -1027,7 +1027,7 @@ static void clear_net(void)
 	}
 }
 
-static void store_pending_net(void)
+static void store_pending_net(bt_mesh_settings_store_func store_func)
 {
 	struct net_val net;
 	int err;
@@ -1038,7 +1038,7 @@ static void store_pending_net(void)
 	net.primary_addr = bt_mesh_primary_addr();
 	memcpy(net.dev_key, bt_mesh.dev_key, 16);
 
-	err = settings_save_one("bt/mesh/Net", &net, sizeof(net));
+	err = store_func("bt/mesh/Net", &net, sizeof(net));
 	if (err) {
 		BT_ERR("Failed to store Network value");
 	} else {
@@ -1046,23 +1046,23 @@ static void store_pending_net(void)
 	}
 }
 
-void bt_mesh_net_pending_net_store(void)
+void bt_mesh_net_pending_net_store(bt_mesh_settings_store_func store_func)
 {
 	if (atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
-		store_pending_net();
+		store_pending_net(store_func);
 	} else {
-		clear_net();
+		clear_net(store_func);
 	}
 }
 
-void bt_mesh_net_pending_seq_store(void)
+void bt_mesh_net_pending_seq_store(bt_mesh_settings_store_func store_func)
 {
 	struct seq_val seq;
 	int err;
 
 	sys_put_le24(bt_mesh.seq, seq.val);
 
-	err = settings_save_one("bt/mesh/Seq", &seq, sizeof(seq));
+	err = store_func("bt/mesh/Seq", &seq, sizeof(seq));
 	if (err) {
 		BT_ERR("Failed to stor Seq value");
 	} else {

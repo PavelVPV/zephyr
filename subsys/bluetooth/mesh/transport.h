@@ -6,6 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "settings.h"
+
 #define TRANS_SEQ_AUTH_NVAL            0xffffffffffffffff
 
 #define BT_MESH_SDU_UNSEG_MAX          11
@@ -109,4 +111,4 @@ uint8_t bt_mesh_va_del(const uint8_t uuid[16], uint16_t *addr);
 
 uint8_t *bt_mesh_va_label_get(uint16_t addr);
 
-void bt_mesh_va_pending_store(void);
+void bt_mesh_va_pending_store(bt_mesh_settings_store_func store_func);

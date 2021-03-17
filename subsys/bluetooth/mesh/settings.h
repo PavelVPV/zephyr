@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef ZEPHYR_SUBSYS_BLUETOOTH_MESH_SETTINGS_H_
+#define ZEPHYR_SUBSYS_BLUETOOTH_MESH_SETTINGS_H_
+
 /* Pending storage actions. */
 enum bt_mesh_settings_flag {
 	BT_MESH_SETTINGS_RPL_PENDING,
@@ -21,8 +24,11 @@ enum bt_mesh_settings_flag {
 	BT_MESH_SETTINGS_FLAG_COUNT,
 };
 
+typedef int (*bt_mesh_settings_store_func)(const char *name, const void *val,
+					   size_t val_len);
+
 #ifdef CONFIG_BT_SETTINGS
-#define BT_MESH_SETTINGS_DEFINE(_hname, _subtree, _set)			     \
+#define BT_MESH_SETTINGS_DEFINE(_hname, _subtree, _set)			      \
 	SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_##_hname, "bt/mesh/" _subtree, \
 				       NULL, _set, NULL, NULL)
 #else
@@ -30,7 +36,7 @@ enum bt_mesh_settings_flag {
  * as well as unused function warning. Since the declared handler structure is
  * unused, linker will discard it.
  */
-#define BT_MESH_SETTINGS_DEFINE(_hname, _subtree, _set)\
+#define BT_MESH_SETTINGS_DEFINE(_hname, _subtree, _set,)		     \
 	const struct settings_handler settings_handler_bt_mesh_ ## _hname = {\
 		.h_set = _set,						     \
 	}
@@ -40,3 +46,5 @@ void bt_mesh_settings_init(void);
 void bt_mesh_settings_store_schedule(enum bt_mesh_settings_flag flag);
 int bt_mesh_settings_set(settings_read_cb read_cb, void *cb_arg,
 			 void *out, size_t read_len);
+
+#endif /* ZEPHYR_SUBSYS_BLUETOOTH_MESH_SETTINGS_H_ */

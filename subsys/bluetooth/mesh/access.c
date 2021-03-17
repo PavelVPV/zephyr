@@ -1065,7 +1065,8 @@ static void encode_mod_path(struct bt_mesh_model *mod, bool vnd,
 	}
 }
 
-static void store_pending_mod_bind(struct bt_mesh_model *mod, bool vnd)
+static void store_pending_mod_bind(struct bt_mesh_model *mod, bool vnd,
+				   bt_mesh_settings_store_func store_func)
 {
 	uint16_t keys[CONFIG_BT_MESH_MODEL_KEY_COUNT];
 	char path[20];
@@ -1081,9 +1082,9 @@ static void store_pending_mod_bind(struct bt_mesh_model *mod, bool vnd)
 	encode_mod_path(mod, vnd, "bind", path, sizeof(path));
 
 	if (count) {
-		err = settings_save_one(path, keys, count * sizeof(keys[0]));
+		err = store_func(path, keys, count * sizeof(keys[0]));
 	} else {
-		err = settings_delete(path);
+		err = store_func(path, NULL, 0);
 	}
 
 	if (err) {
@@ -1093,7 +1094,8 @@ static void store_pending_mod_bind(struct bt_mesh_model *mod, bool vnd)
 	}
 }
 
-static void store_pending_mod_sub(struct bt_mesh_model *mod, bool vnd)
+static void store_pending_mod_sub(struct bt_mesh_model *mod, bool vnd,
+				  bt_mesh_settings_store_func store_func)
 {
 	uint16_t groups[CONFIG_BT_MESH_MODEL_GROUP_COUNT];
 	char path[20];
@@ -1108,10 +1110,9 @@ static void store_pending_mod_sub(struct bt_mesh_model *mod, bool vnd)
 	encode_mod_path(mod, vnd, "sub", path, sizeof(path));
 
 	if (count) {
-		err = settings_save_one(path, groups,
-					count * sizeof(groups[0]));
+		err = store_func(path, groups, count * sizeof(groups[0]));
 	} else {
-		err = settings_delete(path);
+		err = store_func(path, NULL, 0);
 	}
 
 	if (err) {
@@ -1121,7 +1122,8 @@ static void store_pending_mod_sub(struct bt_mesh_model *mod, bool vnd)
 	}
 }
 
-static void store_pending_mod_pub(struct bt_mesh_model *mod, bool vnd)
+static void store_pending_mod_pub(struct bt_mesh_model *mod, bool vnd,
+				  bt_mesh_settings_store_func store_func)
 {
 	struct mod_pub_val pub;
 	char path[20];
@@ -1130,7 +1132,7 @@ static void store_pending_mod_pub(struct bt_mesh_model *mod, bool vnd)
 	encode_mod_path(mod, vnd, "pub", path, sizeof(path));
 
 	if (!mod->pub || mod->pub->addr == BT_MESH_ADDR_UNASSIGNED) {
-		err = settings_delete(path);
+		err = store_func(path, NULL, 0);
 	} else {
 		pub.addr = mod->pub->addr;
 		pub.key = mod->pub->key;
@@ -1140,7 +1142,7 @@ static void store_pending_mod_pub(struct bt_mesh_model *mod, bool vnd)
 		pub.period_div = mod->pub->period_div;
 		pub.cred = mod->pub->cred;
 
-		err = settings_save_one(path, &pub, sizeof(pub));
+		err = store_func(path, &pub, sizeof(pub));
 	}
 
 	if (err) {
@@ -1154,29 +1156,31 @@ static void store_pending_mod(struct bt_mesh_model *mod,
 			      struct bt_mesh_elem *elem, bool vnd,
 			      bool primary, void *user_data)
 {
+	bt_mesh_settings_store_func store_func = user_data;
+
 	if (!mod->flags) {
 		return;
 	}
 
 	if (mod->flags & BT_MESH_MOD_BIND_PENDING) {
 		mod->flags &= ~BT_MESH_MOD_BIND_PENDING;
-		store_pending_mod_bind(mod, vnd);
+		store_pending_mod_bind(mod, vnd, store_func);
 	}
 
 	if (mod->flags & BT_MESH_MOD_SUB_PENDING) {
 		mod->flags &= ~BT_MESH_MOD_SUB_PENDING;
-		store_pending_mod_sub(mod, vnd);
+		store_pending_mod_sub(mod, vnd, store_func);
 	}
 
 	if (mod->flags & BT_MESH_MOD_PUB_PENDING) {
 		mod->flags &= ~BT_MESH_MOD_PUB_PENDING;
-		store_pending_mod_pub(mod, vnd);
+		store_pending_mod_pub(mod, vnd, store_func);
 	}
 }
 
-void bt_mesh_model_pending_store(void)
+void bt_mesh_model_pending_store(bt_mesh_settings_store_func store_func)
 {
-	bt_mesh_model_foreach(store_pending_mod, NULL);
+	bt_mesh_model_foreach(store_pending_mod, store_func);
 }
 
 void bt_mesh_model_bind_store(struct bt_mesh_model *mod)
@@ -1210,11 +1214,7 @@ int bt_mesh_model_data_store(struct bt_mesh_model *mod, bool vnd,
 		strncat(path, name, 8);
 	}
 
-	if (data_len) {
-		err = settings_save_one(path, data, data_len);
-	} else {
-		err = settings_delete(path);
-	}
+	err = settings_save_one(path, data, data_len);
 
 	if (err) {
 		BT_ERR("Failed to store %s value", log_strdup(path));

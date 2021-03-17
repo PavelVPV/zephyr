@@ -311,11 +311,11 @@ static int cfg_set(const char *name, size_t len_rd,
 
 BT_MESH_SETTINGS_DEFINE(cfg, "Cfg", cfg_set);
 
-static void clear_cfg(void)
+static void clear_cfg(bt_mesh_settings_store_func store_func)
 {
 	int err;
 
-	err = settings_delete("bt/mesh/Cfg");
+	err = store_func("bt/mesh/Cfg", NULL, 0);
 	if (err) {
 		BT_ERR("Failed to clear configuration");
 	} else {
@@ -323,7 +323,7 @@ static void clear_cfg(void)
 	}
 }
 
-static void store_pending_cfg(void)
+static void store_pending_cfg(bt_mesh_settings_store_func store_func)
 {
 	struct cfg_val val;
 	int err;
@@ -336,7 +336,7 @@ static void store_pending_cfg(void)
 	val.frnd = bt_mesh_friend_get();
 	val.default_ttl = bt_mesh_default_ttl_get();
 
-	err = settings_save_one("bt/mesh/Cfg", &val, sizeof(val));
+	err = store_func("bt/mesh/Cfg", &val, sizeof(val));
 	if (err) {
 		BT_ERR("Failed to store configuration value");
 	} else {
@@ -345,11 +345,11 @@ static void store_pending_cfg(void)
 	}
 }
 
-void bt_mesh_cfg_pending_store(void)
+void bt_mesh_cfg_pending_store(bt_mesh_settings_store_func store_func)
 {
 	if (atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
-		store_pending_cfg();
+		store_pending_cfg(store_func);
 	} else {
-		clear_cfg();
+		clear_cfg(store_func);
 	}
 }

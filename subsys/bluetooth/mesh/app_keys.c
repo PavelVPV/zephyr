@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <bluetooth/mesh.h>
 #include <bluetooth/conn.h>
+#include "settings.h"
 #include "mesh.h"
 #include "net.h"
 #include "app_keys.h"
@@ -74,13 +75,13 @@ static struct app_key *app_get(uint16_t app_idx)
 	return NULL;
 }
 
-static void clear_app_key(uint16_t app_idx)
+static void clear_app_key(uint16_t app_idx, bt_mesh_settings_store_func store_func)
 {
 	char path[20];
 	int err;
 
 	snprintk(path, sizeof(path), "bt/mesh/AppKey/%x", app_idx);
-	err = settings_delete(path);
+	err = store_func(path, NULL, 0);
 	if (err) {
 		BT_ERR("Failed to clear AppKeyIndex 0x%03x", app_idx);
 	} else {
@@ -88,7 +89,7 @@ static void clear_app_key(uint16_t app_idx)
 	}
 }
 
-static void store_app_key(uint16_t app_idx)
+static void store_app_key(uint16_t app_idx, bt_mesh_settings_store_func store_func)
 {
 	const struct app_key *app;
 	struct app_key_val key;
@@ -109,7 +110,7 @@ static void store_app_key(uint16_t app_idx)
 	memcpy(key.val[0], app->keys[0].val, 16);
 	memcpy(key.val[1], app->keys[1].val, 16);
 
-	err = settings_save_one(path, &key, sizeof(key));
+	err = store_func(path, &key, sizeof(key));
 	if (err) {
 		BT_ERR("Failed to store AppKey %s value", log_strdup(path));
 	} else {
@@ -159,9 +160,9 @@ static void update_app_key_settings(uint16_t app_idx, bool store)
 
 	if (!free_slot) {
 		if (store) {
-			store_app_key(app_idx);
+			store_app_key(app_idx, settings_save_one);
 		} else {
-			clear_app_key(app_idx);
+			clear_app_key(app_idx, settings_save_one);
 		}
 		return;
 	}
@@ -652,7 +653,7 @@ static int app_key_set(const char *name, size_t len_rd,
 
 BT_MESH_SETTINGS_DEFINE(app, "AppKey", app_key_set);
 
-void bt_mesh_app_key_pending_store(void)
+void bt_mesh_app_key_pending_store(bt_mesh_settings_store_func store_func)
 {
 	int i;
 
@@ -664,9 +665,9 @@ void bt_mesh_app_key_pending_store(void)
 		}
 
 		if (update->clear) {
-			clear_app_key(update->key_idx);
+			clear_app_key(update->key_idx, store_func);
 		} else {
-			store_app_key(update->key_idx);
+			store_app_key(update->key_idx, store_func);
 		}
 
 		update->valid = 0U;
