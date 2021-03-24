@@ -39,11 +39,6 @@ static int32_t msg_timeout;
 
 static struct bt_mesh_cfg_cli *cli;
 
-static inline bool cli_response_check(uint32_t resp_opcode, uint16_t resp_addr)
-{
-	return cli->op_pending == resp_opcode && cli->op_addr == resp_addr;
-}
-
 static void comp_data_status(struct bt_mesh_model *model,
 			     struct bt_mesh_msg_ctx *ctx,
 			     struct net_buf_simple *buf)
@@ -55,18 +50,17 @@ static void comp_data_status(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_DEV_COMP_DATA_STATUS, ctx->addr)) {
-		BT_WARN("Unexpected Composition Data Status");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_DEV_COMP_DATA_STATUS, ctx)) {
 		return;
 	}
 
-	param = cli->op_param;
+	param = cli->ack_ctx.user_data;
 
 	*(param->status) = net_buf_simple_pull_u8(buf);
 	to_copy  = MIN(net_buf_simple_tailroom(param->comp), buf->len);
 	net_buf_simple_add_mem(param->comp, buf->data, to_copy);
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 static void state_status_u8(struct bt_mesh_model *model,
@@ -80,16 +74,14 @@ static void state_status_u8(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(expect_status, ctx->addr)) {
-		BT_WARN("Unexpected Status (0x%08x != 0x%08x)",
-			cli->op_pending, expect_status);
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, expect_status, ctx)) {
 		return;
 	}
 
-	status = cli->op_param;
+	status = cli->ack_ctx.user_data;
 	*status = net_buf_simple_pull_u8(buf);
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 static void beacon_status(struct bt_mesh_model *model,
@@ -135,16 +127,15 @@ static void relay_status(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_RELAY_STATUS, ctx->addr)) {
-		BT_WARN("Unexpected Relay Status message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_RELAY_STATUS, ctx)) {
 		return;
 	}
 
-	param = cli->op_param;
+	param = cli->ack_ctx.user_data;
 	*param->status = net_buf_simple_pull_u8(buf);
 	*param->transmit = net_buf_simple_pull_u8(buf);
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 static void net_transmit_status(struct bt_mesh_model *model,
@@ -157,15 +148,14 @@ static void net_transmit_status(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_NET_TRANSMIT_STATUS, ctx->addr)) {
-		BT_WARN("Unexpected Net Transmit Status message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_NET_TRANSMIT_STATUS, ctx)) {
 		return;
 	}
 
-	status = cli->op_param;
+	status = cli->ack_ctx.user_data;
 	*status = net_buf_simple_pull_u8(buf);
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 struct net_key_param {
@@ -185,15 +175,14 @@ static void net_key_status(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_NET_KEY_STATUS, ctx->addr)) {
-		BT_WARN("Unexpected Net Key Status message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_NET_KEY_STATUS, ctx)) {
 		return;
 	}
 
 	status = net_buf_simple_pull_u8(buf);
 	net_idx = net_buf_simple_pull_le16(buf) & 0xfff;
 
-	param = cli->op_param;
+	param = cli->ack_ctx.user_data;
 	if (param->net_idx != net_idx) {
 		BT_WARN("Net Key Status key index does not match");
 		return;
@@ -203,7 +192,7 @@ static void net_key_status(struct bt_mesh_model *model,
 		*param->status = status;
 	}
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 struct net_key_list_param {
@@ -222,12 +211,11 @@ static void net_key_list(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_NET_KEY_LIST, ctx->addr)) {
-		BT_WARN("Unexpected Net Key List message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_NET_KEY_LIST, ctx)) {
 		return;
 	}
 
-	param = cli->op_param;
+	param = cli->ack_ctx.user_data;
 
 	for (i = 0; i < *param->key_cnt && buf->len >= 3; i += 2) {
 		key_idx_unpack(buf, &param->keys[i], &param->keys[i + 1]);
@@ -239,7 +227,7 @@ static void net_key_list(struct bt_mesh_model *model,
 
 	*param->key_cnt = i;
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 static void node_reset_status(struct bt_mesh_model *model,
@@ -249,17 +237,16 @@ static void node_reset_status(struct bt_mesh_model *model,
 	BT_DBG("net_idx 0x%04x app_idx 0x%04x src 0x%04x",
 		ctx->net_idx, ctx->app_idx, ctx->addr);
 
-	if (!cli_response_check(OP_NODE_RESET_STATUS, ctx->addr)) {
-		BT_WARN("Unexpected Node Reset Status message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_NODE_RESET_STATUS, ctx)) {
 		return;
 	}
 
-	param = cli->op_param;
+	param = cli->ack_ctx.user_data;
 
 	if (param) {
 		*param = true;
 	}
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 struct app_key_param {
@@ -280,15 +267,14 @@ static void app_key_status(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_APP_KEY_STATUS, ctx->addr)) {
-		BT_WARN("Unexpected App Key Status message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_APP_KEY_STATUS, ctx)) {
 		return;
 	}
 
 	status = net_buf_simple_pull_u8(buf);
 	key_idx_unpack(buf, &net_idx, &app_idx);
 
-	param = cli->op_param;
+	param = cli->ack_ctx.user_data;
 	if (param->net_idx != net_idx || param->app_idx != app_idx) {
 		BT_WARN("App Key Status key indices did not match");
 		return;
@@ -298,7 +284,7 @@ static void app_key_status(struct bt_mesh_model *model,
 		*param->status = status;
 	}
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 struct app_key_list_param {
@@ -321,15 +307,14 @@ static void app_key_list(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_APP_KEY_LIST, ctx->addr)) {
-		BT_WARN("Unexpected App Key List message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_APP_KEY_LIST, ctx)) {
 		return;
 	}
 
 	status = net_buf_simple_pull_u8(buf);
 	net_idx = net_buf_simple_pull_le16(buf) & 0xfff;
 
-	param = cli->op_param;
+	param = cli->ack_ctx.user_data;
 	if (param->net_idx != net_idx) {
 		BT_WARN("App Key List Net Key index did not match");
 		return;
@@ -348,7 +333,7 @@ static void app_key_list(struct bt_mesh_model *model,
 		*param->status = status;
 	}
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 struct mod_app_param {
@@ -371,8 +356,7 @@ static void mod_app_status(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_MOD_APP_STATUS, ctx->addr)) {
-		BT_WARN("Unexpected Model App Status message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_MOD_APP_STATUS, ctx)) {
 		return;
 	}
 
@@ -388,7 +372,7 @@ static void mod_app_status(struct bt_mesh_model *model,
 
 	mod_id = net_buf_simple_pull_le16(buf);
 
-	param = cli->op_param;
+	param = cli->ack_ctx.user_data;
 	if (param->elem_addr != elem_addr ||
 	    param->mod_app_idx != mod_app_idx || param->mod_id != mod_id ||
 	    param->cid != cid) {
@@ -400,7 +384,7 @@ static void mod_app_status(struct bt_mesh_model *model,
 		*param->status = status;
 	}
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 struct mod_member_list_param {
@@ -428,7 +412,7 @@ static void mod_member_list_handle(struct bt_mesh_msg_ctx *ctx,
 
 	mod_id = net_buf_simple_pull_le16(buf);
 
-	param = cli->op_param;
+	param = cli->ack_ctx.user_data;
 	if (param->elem_addr != elem_addr || param->mod_id != mod_id ||
 	    (vnd && param->cid != cid)) {
 		BT_WARN("Model Member List parameters did not match");
@@ -449,7 +433,7 @@ static void mod_member_list_handle(struct bt_mesh_msg_ctx *ctx,
 		*param->status = status;
 	}
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 static void mod_app_list(struct bt_mesh_model *model,
@@ -460,8 +444,7 @@ static void mod_app_list(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_SIG_MOD_APP_LIST, ctx->addr)) {
-		BT_WARN("Unexpected Model App List message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_SIG_MOD_APP_LIST, ctx)) {
 		return;
 	}
 
@@ -476,8 +459,7 @@ static void mod_app_list_vnd(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_VND_MOD_APP_LIST, ctx->addr)) {
-		BT_WARN("Unexpected Model App List Vendor message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_VND_MOD_APP_LIST, ctx)) {
 		return;
 	}
 
@@ -504,12 +486,11 @@ static void mod_pub_status(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_MOD_PUB_STATUS, ctx->addr)) {
-		BT_WARN("Unexpected Model Pub Status message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_MOD_PUB_STATUS, ctx)) {
 		return;
 	}
 
-	param = cli->op_param;
+	param = cli->ack_ctx.user_data;
 	if (param->cid != CID_NVAL) {
 		if (buf->len < 14) {
 			BT_WARN("Unexpected Mod Pub Status with SIG Model");
@@ -556,7 +537,7 @@ static void mod_pub_status(struct bt_mesh_model *model,
 		param->pub->transmit = net_buf_simple_pull_u8(buf);
 	}
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 struct mod_sub_param {
@@ -580,8 +561,7 @@ static void mod_sub_status(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_MOD_SUB_STATUS, ctx->addr)) {
-		BT_WARN("Unexpected Model Subscription Status message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_MOD_SUB_STATUS, ctx)) {
 		return;
 	}
 
@@ -597,7 +577,7 @@ static void mod_sub_status(struct bt_mesh_model *model,
 
 	mod_id = net_buf_simple_pull_le16(buf);
 
-	param = cli->op_param;
+	param = cli->ack_ctx.user_data;
 	if (param->elem_addr != elem_addr || param->mod_id != mod_id ||
 	    (param->expect_sub && *param->expect_sub != sub_addr) ||
 	    param->cid != cid) {
@@ -613,7 +593,7 @@ static void mod_sub_status(struct bt_mesh_model *model,
 		*param->status = status;
 	}
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 static void mod_sub_list(struct bt_mesh_model *model,
@@ -624,8 +604,7 @@ static void mod_sub_list(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_MOD_SUB_LIST, ctx->addr)) {
-		BT_WARN("Unexpected Model Subscription List message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_MOD_SUB_LIST, ctx)) {
 		return;
 	}
 
@@ -640,8 +619,7 @@ static void mod_sub_list_vnd(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_MOD_SUB_LIST_VND, ctx->addr)) {
-		BT_WARN("Unexpected Model Subscription List Vendor message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_MOD_SUB_LIST_VND, ctx)) {
 		return;
 	}
 
@@ -663,12 +641,11 @@ static void hb_sub_status(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_HEARTBEAT_SUB_STATUS, ctx->addr)) {
-		BT_WARN("Unexpected Heartbeat Subscription Status message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_HEARTBEAT_SUB_STATUS, ctx)) {
 		return;
 	}
 
-	param = cli->op_param;
+	param = cli->ack_ctx.user_data;
 
 	*param->status = net_buf_simple_pull_u8(buf);
 
@@ -679,7 +656,7 @@ static void hb_sub_status(struct bt_mesh_model *model,
 	param->sub->min = net_buf_simple_pull_u8(buf);
 	param->sub->max = net_buf_simple_pull_u8(buf);
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 struct hb_pub_param {
@@ -697,12 +674,11 @@ static void hb_pub_status(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (!cli_response_check(OP_HEARTBEAT_PUB_STATUS, ctx->addr)) {
-		BT_WARN("Unexpected Heartbeat Publication Status message");
+	if (!bt_mesh_model_ack_match(&cli->ack_ctx, OP_HEARTBEAT_PUB_STATUS, ctx)) {
 		return;
 	}
 
-	param = cli->op_param;
+	param = cli->ack_ctx.user_data;
 
 	*param->status = net_buf_simple_pull_u8(buf);
 
@@ -715,7 +691,7 @@ static void hb_pub_status(struct bt_mesh_model *model,
 		param->pub->net_idx = net_buf_simple_pull_u8(buf);
 	}
 
-	k_sem_give(&cli->op_sync);
+	bt_mesh_model_ack_rx(&cli->ack_ctx);
 }
 
 const struct bt_mesh_model_op bt_mesh_cfg_cli_op[] = {
@@ -765,7 +741,7 @@ static int cfg_cli_init(struct bt_mesh_model *model)
 	 */
 	model->keys[0] = BT_MESH_KEY_DEV_ANY;
 
-	k_sem_init(&cli->op_sync, 0, 1);
+	bt_mesh_model_ack_ctx_init(&cli->ack_ctx);
 
 	return 0;
 }
@@ -781,34 +757,7 @@ static int cli_prepare(void *param, uint32_t op, uint16_t addr)
 		return -EINVAL;
 	}
 
-	if (cli->op_pending) {
-		BT_WARN("Another synchronous operation pending");
-		return -EBUSY;
-	}
-
-	cli->op_param = param;
-	cli->op_pending = op;
-	cli->op_addr = addr;
-
-	return 0;
-}
-
-static void cli_reset(void)
-{
-	cli->op_pending = 0U;
-	cli->op_param = NULL;
-	cli->op_addr = BT_MESH_ADDR_UNASSIGNED;
-}
-
-static int cli_wait(void)
-{
-	int err;
-
-	err = k_sem_take(&cli->op_sync, SYS_TIMEOUT_MS(msg_timeout));
-
-	cli_reset();
-
-	return err;
+	return bt_mesh_model_ack_ctx_prepare(&cli->ack_ctx, op, addr, param);
 }
 
 int bt_mesh_cfg_comp_data_get(uint16_t net_idx, uint16_t addr, uint8_t page,
@@ -838,11 +787,11 @@ int bt_mesh_cfg_comp_data_get(uint16_t net_idx, uint16_t addr, uint8_t page,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 static int get_state_u8(uint16_t net_idx, uint16_t addr, uint32_t op, uint32_t rsp,
@@ -867,11 +816,11 @@ static int get_state_u8(uint16_t net_idx, uint16_t addr, uint32_t op, uint32_t r
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 static int set_state_u8(uint16_t net_idx, uint16_t addr, uint32_t op, uint32_t rsp,
@@ -897,11 +846,11 @@ static int set_state_u8(uint16_t net_idx, uint16_t addr, uint32_t op, uint32_t r
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_beacon_get(uint16_t net_idx, uint16_t addr, uint8_t *status)
@@ -994,11 +943,11 @@ int bt_mesh_cfg_relay_get(uint16_t net_idx, uint16_t addr, uint8_t *status,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_relay_set(uint16_t net_idx, uint16_t addr, uint8_t new_relay,
@@ -1029,11 +978,11 @@ int bt_mesh_cfg_relay_set(uint16_t net_idx, uint16_t addr, uint8_t new_relay,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_net_key_add(uint16_t net_idx, uint16_t addr, uint16_t key_net_idx,
@@ -1064,16 +1013,16 @@ int bt_mesh_cfg_net_key_add(uint16_t net_idx, uint16_t addr, uint16_t key_net_id
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_net_key_get(uint16_t net_idx, uint16_t addr, uint16_t *keys,
@@ -1102,11 +1051,11 @@ int bt_mesh_cfg_net_key_get(uint16_t net_idx, uint16_t addr, uint16_t *keys,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_net_key_del(uint16_t net_idx, uint16_t addr,
@@ -1136,16 +1085,16 @@ int bt_mesh_cfg_net_key_del(uint16_t net_idx, uint16_t addr,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_app_key_add(uint16_t net_idx, uint16_t addr, uint16_t key_net_idx,
@@ -1178,16 +1127,16 @@ int bt_mesh_cfg_app_key_add(uint16_t net_idx, uint16_t addr, uint16_t key_net_id
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_node_reset(uint16_t net_idx, uint16_t addr, bool *status)
@@ -1216,16 +1165,16 @@ int bt_mesh_cfg_node_reset(uint16_t net_idx, uint16_t addr, bool *status)
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_app_key_get(uint16_t net_idx, uint16_t addr, uint16_t key_net_idx,
@@ -1257,11 +1206,11 @@ int bt_mesh_cfg_app_key_get(uint16_t net_idx, uint16_t addr, uint16_t key_net_id
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_app_key_del(uint16_t net_idx, uint16_t addr,
@@ -1292,16 +1241,16 @@ int bt_mesh_cfg_app_key_del(uint16_t net_idx, uint16_t addr,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 static int mod_app_bind(uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
@@ -1342,16 +1291,16 @@ static int mod_app_bind(uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_mod_app_bind(uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
@@ -1411,16 +1360,16 @@ static int mod_app_unbind(uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_mod_app_unbind(uint16_t net_idx, uint16_t addr,
@@ -1486,11 +1435,11 @@ static int mod_member_list_get(uint32_t op, uint32_t expect_op, uint16_t net_idx
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_mod_app_get(uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
@@ -1552,16 +1501,16 @@ static int mod_sub(uint32_t op, uint16_t net_idx, uint16_t addr, uint16_t elem_a
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_mod_sub_add(uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
@@ -1663,16 +1612,16 @@ static int mod_sub_va(uint32_t op, uint16_t net_idx, uint16_t addr, uint16_t ele
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_mod_sub_va_add(uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
@@ -1797,16 +1746,16 @@ static int mod_pub_get(uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_mod_pub_get(uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
@@ -1871,16 +1820,16 @@ static int mod_pub_set(uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_mod_pub_set(uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
@@ -1931,16 +1880,16 @@ int bt_mesh_cfg_hb_sub_set(uint16_t net_idx, uint16_t addr,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_hb_sub_get(uint16_t net_idx, uint16_t addr,
@@ -1969,16 +1918,16 @@ int bt_mesh_cfg_hb_sub_get(uint16_t net_idx, uint16_t addr,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_hb_pub_set(uint16_t net_idx, uint16_t addr,
@@ -2012,16 +1961,16 @@ int bt_mesh_cfg_hb_pub_set(uint16_t net_idx, uint16_t addr,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int bt_mesh_cfg_hb_pub_get(uint16_t net_idx, uint16_t addr,
@@ -2050,16 +1999,16 @@ int bt_mesh_cfg_hb_pub_get(uint16_t net_idx, uint16_t addr,
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
 		BT_ERR("model_send() failed (err %d)", err);
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return err;
 	}
 
 	if (!status) {
-		cli_reset();
+		bt_mesh_model_ack_ctx_clear(&cli->ack_ctx);
 		return 0;
 	}
 
-	return cli_wait();
+	return bt_mesh_model_ack_wait(&cli->ack_ctx, msg_timeout);
 }
 
 int32_t bt_mesh_cfg_cli_timeout_get(void)

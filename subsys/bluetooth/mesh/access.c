@@ -863,6 +863,51 @@ int bt_mesh_model_extend(struct bt_mesh_model *mod,
 }
 #endif
 
+void bt_mesh_model_ack_ctx_clear(struct bt_mesh_model_ack_ctx *ack)
+{
+	ack->op = 0U;
+	ack->user_data = NULL;
+	ack->dst = BT_MESH_ADDR_UNASSIGNED;
+}
+
+int bt_mesh_model_ack_ctx_prepare(struct bt_mesh_model_ack_ctx *ack,
+				  uint32_t op, uint16_t dst, void *user_data)
+{
+	if (ack->op) {
+		BT_WARN("Another synchronous operation pending");
+		return -EBUSY;
+	}
+
+	ack->op = op;
+	ack->user_data = user_data;
+	ack->dst = dst;
+
+	return 0;
+}
+
+int bt_mesh_model_ack_wait(struct bt_mesh_model_ack_ctx *ack, int32_t timeout)
+{
+	int err;
+
+	err = k_sem_take(&ack->sem, SYS_TIMEOUT_MS(timeout));
+	bt_mesh_model_ack_ctx_clear(ack);
+
+	return err;
+}
+
+bool bt_mesh_model_ack_match(const struct bt_mesh_model_ack_ctx *ack_ctx,
+			     uint32_t op,
+			     const struct bt_mesh_msg_ctx *msg_ctx)
+{
+	if (ack_ctx->op == op &&
+	    (!BT_MESH_ADDR_IS_UNICAST(ack_ctx->dst) || ack_ctx->dst == msg_ctx->addr)) {
+		return true;
+	}
+
+	BT_WARN("Unexpected message, OpCode: 0x%08x addr 0x%04x", op, msg_ctx->addr);
+	return false;
+}
+
 static int mod_set_bind(struct bt_mesh_model *mod, size_t len_rd,
 			settings_read_cb read_cb, void *cb_arg)
 {

@@ -732,6 +732,85 @@ struct bt_mesh_comp {
 	struct bt_mesh_elem *elem; /**< List of elements. */
 };
 
+/**
+ * Acknowledged message context for tracking the status of model messages
+ * pending a response.
+ */
+struct bt_mesh_model_ack_ctx {
+	struct k_sem          sem;       /**< Sync semaphore. */
+	uint32_t              op;        /**< Opcode we're waiting for. */
+	uint16_t              dst;       /**< Address of the node that should respond. */
+	void                 *user_data; /**< User specific parameter. */
+};
+
+/** @brief Initialize an acknowledged message context.
+ *
+ *  Initializes semaphore used for synchronization.
+ *
+ *  @param ack Acknowledged message context to initialize.
+ */
+static inline void bt_mesh_model_ack_ctx_init(struct bt_mesh_model_ack_ctx *ack)
+{
+	k_sem_init(&ack->sem, 0, 1);
+}
+
+/** @brief Reset the synchronization semaphore in an acknowledged message context.
+ *
+ *  @param ack Acknowledged message context to be reset.
+ */
+static inline void bt_mesh_model_ack_ctx_reset(struct bt_mesh_model_ack_ctx *ack)
+{
+	k_sem_reset(&ack->sem);
+}
+
+/** @brief Clear parameters of an acknowledged message context.
+ *
+ *  @param ack Acknowledged message context to be cleared.
+ */
+void bt_mesh_model_ack_ctx_clear(struct bt_mesh_model_ack_ctx *ack);
+
+/** @brief Prepare an acknowledged message context.
+ *
+ *  @param ack       Acknowledged message context to prepare.
+ *  @param op        The message OpCode.
+ *  @param dst       Destination address of the message.
+ *  @param user_data User data for the acknowledged message context.
+ *
+ *  @return 0 on success, or (negative) error code on failure.
+ */
+int bt_mesh_model_ack_ctx_prepare(struct bt_mesh_model_ack_ctx *ack,
+				  uint32_t op, uint16_t dst, void *user_data);
+
+/** @brief Wait for a message acknowledge.
+ *
+ *  @param ack     Acknowledged message context of the message to wait for.
+ *  @param timeout Wait timeout in milliseconds.
+ *
+ *  @return 0 on success, or (negative) error code on failure.
+ */
+int bt_mesh_model_ack_wait(struct bt_mesh_model_ack_ctx *ack, int32_t timeout);
+
+/** @brief Mark a message as acknowledged.
+ *
+ * @param ack Context of a message to be acknowledged.
+ */
+static inline void bt_mesh_model_ack_rx(struct bt_mesh_model_ack_ctx *ack)
+{
+	k_sem_give(&ack->sem);
+}
+
+/** @brief Check if an address and opcode of the incoming message matches the expected one.
+ *
+ *  @param ack_ctx Acknowledged message context to be checked.
+ *  @param op      OpCode of the incoming message.
+ *  @param msg_ctx Message context of the incoming message.
+ *
+ *  @return true if the incoming message matches the expected one, false otherwise.
+ */
+bool bt_mesh_model_ack_match(const struct bt_mesh_model_ack_ctx *ack_ctx,
+			     uint32_t op,
+			     const struct bt_mesh_msg_ctx *msg_ctx);
+
 #ifdef __cplusplus
 }
 #endif
