@@ -29,6 +29,13 @@ static int32_t msg_timeout;
 
 static struct bt_mesh_health_cli *health_cli;
 
+static inline bool cli_response_check(uint32_t resp_opcode, uint16_t resp_addr)
+{
+	return health_cli->op_pending == resp_opcode &&
+		(!BT_MESH_ADDR_IS_UNICAST(health_cli->op_addr) ||
+		 health_cli->op_addr == resp_addr);
+}
+
 struct health_fault_param {
 	uint16_t   cid;
 	uint8_t   *expect_test_id;
@@ -49,7 +56,7 @@ static void health_fault_status(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (health_cli->op_pending != OP_HEALTH_FAULT_STATUS) {
+	if (!cli_response_check(OP_HEALTH_FAULT_STATUS, ctx->addr)) {
 		BT_WARN("Unexpected Health Fault Status message");
 		return;
 	}
@@ -123,7 +130,7 @@ static void health_period_status(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (health_cli->op_pending != OP_HEALTH_PERIOD_STATUS) {
+	if (!cli_response_check(OP_HEALTH_PERIOD_STATUS, ctx->addr)) {
 		BT_WARN("Unexpected Health Period Status message");
 		return;
 	}
@@ -149,7 +156,7 @@ static void health_attention_status(struct bt_mesh_model *model,
 	       ctx->net_idx, ctx->app_idx, ctx->addr, buf->len,
 	       bt_hex(buf->data, buf->len));
 
-	if (health_cli->op_pending != OP_ATTENTION_STATUS) {
+	if (!cli_response_check(OP_ATTENTION_STATUS, ctx->addr)) {
 		BT_WARN("Unexpected Health Attention Status message");
 		return;
 	}
@@ -171,7 +178,7 @@ const struct bt_mesh_model_op bt_mesh_health_cli_op[] = {
 	BT_MESH_MODEL_OP_END,
 };
 
-static int cli_prepare(void *param, uint32_t op)
+static int cli_prepare(void *param, uint32_t op, uint16_t addr)
 {
 	if (!health_cli) {
 		BT_ERR("No available Health Client context!");
@@ -185,6 +192,7 @@ static int cli_prepare(void *param, uint32_t op)
 
 	health_cli->op_param = param;
 	health_cli->op_pending = op;
+	health_cli->op_addr = addr;
 
 	return 0;
 }
@@ -193,6 +201,7 @@ static void cli_reset(void)
 {
 	health_cli->op_pending = 0U;
 	health_cli->op_param = NULL;
+	health_cli->op_addr = BT_MESH_ADDR_UNASSIGNED;
 }
 
 static int cli_wait(void)
@@ -202,6 +211,8 @@ static int cli_wait(void)
 	err = k_sem_take(&health_cli->op_sync, SYS_TIMEOUT_MS(msg_timeout));
 
 	cli_reset();
+
+	printk("cli wait: %d\n", err);
 
 	return err;
 }
@@ -219,7 +230,7 @@ int bt_mesh_health_attention_get(uint16_t addr, uint16_t app_idx, uint8_t *atten
 	};
 	int err;
 
-	err = cli_prepare(&param, OP_ATTENTION_STATUS);
+	err = cli_prepare(&param, OP_ATTENTION_STATUS, addr);
 	if (err) {
 		return err;
 	}
@@ -250,7 +261,7 @@ int bt_mesh_health_attention_set(uint16_t addr, uint16_t app_idx, uint8_t attent
 	};
 	int err;
 
-	err = cli_prepare(&param, OP_ATTENTION_STATUS);
+	err = cli_prepare(&param, OP_ATTENTION_STATUS, addr);
 	if (err) {
 		return err;
 	}
@@ -291,7 +302,7 @@ int bt_mesh_health_period_get(uint16_t addr, uint16_t app_idx, uint8_t *divisor)
 	};
 	int err;
 
-	err = cli_prepare(&param, OP_HEALTH_PERIOD_STATUS);
+	err = cli_prepare(&param, OP_HEALTH_PERIOD_STATUS, addr);
 	if (err) {
 		return err;
 	}
@@ -322,7 +333,7 @@ int bt_mesh_health_period_set(uint16_t addr, uint16_t app_idx, uint8_t divisor,
 	};
 	int err;
 
-	err = cli_prepare(&param, OP_HEALTH_PERIOD_STATUS);
+	err = cli_prepare(&param, OP_HEALTH_PERIOD_STATUS, addr);
 	if (err) {
 		return err;
 	}
@@ -368,7 +379,7 @@ int bt_mesh_health_fault_test(uint16_t addr, uint16_t app_idx, uint16_t cid,
 	};
 	int err;
 
-	err = cli_prepare(&param, OP_HEALTH_FAULT_STATUS);
+	err = cli_prepare(&param, OP_HEALTH_FAULT_STATUS, addr);
 	if (err) {
 		return err;
 	}
@@ -415,7 +426,7 @@ int bt_mesh_health_fault_clear(uint16_t addr, uint16_t app_idx, uint16_t cid,
 	};
 	int err;
 
-	err = cli_prepare(&param, OP_HEALTH_FAULT_STATUS);
+	err = cli_prepare(&param, OP_HEALTH_FAULT_STATUS, addr);
 	if (err) {
 		return err;
 	}
@@ -461,8 +472,9 @@ int bt_mesh_health_fault_get(uint16_t addr, uint16_t app_idx, uint16_t cid,
 	};
 	int err;
 
-	err = cli_prepare(&param, OP_HEALTH_FAULT_STATUS);
+	err = cli_prepare(&param, OP_HEALTH_FAULT_STATUS, addr);
 	if (err) {
+		printk("fault get failed to prepare\n");
 		return err;
 	}
 
@@ -471,6 +483,7 @@ int bt_mesh_health_fault_get(uint16_t addr, uint16_t app_idx, uint16_t cid,
 
 	err = bt_mesh_model_send(health_cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {
+		printk("fault get failed to send\n");
 		BT_ERR("model_send() failed (err %d)", err);
 		cli_reset();
 		return err;
