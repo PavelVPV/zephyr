@@ -27,7 +27,7 @@ struct bt_mesh_cfg_cli {
 	struct bt_mesh_model *model;
 
 	/* Internal parameters for tracking message responses. */
-	struct bt_mesh_model_ack_ctx    ack_ctx;
+	struct bt_mesh_msg_ack_ctx ack_ctx;
 };
 
 /** @def BT_MESH_MODEL_CFG_CLI
