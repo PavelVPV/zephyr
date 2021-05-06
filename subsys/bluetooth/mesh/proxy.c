@@ -1069,8 +1069,35 @@ static const struct bt_data net_id_ad[] = {
 	BT_DATA(BT_DATA_SVC_DATA16, proxy_svc_data, NET_ID_LEN),
 };
 
+static size_t proxy_sd_create(struct bt_data *proxy_sd)
+{
+	if (!IS_ENABLED(CONFIG_BT_MESH_PROXY_DEVICE_NAME_IN_SCAN_RSP)) {
+		return 0;
+	}
+
+	const char *name = bt_get_name();
+	size_t name_len = strlen(name);
+
+	if (name_len <= 0) {
+		return 0;
+	}
+
+	if (name_len > 29) {
+		proxy_sd[0].type = BT_DATA_NAME_SHORTENED;
+		proxy_sd[0].data_len = 29;
+	} else {
+		proxy_sd[0].type = BT_DATA_NAME_COMPLETE;
+		proxy_sd[0].data_len = name_len;
+	}
+
+	proxy_sd[0].data = name;
+	return 1;
+}
+
 static int node_id_adv(struct bt_mesh_subnet *sub, int32_t duration)
 {
+	struct bt_data proxy_sd[1];
+	size_t proxy_sd_len;
 	uint8_t tmp[16];
 	int err;
 
@@ -1095,8 +1122,10 @@ static int node_id_adv(struct bt_mesh_subnet *sub, int32_t duration)
 
 	memcpy(proxy_svc_data + 3, tmp + 8, 8);
 
+	proxy_sd_len = proxy_sd_create(proxy_sd);
+
 	err = bt_mesh_adv_start(&fast_adv_param, duration, node_id_ad,
-				ARRAY_SIZE(node_id_ad), NULL, 0);
+				ARRAY_SIZE(node_id_ad), proxy_sd, proxy_sd_len);
 	if (err) {
 		BT_WARN("Failed to advertise using Node ID (err %d)", err);
 		return err;
@@ -1107,6 +1136,8 @@ static int node_id_adv(struct bt_mesh_subnet *sub, int32_t duration)
 
 static int net_id_adv(struct bt_mesh_subnet *sub, int32_t duration)
 {
+	struct bt_data proxy_sd[1];
+	size_t proxy_sd_len;
 	int err;
 
 	BT_DBG("");
@@ -1118,8 +1149,10 @@ static int net_id_adv(struct bt_mesh_subnet *sub, int32_t duration)
 
 	memcpy(proxy_svc_data + 3, sub->keys[SUBNET_KEY_TX_IDX(sub)].net_id, 8);
 
+	proxy_sd_len = proxy_sd_create(proxy_sd);
+
 	err = bt_mesh_adv_start(&slow_adv_param, duration, net_id_ad,
-				ARRAY_SIZE(net_id_ad), NULL, 0);
+				ARRAY_SIZE(net_id_ad), proxy_sd, proxy_sd_len);
 	if (err) {
 		BT_WARN("Failed to advertise using Network ID (err %d)", err);
 		return err;
