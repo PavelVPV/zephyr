@@ -88,6 +88,34 @@ int settings_load_subtree_direct(
 	return 0;
 }
 
+#include <soc.h>
+
+static inline void pin_set(uint32_t pin)
+{
+	NRF_P0->OUTSET = 1 << pin;
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+}
+
+static inline void pin_clr(uint32_t pin)
+{
+	NRF_P0->OUTCLR = 1 << pin;
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+}
+
+static inline void pin_toggle(uint32_t pin, uint32_t count)
+{
+	for (uint32_t i = 0; i < count; i++) {
+		pin_set(pin);
+		pin_clr(pin);
+	}
+}
+
 /*
  * Append a single value to persisted config. Don't store duplicate value.
  */
@@ -101,11 +129,15 @@ int settings_save_one(const char *name, const void *value, size_t val_len)
 		return -ENOENT;
 	}
 
+	pin_set(4);
+
 	k_mutex_lock(&settings_lock, K_FOREVER);
 
 	rc = cs->cs_itf->csi_save(cs, name, (char *)value, val_len);
 
 	k_mutex_unlock(&settings_lock);
+
+	pin_clr(4);
 
 	return rc;
 }

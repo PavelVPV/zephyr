@@ -122,8 +122,38 @@ void bt_mesh_settings_store_schedule(enum bt_mesh_settings_flag flag)
 	}
 }
 
+#include <soc.h>
+
+static inline void pin_set(uint32_t pin)
+{
+	NRF_P0->OUTSET = 1 << pin;
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+}
+
+static inline void pin_clr(uint32_t pin)
+{
+	NRF_P0->OUTCLR = 1 << pin;
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+}
+
+static inline void pin_toggle(uint32_t pin, uint32_t count)
+{
+	for (uint32_t i = 0; i < count; i++) {
+		pin_set(pin);
+		pin_clr(pin);
+	}
+}
+
 static void store_pending(struct k_work *work)
 {
+	pin_set(3);
+
 	BT_DBG("");
 
 	if (atomic_test_and_clear_bit(pending_flags,
@@ -181,6 +211,8 @@ static void store_pending(struct k_work *work)
 				      BT_MESH_SETTINGS_CDB_PENDING)) {
 		bt_mesh_cdb_pending_store();
 	}
+
+	pin_clr(3);
 }
 
 void bt_mesh_settings_init(void)
