@@ -425,6 +425,12 @@ static void prov_pub_key(const uint8_t *data)
 {
 	BT_DBG("Remote Public Key: %s", bt_hex(data, 64));
 
+	if (!memcmp(data, bt_pub_key_get(), 64)) {
+		BT_ERR("Public keys are equal");
+		prov_fail(PROV_ERR_NVAL_FMT);
+		return;
+	}
+
 	atomic_set_bit(bt_mesh_prov_link.flags, REMOTE_PUB_KEY);
 
 	/* PublicKeyDevice */
