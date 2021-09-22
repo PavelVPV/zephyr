@@ -24,6 +24,8 @@
 #include "foundation.h"
 #include "settings.h"
 
+#include <bluetooth/mesh/models.h>
+
 #define CID_NVAL   0xffff
 
 static const struct shell *ctx_shell;
@@ -163,6 +165,183 @@ static struct bt_mesh_health_cli health_cli = {
 	.current_status = health_current_status,
 };
 
+
+#define LOG_MODEL(mod, fmt, ...) printk("[%04x:%04x]: " fmt,\
+					bt_mesh_model_elem(mod)->addr,\
+					mod->id, __VA_ARGS__)
+
+static int32_t sensor_val = 50;
+
+static int motion_get(struct bt_mesh_sensor *sensor,
+		      struct bt_mesh_msg_ctx *ctx, struct sensor_value *rsp)
+{
+	rsp[0].val1 = sensor_val;
+	rsp[0].val2 = 0;
+
+	printk("Motion Get: %d\n", sensor_val);
+
+	return 0;
+}
+
+static struct sensor_value motion_threshold;
+
+static void motion_threshold_get(struct bt_mesh_sensor *sensor,
+				 const struct bt_mesh_sensor_setting *setting,
+				 struct bt_mesh_msg_ctx *ctx,
+				 struct sensor_value *rsp)
+{
+	printk("motion_threshold_get: sen:[%d], set:[%d], val1:[%d], val2:[%d], wr:[%d]\n",
+	       sensor->type->id, setting->type->id,
+	       motion_threshold.val1, motion_threshold.val2,
+	       setting->set != NULL);
+
+	*rsp = motion_threshold;
+}
+
+static int motion_threshold_set(struct bt_mesh_sensor *sensor,
+				const struct bt_mesh_sensor_setting *setting,
+				struct bt_mesh_msg_ctx *ctx,
+				const struct sensor_value *value)
+{
+	printk("motion_threshold_set: sen:[%d], set:[%d], val1:[%d], val2:[%d], wr:[%d]\n",
+	       sensor->type->id, setting->type->id, value->val1, value->val2, setting->set != NULL);
+
+	motion_threshold = *value;
+	return 0;
+}
+
+static struct bt_mesh_sensor_setting motion_settings[] = { {
+	.type = &bt_mesh_sensor_motion_threshold,
+	.get = motion_threshold_get,
+	.set = motion_threshold_set,
+} };
+
+static const struct bt_mesh_sensor_descriptor motion_sensor_descriptor = {
+	.tolerance = {
+		.positive = { 5, 0 },
+		.negative = { 5, 0 },
+	},
+	.sampling_type = BT_MESH_SENSOR_SAMPLING_ACCUMULATED,
+	.period = 1000L, // 1 second
+	.update_interval = 50L, // 50 ms
+};
+
+static struct bt_mesh_sensor motion_sensor = {
+	.type = &bt_mesh_sensor_motion_sensed,
+	.descriptor = &motion_sensor_descriptor,
+	.get = motion_get,
+	.settings = {
+		.count = ARRAY_SIZE(motion_settings),
+		.list = motion_settings,
+	},
+};
+
+static struct bt_mesh_sensor *const sensors[] = {
+	&motion_sensor,
+};
+
+static struct bt_mesh_sensor_srv sensor_srv =
+	BT_MESH_SENSOR_SRV_INIT(sensors, ARRAY_SIZE(sensors));
+
+
+static void sensor_status(struct bt_mesh_sensor_cli *cli,
+			  struct bt_mesh_msg_ctx *ctx,
+			  const struct bt_mesh_sensor_type *sensor,
+			  const struct sensor_value *value)
+{
+	LOG_MODEL(cli->model, "sensor_status: %d\n", sensor->id);
+
+	for (size_t i = 0; i < sensor->channel_count; i++) {
+		LOG_MODEL(cli->model, "\t[%d]: %d.%d\n", i, value->val1, value->val2);
+	}
+}
+
+static void sensor_descriptor_status(struct bt_mesh_sensor_cli *cli,
+				     struct bt_mesh_msg_ctx *ctx,
+				     const struct bt_mesh_sensor_info *sensor)
+{
+	LOG_MODEL(cli->model, "sensor_descriptor_status: %d [%d.%d %d.%d] %d %lld %lld\n",
+		  sensor->id,
+		  sensor->descriptor.tolerance.positive.val1,
+		  sensor->descriptor.tolerance.positive.val2,
+		  sensor->descriptor.tolerance.negative.val1,
+		  sensor->descriptor.tolerance.negative.val2,
+		  sensor->descriptor.sampling_type, sensor->descriptor.period,
+		  sensor->descriptor.update_interval);
+}
+
+static void
+sensor_cadence_status(struct bt_mesh_sensor_cli *cli,
+		      struct bt_mesh_msg_ctx *ctx,
+		      const struct bt_mesh_sensor_type *sensor,
+		      const struct bt_mesh_sensor_cadence_status *cadence)
+{
+	LOG_MODEL(cli->model, "sensor_cadence_status: %d [%d %d] [%d %d.%d %d.%d] [%d %d.%d %d.%d]\n",
+		  sensor->id,
+		  cadence->fast_period_div, cadence->min_int,
+		  cadence->threshold.delta.type,
+		  cadence->threshold.delta.up.val1, cadence->threshold.delta.up.val2,
+		  cadence->threshold.delta.down.val1, cadence->threshold.delta.down.val2,
+		  cadence->threshold.range.cadence,
+		  cadence->threshold.range.low.val1, cadence->threshold.range.low.val2,
+		  cadence->threshold.range.high.val1, cadence->threshold.range.high.val2);
+}
+
+static void sensor_settings_status(struct bt_mesh_sensor_cli *cli,
+				   struct bt_mesh_msg_ctx *ctx,
+				   const struct bt_mesh_sensor_type *sensor,
+				   const uint16_t *ids, uint32_t count)
+{
+	LOG_MODEL(cli->model, "sensor_setting*s*_status: %d %d\n", sensor->id, count);
+}
+
+static void
+sensor_setting_status(struct bt_mesh_sensor_cli *cli,
+		      struct bt_mesh_msg_ctx *ctx,
+		      const struct bt_mesh_sensor_type *sensor,
+		      const struct bt_mesh_sensor_setting_status *setting)
+{
+	LOG_MODEL(cli->model, "sensor_setting_status: %d %d %d.%d %d\n", sensor->id,
+		  setting->type->id, setting->value[0].val1, setting->value[0].val2,
+		  setting->writable);
+}
+
+static void sensor_series_status(
+	struct bt_mesh_sensor_cli *cli, struct bt_mesh_msg_ctx *ctx,
+	const struct bt_mesh_sensor_type *sensor, uint8_t index, uint8_t count,
+	const struct bt_mesh_sensor_series_entry *entry)
+{
+	LOG_MODEL(cli->model, "sensor_series_status: %d %d %d %d.%d %d.%d\n",
+		  sensor->id, index, count,
+		  entry->column.start.val1, entry->column.start.val2,
+		  entry->column.end.val1, entry->column.end.val2);
+
+	for (size_t i = 0; i < sensor->channel_count; i++) {
+		LOG_MODEL(cli->model, "sensor_series_status: e: %d.%d\n",
+			  entry->value[i].val1, entry->value[i].val2);
+	}
+}
+
+static void sensor_unknown_type(struct bt_mesh_sensor_cli *cli,
+				struct bt_mesh_msg_ctx *ctx, uint16_t id,
+				uint32_t opcode)
+{
+	LOG_MODEL(cli->model, "sensor_unknown_type: %d\n", id);
+}
+
+static const struct bt_mesh_sensor_cli_handlers sensor_handlers = {
+	.data = sensor_status,
+	.sensor = sensor_descriptor_status,
+	.cadence = sensor_cadence_status,
+	.settings = sensor_settings_status,
+	.setting_status = sensor_setting_status,
+	.series_entry = sensor_series_status,
+	.unknown_type = sensor_unknown_type,
+};
+
+static struct bt_mesh_sensor_cli sensor_cli =
+	BT_MESH_SENSOR_CLI_INIT(&sensor_handlers);
+
 static uint8_t dev_uuid[16] = { 0xdd, 0xdd };
 
 static struct bt_mesh_model root_models[] = {
@@ -170,6 +349,9 @@ static struct bt_mesh_model root_models[] = {
 	BT_MESH_MODEL_CFG_CLI(&cfg_cli),
 	BT_MESH_MODEL_HEALTH_SRV(&health_srv, &health_pub),
 	BT_MESH_MODEL_HEALTH_CLI(&health_cli),
+	BT_MESH_MODEL_SENSOR_CLI(&sensor_cli),
+	BT_MESH_MODEL_SENSOR_SRV(&sensor_srv),
+
 };
 
 static struct bt_mesh_elem elements[] = {
@@ -2638,6 +2820,140 @@ static int cmd_cdb_app_key_del(const struct shell *shell, size_t argc,
 }
 #endif
 
+static int cmd_sensor_setting_set(const struct shell *shell, size_t argc, char *argv[])
+{
+	if (argc < 3) {
+		return -EINVAL;
+	}
+
+	struct sensor_value setting_value = {
+		.val1 = strtol(argv[1], NULL, 0),
+		.val2 = strtol(argv[2], NULL, 0),
+	};
+
+	int err = bt_mesh_sensor_cli_setting_set(&sensor_cli, NULL,
+					      &bt_mesh_sensor_motion_sensed,
+					      &bt_mesh_sensor_motion_threshold,
+					      &setting_value, NULL);
+	shell_print(shell, "err: %d", err);
+	return 0;
+}
+
+static int cmd_sensor_setting_get(const struct shell *shell, size_t argc, char *argv[])
+{
+	int err = bt_mesh_sensor_cli_setting_get(&sensor_cli, NULL,
+					      &bt_mesh_sensor_motion_sensed,
+					      &bt_mesh_sensor_motion_threshold,
+					      NULL);
+	shell_print(shell, "err: %d", err);
+	return 0;
+}
+
+static struct bt_mesh_sensor_cadence_status cadence_data = {
+	.fast_period_div = 4,
+	.min_int = 9,
+	.threshold.delta.type = BT_MESH_SENSOR_DELTA_VALUE,
+	.threshold.delta.up.val1 = 1,
+	.threshold.delta.up.val2 = 0,
+	.threshold.delta.down.val1 = 1,
+	.threshold.delta.down.val2 = 0,
+	.threshold.range.cadence = BT_MESH_SENSOR_CADENCE_FAST,
+	.threshold.range.low.val1 = 49,
+	.threshold.range.low.val2 = 0,
+	.threshold.range.high.val1 = 100,
+	.threshold.range.high.val2 = 0,
+};
+
+static int cmd_sensor_cadence_fast_pub_div_set(const struct shell *shell, size_t argc, char *argv[])
+{
+	if (argc < 2) {
+		return -EINVAL;
+	}
+
+	cadence_data.fast_period_div = strtol(argv[1], NULL, 0);
+
+	return 0;
+}
+
+static int cmd_sensor_cadence_min_int_set(const struct shell *shell, size_t argc, char *argv[])
+{
+	if (argc < 2) {
+		return -EINVAL;
+	}
+
+	cadence_data.min_int = strtol(argv[1], NULL, 0);
+
+	return 0;
+}
+
+static int cmd_sensor_cadence_threshold_delta_set(const struct shell *shell, size_t argc, char *argv[])
+{
+	if (argc < 6) {
+		return -EINVAL;
+	}
+
+	cadence_data.threshold.delta.type = strtol(argv[1], NULL, 0);
+	cadence_data.threshold.delta.up.val1 = strtol(argv[2], NULL, 0);
+	cadence_data.threshold.delta.up.val2 = strtol(argv[3], NULL, 0);
+	cadence_data.threshold.delta.down.val1 = strtol(argv[4], NULL, 0);
+	cadence_data.threshold.delta.down.val2 = strtol(argv[5], NULL, 0);
+
+	return 0;
+}
+
+static int cmd_sensor_cadence_threshold_range_set(const struct shell *shell, size_t argc, char *argv[])
+{
+	if (argc < 6) {
+		return -EINVAL;
+	}
+
+	cadence_data.threshold.range.cadence = strtol(argv[1], NULL, 0);
+	cadence_data.threshold.range.low.val1 = strtol(argv[2], NULL, 0);
+	cadence_data.threshold.range.low.val2 = strtol(argv[3], NULL, 0);
+	cadence_data.threshold.range.high.val1 = strtol(argv[4], NULL, 0);
+	cadence_data.threshold.range.high.val2 = strtol(argv[5], NULL, 0);
+
+	return 0;
+}
+
+static int cmd_sensor_cadence_set(const struct shell *shell, size_t argc, char *argv[])
+{
+	int err = bt_mesh_sensor_cli_cadence_set(&sensor_cli, NULL,
+					bt_mesh_sensor_type_get(BT_MESH_PROP_ID_MOTION_SENSED),
+					&cadence_data, NULL);
+	shell_print(shell, "err: %d", err);
+
+	return 0;
+}
+
+static int cmd_sensor_value_set(const struct shell *shell, size_t argc, char *argv[])
+{
+	if (argc < 2) {
+		return -EINVAL;
+	}
+
+	sensor_val = strtol(argv[1], NULL, 0);
+
+	return 0;
+}
+
+static int cmd_sensor_pub(const struct shell *shell, size_t argc, char *argv[])
+{
+	if (argc < 3) {
+		return -EINVAL;
+	}
+
+	struct sensor_value value = {
+		.val1 = strtol(argv[1], NULL, 0),
+		.val2 = strtol(argv[2], NULL, 0),
+	};
+
+	int err = bt_mesh_sensor_srv_pub(&sensor_srv, NULL, &motion_sensor, &value);
+	shell_print(shell, "err: %d", err);
+
+	return 0;
+}
+
 /* List of Mesh subcommands.
  *
  * Each command is documented in doc/reference/bluetooth/mesh/shell.rst.
@@ -2784,6 +3100,15 @@ SHELL_STATIC_SUBCMD_SET_CREATE(mesh_cmds,
 	SHELL_CMD_ARG(cdb-app-key-del, NULL, "<AppKeyIdx>", cmd_cdb_app_key_del,
 		      2, 0),
 #endif
+	SHELL_CMD_ARG(sensor_setting_set, NULL, "Send Sensor Setting Set message: <val1> <val2>", cmd_sensor_setting_set, 3, 0),
+	SHELL_CMD_ARG(sensor_setting_get, NULL, "Send Sensor Setting Get message", cmd_sensor_setting_get, 1, 0),
+	SHELL_CMD_ARG(sensor_cadence_fast_pub_div_set, NULL, "Set Sensor Cadence Fast Pub Div: <div>", cmd_sensor_cadence_fast_pub_div_set, 2, 0),
+	SHELL_CMD_ARG(sensor_cadence_min_int_set, NULL, "Set Sensor Cadence Min Int: <int>", cmd_sensor_cadence_min_int_set, 2, 0),
+	SHELL_CMD_ARG(sensor_cadence_threshold_delta_set, NULL, "Set Sensor Cadence Threshold Delta: <delta...>", cmd_sensor_cadence_threshold_delta_set, 6, 0),
+	SHELL_CMD_ARG(sensor_cadence_threshold_range_set, NULL, "Set Sensor Cadence Threshold Range: <range...>", cmd_sensor_cadence_threshold_range_set, 6, 0),
+	SHELL_CMD_ARG(sensor_cadence_set, NULL, "Send Sensor Cadence Set message", cmd_sensor_cadence_set, 1, 0),
+	SHELL_CMD_ARG(sensor_value_set, NULL, "Set Sensor value: <val1>", cmd_sensor_value_set, 2, 0),
+	SHELL_CMD_ARG(sensor_pub, NULL, "Send Sensor Status message: <val1> <val2>", cmd_sensor_pub, 3, 0),
 
 	SHELL_SUBCMD_SET_END
 );
