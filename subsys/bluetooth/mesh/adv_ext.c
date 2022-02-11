@@ -289,6 +289,7 @@ void bt_mesh_adv_init(void)
 #if defined(CONFIG_BT_MESH_DEBUG_USE_ID_ADDR)
 		.options = BT_LE_ADV_OPT_USE_IDENTITY,
 #endif
+		.options = BT_LE_ADV_OPT_CODED | BT_LE_ADV_OPT_EXT_ADV,
 };
 	STRUCT_SECTION_FOREACH(bt_mesh_ext_adv, adv) {
 		(void)memcpy(&adv->adv_param, &adv_param, sizeof(adv_param));

@@ -230,7 +230,7 @@ int bt_mesh_adv_gatt_send(void)
 static void bt_mesh_scan_cb(const bt_addr_le_t *addr, int8_t rssi,
 			    uint8_t adv_type, struct net_buf_simple *buf)
 {
-	if (adv_type != BT_GAP_ADV_TYPE_ADV_NONCONN_IND) {
+	if (adv_type != BT_GAP_ADV_TYPE_EXT_ADV) {
 		return;
 	}
 
@@ -282,7 +282,7 @@ int bt_mesh_scan_enable(void)
 {
 	struct bt_le_scan_param scan_param = {
 			.type       = BT_HCI_LE_SCAN_PASSIVE,
-			.options    = BT_LE_SCAN_OPT_NONE,
+			.options    = BT_LE_SCAN_OPT_CODED | BT_LE_SCAN_OPT_NO_1M,
 			.interval   = MESH_SCAN_INTERVAL,
 			.window     = MESH_SCAN_WINDOW };
 	int err;
