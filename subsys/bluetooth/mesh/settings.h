@@ -21,6 +21,11 @@ enum bt_mesh_settings_flag {
 	BT_MESH_SETTINGS_FLAG_COUNT,
 };
 
+#define BT_MESH_SETTINGS_DEFINE_UNUSED(_hname, _subtree, _set)\
+	const struct settings_handler settings_handler_bt_mesh_ ## _hname = {\
+		.h_set = _set,						     \
+	}
+
 #ifdef CONFIG_BT_SETTINGS
 #define BT_MESH_SETTINGS_DEFINE(_hname, _subtree, _set)			     \
 	SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_##_hname, "bt/mesh/" _subtree, \
@@ -31,9 +36,7 @@ enum bt_mesh_settings_flag {
  * unused, linker will discard it.
  */
 #define BT_MESH_SETTINGS_DEFINE(_hname, _subtree, _set)\
-	const struct settings_handler settings_handler_bt_mesh_ ## _hname = {\
-		.h_set = _set,						     \
-	}
+	BT_MESH_SETTINGS_DEFINE_UNUSED(_hname, _subtree, _set)
 #endif
 
 void bt_mesh_settings_init(void);

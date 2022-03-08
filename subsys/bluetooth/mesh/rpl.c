@@ -171,7 +171,6 @@ void bt_mesh_rpl_clear(void)
 	}
 }
 
-#ifdef CONFIG_BT_MESH_RPL_STORE
 static struct bt_mesh_rpl *bt_mesh_rpl_find(uint16_t src)
 {
 	int i;
@@ -184,7 +183,6 @@ static struct bt_mesh_rpl *bt_mesh_rpl_find(uint16_t src)
 
 	return NULL;
 }
-#endif
 
 static struct bt_mesh_rpl *bt_mesh_rpl_alloc(uint16_t src)
 {
@@ -228,7 +226,6 @@ void bt_mesh_rpl_reset(void)
 	}
 }
 
-#ifdef CONFIG_BT_MESH_RPL_STORE
 static int rpl_set(const char *name, size_t len_rd,
 		   settings_read_cb read_cb, void *cb_arg)
 {
@@ -279,7 +276,10 @@ static int rpl_set(const char *name, size_t len_rd,
 	return 0;
 }
 
+#ifdef CONFIG_BT_MESH_RPL_STORE
 BT_MESH_SETTINGS_DEFINE(rpl, "RPL", rpl_set);
+#else
+BT_MESH_SETTINGS_DEFINE_UNUSED(rpl, "RPL", rpl_set);
 #endif
 
 static void store_rpl(struct bt_mesh_rpl *entry)
