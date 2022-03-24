@@ -453,24 +453,34 @@ static int cmd_reset(const struct shell *shell, size_t argc, char *argv[])
 	return 0;
 }
 
-static uint8_t str2u8(const char *str)
+uint8_t bt_mesh_shell_str2u8(const char *str, int *err)
+{
+	char *endptr = NULL;
+
+	*val = strtol(str, &endptr, 0);
+	if (errno == ERANGE) {
+		return -ERANGE;
+	} else if (errno || endptr == str) {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+bool bt_mesh_shell_str2bool(const char *str, int *err)
 {
 	if (isdigit((unsigned char)str[0])) {
-		return strtoul(str, NULL, 0);
+		return str2u8(str, err);
 	}
 
 	return (!strcmp(str, "on") || !strcmp(str, "enable"));
-}
-
-static bool str2bool(const char *str)
-{
-	return str2u8(str);
 }
 
 #if defined(CONFIG_BT_MESH_LOW_POWER)
 static int cmd_lpn(const struct shell *shell, size_t argc, char *argv[])
 {
 	static bool enabled;
+	bool enable;
 	int err;
 
 	if (argc < 2) {
@@ -478,7 +488,12 @@ static int cmd_lpn(const struct shell *shell, size_t argc, char *argv[])
 		return 0;
 	}
 
-	if (str2bool(argv[1])) {
+	enable = str2bool(argv[1], &err);
+	if (err) {
+		return err;
+	}
+
+	if (enable) {
 		if (enabled) {
 			shell_print(shell, "LPN already enabled");
 			return 0;
@@ -730,12 +745,17 @@ static int cmd_iv_update_test(const struct shell *shell, size_t argc,
 			      char *argv[])
 {
 	bool enable;
+	int err;
 
 	if (argc < 2) {
 		return -EINVAL;
 	}
 
 	enable = str2bool(argv[1]);
+	if (err) {
+		return err;
+	}
+
 	if (enable) {
 		shell_print(shell, "Enabling IV Update test mode");
 	} else {
@@ -763,7 +783,10 @@ static int cmd_beacon(const struct shell *shell, size_t argc, char *argv[])
 	if (argc < 2) {
 		err = bt_mesh_cfg_beacon_get(net.net_idx, net.dst, &status);
 	} else {
-		uint8_t val = str2u8(argv[1]);
+		uint8_t val = str2u8(argv[1], &err);
+		if (err) {
+			return err;
+		}
 
 		err = bt_mesh_cfg_beacon_set(net.net_idx, net.dst, val,
 					     &status);
@@ -868,7 +891,11 @@ static int cmd_proxy_disconnect(const struct shell *sh, size_t argc,
 static int cmd_beacon_listen(const struct shell *shell, size_t argc,
 			     char *argv[])
 {
-	uint8_t val = str2u8(argv[1]);
+	int err;
+	uint8_t val = str2u8(argv[1], &err);
+	if (err) {
+		return err;
+	}
 
 	if (val) {
 		bt_mesh_shell_prov.unprovisioned_beacon = print_unprovisioned_beacon;
@@ -916,7 +943,10 @@ static int cmd_friend(const struct shell *shell, size_t argc, char *argv[])
 	if (argc < 2) {
 		err = bt_mesh_cfg_friend_get(net.net_idx, net.dst, &frnd);
 	} else {
-		uint8_t val = str2u8(argv[1]);
+		uint8_t val = str2u8(argv[1], &err);
+		if (err) {
+			return err;
+		}
 
 		err = bt_mesh_cfg_friend_set(net.net_idx, net.dst, val, &frnd);
 	}
@@ -940,7 +970,10 @@ static int cmd_gatt_proxy(const struct shell *shell, size_t argc, char *argv[])
 	if (argc < 2) {
 		err = bt_mesh_cfg_gatt_proxy_get(net.net_idx, net.dst, &proxy);
 	} else {
-		uint8_t val = str2u8(argv[1]);
+		uint8_t val = str2u8(argv[1], &err);
+		if (err) {
+			return err;
+		}
 
 		err = bt_mesh_cfg_gatt_proxy_set(net.net_idx, net.dst, val,
 						 &proxy);
@@ -1029,8 +1062,12 @@ static int cmd_relay(const struct shell *shell, size_t argc, char *argv[])
 		err = bt_mesh_cfg_relay_get(net.net_idx, net.dst, &relay,
 					    &transmit);
 	} else {
-		uint8_t val = str2u8(argv[1]);
-		uint8_t count, interval, new_transmit;
+		uint8_t val, count, interval, new_transmit;
+
+		val = str2u8(argv[1], &err);
+		if (err) {
+			return err;
+		}
 
 		if (val) {
 			if (argc > 2) {
@@ -2018,7 +2055,11 @@ static int mod_pub_set(const struct shell *sh, uint16_t addr, bool is_va,
 	}
 
 	pub.app_idx = strtoul(argv[1], NULL, 0);
-	pub.cred_flag = str2bool(argv[2]);
+	pub.cred_flag = str2bool(argv[2], &err);
+	if (err) {
+		return err;
+	}
+
 	pub.ttl = strtoul(argv[3], NULL, 0);
 	pub.period = strtoul(argv[4], NULL, 0);
 
@@ -2262,13 +2303,19 @@ static int cmd_hb_pub(const struct shell *shell, size_t argc, char *argv[])
 static int cmd_pb(bt_mesh_prov_bearer_t bearer, const struct shell *shell,
 		  size_t argc, char *argv[])
 {
+	bool enable;
 	int err;
 
 	if (argc < 2) {
 		return -EINVAL;
 	}
 
-	if (str2bool(argv[1])) {
+	enable = str2bool(argv[1], &err);
+	if (err) {
+		return err;
+	}
+
+	if (enable) {
 		err = bt_mesh_prov_enable(bearer);
 		if (err) {
 			shell_error(shell, "Failed to enable %s (err %d)",
