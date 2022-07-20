@@ -689,6 +689,56 @@ static int cmd_appidx(const struct shell *shell, size_t argc, char *argv[])
 	return 0;
 }
 
+static void send_msg(void);
+static void send_end(int err, void *cb_data)
+{
+	send_msg();
+}
+
+static void send_start(uint16_t duration, int err, void *cb_data)
+{
+	if (err) {
+		send_end(err, cb_data);
+	}
+}
+
+static struct bt_mesh_send_cb send_cb = {
+	.start = send_start,
+	.end = send_end,
+};
+
+static void send_msg(void)
+{
+	NET_BUF_SIMPLE_DEFINE(msg, 32);
+	struct bt_mesh_msg_ctx ctx = {
+		.send_ttl = BT_MESH_TTL_DEFAULT,
+		.net_idx = net.net_idx,
+		.addr = net.dst,
+		.app_idx = net.app_idx,
+	};
+	struct bt_mesh_net_tx tx = {
+		.ctx = &ctx,
+		.src = net.local,
+	};
+	size_t len;
+	int err;
+
+	bt_mesh_model_msg_init(&msg, 0xFFFF);
+
+	net_buf_simple_add(&msg, 8);
+
+	err = bt_mesh_trans_send(&tx, &msg, &send_cb, NULL);
+	if (err) {
+		shell_error(ctx_shell, "Failed to send (err %d)", err);
+	}
+}
+
+static int cmd_test_start(const struct shell *shell, size_t argc, char *argv[])
+{
+	send_msg();
+	return 0;
+}
+
 static int cmd_net_send(const struct shell *shell, size_t argc, char *argv[])
 {
 	NET_BUF_SIMPLE_DEFINE(msg, 32);
@@ -3322,6 +3372,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(mesh_cmds,
 	SHELL_CMD_ARG(appidx, NULL, "[AppIdx]", cmd_appidx, 1, 1),
 
 	/* Commands which access internal APIs, for testing only */
+	SHELL_CMD_ARG(test-start, NULL, NULL, cmd_test_start, 1, 0),
 	SHELL_CMD_ARG(net-send, NULL, "<hex string>", cmd_net_send, 2, 0),
 #if defined(CONFIG_BT_MESH_IV_UPDATE_TEST)
 	SHELL_CMD_ARG(iv-update, NULL, NULL, cmd_iv_update, 1, 0),
