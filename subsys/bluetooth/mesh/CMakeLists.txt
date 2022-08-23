@@ -63,3 +63,10 @@ zephyr_library_sources_ifdef(CONFIG_BT_MESH_SELF_TEST test.c)
 zephyr_library_sources_ifdef(CONFIG_BT_MESH_SHELL shell.c)
 
 zephyr_library_sources_ifdef(CONFIG_BT_MESH_CDB cdb.c)
+
+if(CONFIG_BT_MESH_SHELL)
+    zephyr_library_sources(shell.c)
+    zephyr_library_sources(shell_utils.c)
+    zephyr_library_sources_ifdef(CONFIG_BT_MESH_HEALTH_CLI shell_health_cli.c)
+    zephyr_library_sources_ifdef(CONFIG_BT_MESH_CFG_CLI shell_config_cli.c)
+endif()
