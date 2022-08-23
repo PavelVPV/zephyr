@@ -1708,5 +1708,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_CMD_ARG(help, NULL, "Prompt info for this shell module", cmd_help, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_ARG_REGISTER(mdl_cfg, &cfg_cli_cmds, "Config Cli commands",
-			shell_model_cmds_help, 1, 1);
+SHELL_SUBCMD_ADD((mesh), cfg, &cfg_cli_cmds, "Config Cli commands", shell_model_cmds_help, 1, 1);

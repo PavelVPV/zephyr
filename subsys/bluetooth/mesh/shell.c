@@ -1260,74 +1260,72 @@ SHELL_STATIC_SUBCMD_SET_CREATE(cdb_cmds,
  * Please keep the documentation up to date by adding any new commands to the
  * list.
  */
-SHELL_STATIC_SUBCMD_SET_CREATE(
-	mesh_cmds,
-	/* General operations */
-	SHELL_CMD_ARG(init, NULL, NULL, cmd_init, 1, 0),
-	SHELL_CMD_ARG(reset-local, NULL, NULL, cmd_reset, 1, 0),
+SHELL_SUBCMD_SET_CREATE(mesh_cmds, (mesh));
+
+/* General operations */
+SHELL_SUBCMD_ADD((mesh), init, NULL, NULL, cmd_init, 1, 0);
+SHELL_SUBCMD_ADD((mesh), reset_local, NULL, NULL, cmd_reset, 1, 0);
 #if defined(CONFIG_BT_MESH_LOW_POWER)
-	SHELL_CMD_ARG(lpn, NULL, "<Val: off, on>", cmd_lpn, 2, 0),
-	SHELL_CMD_ARG(poll, NULL, NULL, cmd_poll, 1, 0),
+SHELL_SUBCMD_ADD((mesh), lpn, NULL, "<Val: off, on>", cmd_lpn, 2, 0);
+SHELL_SUBCMD_ADD((mesh), poll, NULL, NULL, cmd_poll, 1, 0);
 #endif
 #if defined(CONFIG_BT_MESH_GATT_PROXY)
-	SHELL_CMD_ARG(ident, NULL, NULL, cmd_ident, 1, 0),
+SHELL_SUBCMD_ADD((mesh), ident, NULL, NULL, cmd_ident, 1, 0);
 #endif
-	/* Commands which access internal APIs, for testing only */
-	SHELL_CMD_ARG(net-send, NULL, "<Src> <Dst> <App_idx> <Net_idx> <Hex string>",
-		      cmd_net_send, 6, 0),
+/* Commands which access internal APIs, for testing only */
+SHELL_SUBCMD_ADD((mesh), net_send, NULL, "<Src> <Dst> <App_idx> <Net_idx> <Hex string>",
+	      cmd_net_send, 6, 0);
 #if defined(CONFIG_BT_MESH_IV_UPDATE_TEST)
-	SHELL_CMD_ARG(iv-update, NULL, NULL, cmd_iv_update, 1, 0),
-	SHELL_CMD_ARG(iv-update-test, NULL, "<Val: off, on>", cmd_iv_update_test, 2, 0),
+SHELL_SUBCMD_ADD((mesh), iv_update, NULL, NULL, cmd_iv_update, 1, 0);
+SHELL_SUBCMD_ADD((mesh), iv_update_test, NULL, "<Val: off, on>", cmd_iv_update_test, 2, 0);
 #endif
-	SHELL_CMD_ARG(rpl-clear, NULL, NULL, cmd_rpl_clear, 1, 0),
+SHELL_SUBCMD_ADD((mesh), rpl_clear, NULL, NULL, cmd_rpl_clear, 1, 0);
 
-	/* Provisioning operations */
+/* Provisioning operations */
 #if defined(CONFIG_BT_MESH_PROV_DEVICE)
 #if defined(CONFIG_BT_MESH_PB_GATT)
-	SHELL_CMD_ARG(pb-gatt, NULL, "<Val: off, on>", cmd_pb_gatt, 2, 0),
+SHELL_SUBCMD_ADD((mesh), pb_gatt, NULL, "<Val: off, on>", cmd_pb_gatt, 2, 0);
 #endif
 #if defined(CONFIG_BT_MESH_PB_ADV)
-	SHELL_CMD_ARG(pb-adv, NULL, "<Val: off, on>", cmd_pb_adv, 2, 0),
+SHELL_SUBCMD_ADD((mesh), pb_adv, NULL, "<Val: off, on>", cmd_pb_adv, 2, 0);
 #endif
 #endif /* CONFIG_BT_MESH_PROV_DEVICE */
 
 #if defined(CONFIG_BT_MESH_PROVISIONER)
-	SHELL_CMD_ARG(provision-adv, NULL,
-		      "<UUID> <NetKeyIndex> <Addr> "
-		      "<AttentionDuration>",
-		      cmd_provision_adv, 5, 0),
+SHELL_SUBCMD_ADD((mesh), provision_adv, NULL,
+	      "<UUID> <NetKeyIndex> <Addr> "
+	      "<AttentionDuration>",
+	      cmd_provision_adv, 5, 0);
 #endif
 
 #if defined(CONFIG_BT_MESH_PB_GATT_CLIENT)
-	SHELL_CMD_ARG(provision-gatt, NULL,
-		      "<UUID> <NetKeyIndex> <Addr> "
-		      "<AttentionDuration>",
-		      cmd_provision_gatt, 5, 0),
+SHELL_SUBCMD_ADD((mesh), provision_gatt, NULL,
+	      "<UUID> <NetKeyIndex> <Addr> "
+	      "<AttentionDuration>",
+	      cmd_provision_gatt, 5, 0);
 #endif
 
 #if defined(CONFIG_BT_MESH_PROXY_CLIENT)
-	SHELL_CMD_ARG(proxy-connect, NULL, "<NetKeyIndex>", cmd_proxy_connect, 2, 0),
-	SHELL_CMD_ARG(proxy-disconnect, NULL, "<NetKeyIndex>", cmd_proxy_disconnect, 2, 0),
+SHELL_SUBCMD_ADD((mesh), proxy_connect, NULL, "<NetKeyIndex>", cmd_proxy_connect, 2, 0);
+SHELL_SUBCMD_ADD((mesh), proxy_disconnect, NULL, "<NetKeyIndex>", cmd_proxy_disconnect, 2, 0);
 #endif
 
-	SHELL_CMD_ARG(uuid, NULL, "<UUID: 1-16 hex values>", cmd_uuid, 2, 0),
-	SHELL_CMD_ARG(input-num, NULL, "<Number>", cmd_input_num, 2, 0),
-	SHELL_CMD_ARG(input-str, NULL, "<String>", cmd_input_str, 2, 0),
-	SHELL_CMD_ARG(static-oob, NULL, "[Val: 1-16 hex values]", cmd_static_oob, 2, 1),
-	SHELL_CMD_ARG(provision-local, NULL, "<NetKeyIndex> <Addr> [IVIndex]",
-		      cmd_provision_local, 3, 1),
-	SHELL_CMD_ARG(beacon-listen, NULL, "<Val: off, on>", cmd_beacon_listen, 2, 0),
+SHELL_SUBCMD_ADD((mesh), uuid, NULL, "<UUID: 1-16 hex values>", cmd_uuid, 2, 0);
+SHELL_SUBCMD_ADD((mesh), input_num, NULL, "<Number>", cmd_input_num, 2, 0);
+SHELL_SUBCMD_ADD((mesh), input_str, NULL, "<String>", cmd_input_str, 2, 0);
+SHELL_SUBCMD_ADD((mesh), static_oob, NULL, "[Val: 1-16 hex values]", cmd_static_oob, 2, 1);
+SHELL_SUBCMD_ADD((mesh), provision_local, NULL, "<NetKeyIndex> <Addr> [IVIndex]",
+	      cmd_provision_local, 3, 1);
+SHELL_SUBCMD_ADD((mesh), beacon_listen, NULL, "<Val: off, on>", cmd_beacon_listen, 2, 0);
 
-	/* Health Server Model Operations */
-	SHELL_CMD_ARG(add-fault, NULL, "<Fault ID>", cmd_add_fault, 2, 0),
-	SHELL_CMD_ARG(del-fault, NULL, "[Fault ID]", cmd_del_fault, 1, 1),
+/* Health Server Model Operations */
+SHELL_SUBCMD_ADD((mesh), add_fault, NULL, "<Fault ID>", cmd_add_fault, 2, 0);
+SHELL_SUBCMD_ADD((mesh), del_fault, NULL, "[Fault ID]", cmd_del_fault, 1, 1);
 
 #if defined(CONFIG_BT_MESH_CDB)
-	/* Mesh Configuration Database Operations */
-	SHELL_CMD(cdb, &cdb_cmds, "Configuration Database", shell_model_cmds_help),
+/* Mesh Configuration Database Operations */
+SHELL_SUBCMD_ADD((mesh), cdb, &cdb_cmds, "Configuration Database", shell_model_cmds_help, 0, 0);
 #endif
 
-	SHELL_SUBCMD_SET_END);
-
 SHELL_CMD_ARG_REGISTER(mesh, &mesh_cmds, "Bluetooth mesh shell commands",
-			shell_model_cmds_help, 1, 1);
+		       shell_model_cmds_help, 1, 1);
