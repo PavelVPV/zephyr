@@ -18,11 +18,64 @@ static struct bt_mesh_cfg_cli cfg_cli;
 
 BT_MESH_SHELL_HEALTH_PUB_DEFINE(health_pub);
 
+static void show_faults(uint8_t test_id, uint16_t cid, uint8_t *faults, size_t fault_count)
+{
+	size_t i;
+
+	if (!fault_count) {
+		printk("Health Test ID 0x%02x Company ID "
+				"0x%04x: no faults\n", test_id, cid);
+		return;
+	}
+
+	printk("Health Test ID 0x%02x Company ID 0x%04x Fault "
+			"Count %zu:\n", test_id, cid, fault_count);
+
+	for (i = 0; i < fault_count; i++) {
+		printk("\t0x%02x\n", faults[i]);
+	}
+}
+
+static void health_current_status(struct bt_mesh_health_cli *cli, uint16_t addr,
+				  uint8_t test_id, uint16_t cid, uint8_t *faults,
+				  size_t fault_count)
+{
+	printk("Health Current Status from 0x%04x\n", addr);
+	show_faults(test_id, cid, faults, fault_count);
+}
+
+static void health_fault_status(struct bt_mesh_health_cli *cli, uint16_t addr,
+				uint8_t test_id, uint16_t cid, uint8_t *faults,
+				size_t fault_count)
+{
+	printk("Health Fault Status from 0x%04x\n", addr);
+	show_faults(test_id, cid, faults, fault_count);
+}
+
+static void health_attention_status(struct bt_mesh_health_cli *cli,
+				    uint16_t addr, uint8_t attention)
+{
+	printk("Health Attention Status from 0x%04x: %u\n", addr, attention);
+}
+
+static void health_period_status(struct bt_mesh_health_cli *cli, uint16_t addr,
+				 uint8_t period)
+{
+	printk("Health Fast Period Divisor Status from 0x%04x: %u\n", addr, period);
+}
+
+struct bt_mesh_health_cli health_cli = {
+	.current_status = health_current_status,
+	.fault_status = health_fault_status,
+	.attention_status = health_attention_status,
+	.period_status = health_period_status,
+};
+
 static struct bt_mesh_model root_models[] = {
 	BT_MESH_MODEL_CFG_SRV,
 	BT_MESH_MODEL_CFG_CLI(&cfg_cli),
 	BT_MESH_MODEL_HEALTH_SRV(&bt_mesh_shell_health_srv, &health_pub),
-	BT_MESH_MODEL_HEALTH_CLI(&bt_mesh_shell_health_cli),
+	BT_MESH_MODEL_HEALTH_CLI(&health_cli),
 };
 
 static struct bt_mesh_elem elements[] = {
