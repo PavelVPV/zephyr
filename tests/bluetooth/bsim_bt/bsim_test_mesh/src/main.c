@@ -19,6 +19,9 @@ extern struct bst_test_list *test_scanner_install(struct bst_test_list *test);
 extern struct bst_test_list *test_heartbeat_install(struct bst_test_list *test);
 extern struct bst_test_list *test_access_install(struct bst_test_list *test);
 extern struct bst_test_list *test_ivi_install(struct bst_test_list *test);
+#if defined(CONFIG_BT_EXT_ADV)
+extern struct bst_test_list *test_relay_latency_install(struct bst_test_list *tests);
+#endif
 #endif
 
 bst_test_install_t test_installers[] = {
@@ -34,6 +37,9 @@ bst_test_install_t test_installers[] = {
 	test_heartbeat_install,
 	test_access_install,
 	test_ivi_install,
+#if defined(CONFIG_BT_EXT_ADV)
+	test_relay_latency_install,
+#endif
 #endif
 	NULL
 };
