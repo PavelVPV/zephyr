@@ -560,6 +560,12 @@ static int exec_cmd(const struct shell *shell, size_t argc, const char **argv,
 		/* Bring back mutex to shell thread. */
 		k_mutex_lock(&shell->ctx->wr_mtx, K_FOREVER);
 		z_flag_cmd_ctx_set(shell, false);
+
+		if (ret_val < 0) {
+			z_shell_fprintf(shell, SHELL_ERROR,
+					"Error: command failed with (%d)\n",
+					ret_val);
+		}
 	}
 
 	return ret_val;
