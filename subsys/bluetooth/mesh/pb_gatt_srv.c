@@ -270,7 +270,7 @@ int bt_mesh_pb_gatt_srv_adv_start(void)
 {
 	BT_DBG("");
 
-	if (!service_registered || bt_mesh_is_provisioned()) {
+	if (!service_registered || bt_mesh_is_provisioned() || cli) {
 		return -ENOTSUP;
 	}
 
