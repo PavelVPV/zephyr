@@ -37,6 +37,36 @@
  */
 #define FRIEND_XMIT         BT_MESH_TRANSMIT(0, 20)
 
+#define BT_MESH_FRIEND_ADV_LATENCY 2
+
+#include <soc.h>
+
+static inline void pin_set(uint32_t pin)
+{
+	NRF_P0->OUTSET = 1 << pin;
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+}
+
+static inline void pin_clr(uint32_t pin)
+{
+	NRF_P0->OUTCLR = 1 << pin;
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+}
+
+static inline void pin_toggle(uint32_t pin, uint32_t count)
+{
+	for (uint32_t i = 0; i < count; i++) {
+		pin_set(pin);
+		pin_clr(pin);
+	}
+}
+
 struct friend_pdu_info {
 	uint16_t  src;
 	uint16_t  dst;
@@ -55,6 +85,44 @@ NET_BUF_POOL_FIXED_DEFINE(friend_buf_pool, FRIEND_BUF_COUNT,
 static struct friend_adv {
 	uint16_t app_idx;
 } adv_pool[FRIEND_BUF_COUNT];
+
+static struct {
+	int64_t min;
+	int64_t max;
+	int64_t avg;
+} tx_time_delta;
+static int64_t tx_time_start;
+
+static void tx_time_delta_update(int64_t delta)
+{
+	static bool first = true;
+
+	if (first) {
+		first = false;
+		return;
+	}
+
+	if (delta < tx_time_delta.min || tx_time_delta.min == 0) {
+		tx_time_delta.min = delta;
+	}
+
+	if (delta > tx_time_delta.max) {
+		tx_time_delta.max = delta;
+	}
+
+	if (tx_time_delta.avg != 0) {
+		tx_time_delta.avg += delta;
+		tx_time_delta.avg /= 2;
+	} else {
+		tx_time_delta.avg = delta;
+	}
+
+	BT_WARN(">>>>>> new tx_time_delta: cur %lld min %lld max %lld avg %lld ms <<<<<<",
+		delta,
+		tx_time_delta.min,
+		tx_time_delta.max,
+		tx_time_delta.avg);
+}
 
 #define FRIEND_ADV(buf) (*(struct friend_adv **)net_buf_user_data(buf))
 
@@ -141,7 +209,7 @@ static int32_t recv_delay(struct bt_mesh_friend *frnd)
 #if CONFIG_BT_MESH_FRIEND_RECV_WIN > 50
 	return (int32_t)frnd->recv_delay + (CONFIG_BT_MESH_FRIEND_RECV_WIN / 5);
 #else
-	return frnd->recv_delay;
+	return frnd->recv_delay - BT_MESH_FRIEND_ADV_LATENCY;
 #endif
 }
 
@@ -597,6 +665,8 @@ static void friend_recv_delay(struct bt_mesh_friend *frnd)
 {
 	int32_t delay = recv_delay(frnd);
 
+	pin_set(4);
+
 	frnd->pending_req = 1U;
 	k_work_reschedule(&frnd->timer, K_MSEC(delay));
 	BT_DBG("Waiting RecvDelay of %d ms", delay);
@@ -718,6 +788,8 @@ int bt_mesh_friend_poll(struct bt_mesh_net_rx *rx, struct net_buf_simple *buf)
 	}
 
 	BT_DBG("msg->fsn %u frnd->fsn %u", (msg->fsn & 1), frnd->fsn);
+
+	pin_toggle(29, 1);
 
 	friend_recv_delay(frnd);
 
@@ -1167,6 +1239,9 @@ static void buf_send_end(int err, void *user_data)
 
 	BT_DBG("err %d", err);
 
+	tx_time_delta_update(k_uptime_delta(&tx_time_start));
+	pin_clr(28);
+
 	if (frnd->pending_req || frnd->pending_buf) {
 		BT_WARN("Another request before previous completed sending");
 		return;
@@ -1231,6 +1306,8 @@ static void friend_timeout(struct k_work *work)
 		return;
 	}
 
+	pin_clr(4);
+
 	__ASSERT_NO_MSG(frnd->pending_buf == 0U);
 
 	BT_DBG("lpn 0x%04x send_last %u last %p", frnd->lpn,
@@ -1273,7 +1350,7 @@ static void friend_timeout(struct k_work *work)
 	frnd->queue_size--;
 
 send_last:
-	buf = bt_mesh_adv_create(BT_MESH_ADV_DATA, BT_MESH_LOCAL_ADV,
+	buf = bt_mesh_adv_create(BT_MESH_ADV_DATA, BT_MESH_FRIEND_ADV,
 				 FRIEND_XMIT, K_NO_WAIT);
 	if (!buf) {
 		BT_ERR("Unable to allocate friend adv buffer");
@@ -1281,6 +1358,9 @@ send_last:
 	}
 
 	net_buf_add_mem(buf, frnd->last->data, frnd->last->len);
+
+	pin_set(28);
+	tx_time_start = k_uptime_get();
 
 	frnd->pending_req = 0U;
 	frnd->pending_buf = 1U;

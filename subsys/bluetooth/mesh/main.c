@@ -41,6 +41,53 @@
 #include "mesh.h"
 #include "gatt_cli.h"
 
+#include <soc.h>
+
+static inline void pin_set(uint32_t pin)
+{
+	NRF_P0->OUTSET = 1 << pin;
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+}
+
+static inline void pin_clr(uint32_t pin)
+{
+	NRF_P0->OUTCLR = 1 << pin;
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+	__asm("NOP");
+}
+
+static inline void pin_toggle(uint32_t pin, uint32_t count)
+{
+	for (uint32_t i = 0; i < count; i++) {
+		pin_set(pin);
+		pin_clr(pin);
+	}
+}
+
+static void pin_cfg(uint32_t pin)
+{
+	static uint32_t pins_configured_mask;
+	if (pins_configured_mask & (1 << pin)) {
+		return;
+	}
+
+	pins_configured_mask |= (1 << pin);
+
+	NRF_P0->PIN_CNF[pin] = 0;
+	NRF_P0->PIN_CNF[pin] |= (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos) & GPIO_PIN_CNF_DIR_Msk;
+	NRF_P0->PIN_CNF[pin] |= (GPIO_PIN_CNF_PULL_Disabled << GPIO_PIN_CNF_PULL_Pos) & GPIO_PIN_CNF_PULL_Msk;
+	NRF_P0->PIN_CNF[pin] |= (GPIO_PIN_CNF_DRIVE_S0S1 << GPIO_PIN_CNF_DRIVE_Pos) & GPIO_PIN_CNF_DRIVE_Msk;
+	NRF_P0->PIN_CNF[pin] |= (GPIO_PIN_CNF_SENSE_Disabled << GPIO_PIN_CNF_SENSE_Pos) & GPIO_PIN_CNF_SENSE_Msk;
+	NRF_P0->OUTCLR = 1 << pin;
+
+	pin_toggle(pin, 1);
+}
+
 int bt_mesh_provision(const uint8_t net_key[16], uint16_t net_idx,
 		      uint8_t flags, uint32_t iv_index, uint16_t addr,
 		      const uint8_t dev_key[16])
@@ -365,6 +412,13 @@ int bt_mesh_init(const struct bt_mesh_prov *prov,
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
 		bt_mesh_settings_init();
 	}
+
+	bt_mesh_scan_init();
+
+	pin_cfg(3);
+	pin_cfg(4);
+	pin_cfg(28);
+	pin_cfg(29);
 
 	return 0;
 }
