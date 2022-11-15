@@ -13,6 +13,8 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/mesh.h>
 
+#include <sdc_hci_vs.h>
+
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_ADV)
 #define LOG_MODULE_NAME bt_mesh_adv_ext
 #include "common/log.h"
@@ -113,6 +115,26 @@ static inline struct bt_mesh_ext_adv *gatt_adv_get(void)
 #endif /* CONFIG_BT_MESH_ADV_EXT_GATT_SEPARATE */
 }
 
+static int set_adv_randomness(uint8_t handle, int rand_us)
+{
+	struct net_buf *buf;
+	sdc_hci_cmd_vs_set_adv_randomness_t *cmd_params;
+
+	buf = bt_hci_cmd_create(SDC_HCI_OPCODE_CMD_VS_SET_ADV_RANDOMNESS, sizeof(*cmd_params));
+	if (!buf) {
+		printk("Could not allocate command buffer\n");
+		return -ENOMEM;
+	}
+
+	cmd_params = net_buf_add(buf, sizeof(*cmd_params));
+	cmd_params->adv_handle = handle;
+	cmd_params->rand_us = rand_us;
+
+	return bt_hci_cmd_send_sync(SDC_HCI_OPCODE_CMD_VS_SET_ADV_RANDOMNESS, buf, NULL);
+}
+
+#define RANDOMNESS 0
+
 static int adv_start(struct bt_mesh_ext_adv *adv,
 		     const struct bt_le_adv_param *param,
 		     struct bt_le_ext_adv_start_param *start,
@@ -151,6 +173,11 @@ static int adv_start(struct bt_mesh_ext_adv *adv,
 	}
 
 	adv->timestamp = k_uptime_get();
+
+	err = set_adv_randomness(0xFF, 0);
+	if (err) {
+		BT_ERR("Failed to disable randomness: %d", err);
+	}
 
 	err = bt_le_ext_adv_start(adv->instance, start);
 	if (err) {
@@ -218,7 +245,7 @@ static void send_pending_adv(struct k_work *work)
 		 */
 		int64_t duration = k_uptime_delta(&adv->timestamp);
 
-		BT_DBG("Advertising stopped after %u ms", (uint32_t)duration);
+		BT_ERR("Advertising stopped after %u ms", (uint32_t)duration);
 
 		atomic_clear_bit(adv->flags, ADV_FLAG_ACTIVE);
 		atomic_clear_bit(adv->flags, ADV_FLAG_PROXY);
@@ -404,6 +431,13 @@ int bt_mesh_adv_enable(void)
 		if (err) {
 			return err;
 		}
+
+#if 0
+		err = set_adv_randomness(adv->instance->handle, 0);
+		if (err) {
+			BT_ERR("Failed to enable randomness: %d", err);
+		}
+#endif
 	}
 
 	return 0;
