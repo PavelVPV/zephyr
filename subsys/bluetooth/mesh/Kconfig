@@ -392,6 +392,13 @@ config BT_MESH_ADV_EXT_GATT_SEPARATE
 	  Use a separate extended advertising set for GATT Server Advertising,
 	  otherwise will be used a shared advertising set.
 
+config BT_MESH_ADV_EXT_FRIEND_SEPARATE
+	bool "Use a separate extended advertising set for Friend advertisings"
+	depends on BT_MESH_FRIEND
+	help
+	  Use a separate extended advertising set for Friend advertising,
+	  otherwise will be used a shared advertising set.
+
 endif # BT_MESH_ADV_EXT
 
 config BT_MESH_ADV_STACK_SIZE
