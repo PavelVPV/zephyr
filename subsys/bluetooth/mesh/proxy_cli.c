@@ -37,8 +37,8 @@ static struct bt_mesh_proxy_server {
 	struct bt_mesh_proxy_role *role;
 	bool link_opened;
 	uint16_t net_idx;
-} servers[CONFIG_BT_MAX_CONN] = {
-	[0 ... (CONFIG_BT_MAX_CONN - 1)] = {
+} servers[CONFIG_BT_MESH_MAX_CONN] = {
+	[0 ... (CONFIG_BT_MESH_MAX_CONN - 1)] = {
 		.net_idx = BT_MESH_KEY_UNUSED,
 	},
 };

@@ -57,8 +57,8 @@ static struct bt_mesh_proxy_client {
 		REJECT,
 	} filter_type;
 	struct k_work send_beacons;
-} clients[CONFIG_BT_MAX_CONN] = {
-	[0 ... (CONFIG_BT_MAX_CONN - 1)] = {
+} clients[CONFIG_BT_MESH_MAX_CONN] = {
+	[0 ... (CONFIG_BT_MESH_MAX_CONN - 1)] = {
 		.send_beacons = Z_WORK_INITIALIZER(proxy_send_beacons),
 	},
 };
@@ -556,7 +556,7 @@ static int gatt_proxy_advertise(struct bt_mesh_subnet *sub)
 
 	BT_DBG("");
 
-	if (bt_mesh_proxy_conn_count_get() == CONFIG_BT_MAX_CONN) {
+	if (bt_mesh_proxy_conn_count_get() == CONFIG_BT_MESH_MAX_CONN) {
 		BT_DBG("Connectable advertising deferred (max connections)");
 		return -ENOMEM;
 	}
@@ -847,7 +847,7 @@ static void gatt_connected(struct bt_conn *conn, uint8_t err)
 					       proxy_msg_recv);
 
 	/* Try to re-enable advertising in case it's possible */
-	if (bt_mesh_proxy_conn_count_get() < CONFIG_BT_MAX_CONN) {
+	if (bt_mesh_proxy_conn_count_get() < CONFIG_BT_MESH_MAX_CONN) {
 		bt_mesh_adv_gatt_update();
 	}
 }

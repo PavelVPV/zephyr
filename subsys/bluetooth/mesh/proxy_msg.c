@@ -49,11 +49,24 @@
 
 #define PDU_HDR(sar, type) (sar << 6 | (type & BIT_MASK(6)))
 
-static uint8_t __noinit bufs[CONFIG_BT_MAX_CONN * CONFIG_BT_MESH_PROXY_MSG_LEN];
+static uint8_t __noinit bufs[CONFIG_BT_MESH_MAX_CONN * CONFIG_BT_MESH_PROXY_MSG_LEN];
 
-static struct bt_mesh_proxy_role roles[CONFIG_BT_MAX_CONN];
+static struct bt_mesh_proxy_role roles[CONFIG_BT_MESH_MAX_CONN];
 
 static int conn_count;
+
+static struct bt_mesh_proxy_role* get_role_by_conn(struct bt_conn *conn)
+{
+	for (int i = 0; i < ARRAY_SIZE(roles); i++) {
+		if (!roles[i].conn || roles[i].conn != conn) {
+			continue;
+		}
+
+		return &role[i];
+	}
+
+	return NULL;
+}
 
 static void proxy_sar_timeout(struct k_work *work)
 {
@@ -73,7 +86,11 @@ ssize_t bt_mesh_proxy_msg_recv(struct bt_conn *conn,
 			       const void *buf, uint16_t len)
 {
 	const uint8_t *data = buf;
-	struct bt_mesh_proxy_role *role = &roles[bt_conn_index(conn)];
+	struct bt_mesh_proxy_role *role = get_role_by_conn(conn);
+
+	if (!role) {
+		return -ENOENT;
+	}
 
 	switch (PDU_SAR(data)) {
 	case SAR_COMPLETE:
@@ -144,7 +161,11 @@ int bt_mesh_proxy_msg_send(struct bt_conn *conn, uint8_t type,
 {
 	int err;
 	uint16_t mtu;
-	struct bt_mesh_proxy_role *role = &roles[bt_conn_index(conn)];
+	struct bt_mesh_proxy_role *role = get_role_by_conn(conn);
+
+	if (!role) {
+		return -ENOENT;
+	}
 
 	BT_DBG("conn %p type 0x%02x len %u: %s", (void *)conn, type, msg->len,
 	       bt_hex(msg->data, msg->len));

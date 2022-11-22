@@ -47,7 +47,7 @@ static struct bt_mesh_gatt_server {
 		struct bt_gatt_discover_params discover;
 		struct bt_gatt_subscribe_params subscribe;
 	};
-} servers[CONFIG_BT_MAX_CONN];
+} servers[CONFIG_BT_MESH_MAX_CONN];
 
 static struct bt_mesh_gatt_server *get_server(struct bt_conn *conn)
 {
@@ -302,7 +302,7 @@ static void scan_recv(const struct bt_le_scan_recv_info *info,
 		return;
 	}
 
-	if (bt_mesh_proxy_conn_count_get() == CONFIG_BT_MAX_CONN) {
+	if (bt_mesh_proxy_conn_count_get() == CONFIG_BT_MESH_MAX_CONN) {
 		return;
 	}
 
