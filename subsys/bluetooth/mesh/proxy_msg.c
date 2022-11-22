@@ -75,10 +75,6 @@ ssize_t bt_mesh_proxy_msg_recv(struct bt_conn *conn,
 	const uint8_t *data = buf;
 	struct bt_mesh_proxy_role *role = &roles[bt_mesh_proxy_msg_role_index(conn)];
 
-	if (!role) {
-		return -ENOENT;
-	}
-
 	switch (PDU_SAR(data)) {
 	case SAR_COMPLETE:
 		if (role->buf.len) {
@@ -149,10 +145,6 @@ int bt_mesh_proxy_msg_send(struct bt_conn *conn, uint8_t type,
 	int err;
 	uint16_t mtu;
 	struct bt_mesh_proxy_role *role = &roles[bt_mesh_proxy_msg_role_index(conn)];
-
-	if (!role) {
-		return -ENOENT;
-	}
 
 	BT_DBG("conn %p type 0x%02x len %u: %s", (void *)conn, type, msg->len,
 	       bt_hex(msg->data, msg->len));
