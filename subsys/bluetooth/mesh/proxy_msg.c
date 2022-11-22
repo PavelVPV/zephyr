@@ -55,19 +55,6 @@ static struct bt_mesh_proxy_role roles[CONFIG_BT_MESH_MAX_CONN];
 
 static int conn_count;
 
-static struct bt_mesh_proxy_role* get_role_by_conn(struct bt_conn *conn)
-{
-	for (int i = 0; i < ARRAY_SIZE(roles); i++) {
-		if (!roles[i].conn || roles[i].conn != conn) {
-			continue;
-		}
-
-		return &role[i];
-	}
-
-	return NULL;
-}
-
 static void proxy_sar_timeout(struct k_work *work)
 {
 	struct bt_mesh_proxy_role *role;
@@ -86,7 +73,7 @@ ssize_t bt_mesh_proxy_msg_recv(struct bt_conn *conn,
 			       const void *buf, uint16_t len)
 {
 	const uint8_t *data = buf;
-	struct bt_mesh_proxy_role *role = get_role_by_conn(conn);
+	struct bt_mesh_proxy_role *role = &roles[bt_mesh_proxy_msg_role_index(conn)];
 
 	if (!role) {
 		return -ENOENT;
@@ -161,7 +148,7 @@ int bt_mesh_proxy_msg_send(struct bt_conn *conn, uint8_t type,
 {
 	int err;
 	uint16_t mtu;
-	struct bt_mesh_proxy_role *role = get_role_by_conn(conn);
+	struct bt_mesh_proxy_role *role = &roles[bt_mesh_proxy_msg_role_index(conn)];
 
 	if (!role) {
 		return -ENOENT;
@@ -256,7 +243,7 @@ static void proxy_msg_init(struct bt_mesh_proxy_role *role)
 	}
 
 	net_buf_simple_init_with_data(&role->buf,
-				      &bufs[bt_conn_index(role->conn) *
+				      &bufs[bt_mesh_proxy_msg_role_index(role->conn) *
 					    CONFIG_BT_MESH_PROXY_MSG_LEN],
 				      CONFIG_BT_MESH_PROXY_MSG_LEN);
 
@@ -269,11 +256,18 @@ struct bt_mesh_proxy_role *bt_mesh_proxy_role_setup(struct bt_conn *conn,
 						    proxy_send_cb_t send,
 						    proxy_recv_cb_t recv)
 {
-	struct bt_mesh_proxy_role *role;
+	struct bt_mesh_proxy_role *role = NULL;
 
 	conn_count++;
 
-	role = &roles[bt_conn_index(conn)];
+	for (int i = 0; i < ARRAY_SIZE(roles); i++) {
+		if (!roles[i].conn) {
+			role = &roles[i];
+			break;
+		}
+	}
+
+	__ASSERT_NO_MSG(role);
 
 	role->conn = bt_conn_ref(conn);
 	proxy_msg_init(role);
@@ -301,4 +295,22 @@ void bt_mesh_proxy_role_cleanup(struct bt_mesh_proxy_role *role)
 int bt_mesh_proxy_conn_count_get(void)
 {
 	return conn_count;
+}
+
+int bt_mesh_proxy_msg_role_index(struct bt_conn *conn)
+{
+	if (CONFIG_BT_MESH_MAX_CONN == CONFIG_BT_MAX_CONN) {
+		return bt_conn_index(conn);
+	}
+
+	for (int i = 0; i < ARRAY_SIZE(roles); i++) {
+		if (!roles[i].conn || roles[i].conn != conn) {
+			continue;
+		}
+
+		return i;
+	}
+
+	__ASSERT_NO_MSG(false);
+	return 0;
 }

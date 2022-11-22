@@ -67,16 +67,7 @@ static struct bt_mesh_proxy_server *find_proxy_srv(uint16_t net_idx,
 
 static struct bt_mesh_proxy_server *find_proxy_srv_by_conn(struct bt_conn *conn)
 {
-	for (int i = 0; i < ARRAY_SIZE(servers); i++) {
-		if (!servers[i].role ||
-		    servers[i].role->conn != conn) {
-			continue;
-		}
-
-		return &servers[i];
-	}
-
-	return NULL;
+	return &servers[bt_mesh_proxy_msg_role_index(conn)];
 }
 
 bool bt_mesh_proxy_cli_relay(struct net_buf *buf)

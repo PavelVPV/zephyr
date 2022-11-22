@@ -67,7 +67,7 @@ static bool service_registered;
 
 static struct bt_mesh_proxy_client *find_client(struct bt_conn *conn)
 {
-	return &clients[bt_conn_index(conn)];
+	return &clients[bt_mesh_proxy_msg_role_index(conn)];
 }
 
 static ssize_t gatt_recv(struct bt_conn *conn,
@@ -829,6 +829,7 @@ bool bt_mesh_proxy_relay(struct net_buf *buf, uint16_t dst)
 static void gatt_connected(struct bt_conn *conn, uint8_t err)
 {
 	struct bt_mesh_proxy_client *client;
+	struct bt_mesh_proxy_role *cli;
 	struct bt_conn_info info;
 
 	bt_conn_get_info(conn, &info);
@@ -839,13 +840,13 @@ static void gatt_connected(struct bt_conn *conn, uint8_t err)
 
 	BT_DBG("conn %p err 0x%02x", (void *)conn, err);
 
+	cli = bt_mesh_proxy_role_setup(conn, proxy_send, proxy_msg_recv);
+
 	client = find_client(conn);
-
+	client->cli = cli;
 	client->filter_type = NONE;
-	(void)memset(client->filter, 0, sizeof(client->filter));
-	client->cli = bt_mesh_proxy_role_setup(conn, proxy_send,
-					       proxy_msg_recv);
 
+	(void)memset(client->filter, 0, sizeof(client->filter));
 	/* Try to re-enable advertising in case it's possible */
 	if (bt_mesh_proxy_conn_count_get() < CONFIG_BT_MESH_MAX_CONN) {
 		bt_mesh_adv_gatt_update();

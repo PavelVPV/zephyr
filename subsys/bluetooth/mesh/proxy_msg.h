@@ -46,6 +46,13 @@ struct bt_mesh_proxy_role {
 	struct net_buf_simple buf;
 };
 
+/* Returns struct bt_mesh_proxy_role index.
+ *
+ * The role must always be allocated through bt_mesh_proxy_role_setup() before using this function.
+ * This function must not be used after bt_mesh_proxy_role_cleanup().
+ */
+int bt_mesh_proxy_msg_role_index(struct bt_conn *conn);
+
 ssize_t bt_mesh_proxy_msg_recv(struct bt_conn *conn,
 			       const void *buf, uint16_t len);
 int bt_mesh_proxy_msg_send(struct bt_conn *conn, uint8_t type,

@@ -51,7 +51,17 @@ static struct bt_mesh_gatt_server {
 
 static struct bt_mesh_gatt_server *get_server(struct bt_conn *conn)
 {
-	return &servers[bt_conn_index(conn)];
+	if (CONFIG_BT_MESH_MAX_CONN == CONFIG_BT_MAX_CONN) {
+		return &servers[bt_conn_index(conn)];
+	}
+
+	for (int i = 0; i < ARRAY_SIZE(servers); i++) {
+		if (!servers[i].conn || servers[i].conn != conn) {
+			return &servers[i];
+		}
+	}
+
+	return NULL;
 }
 
 static uint8_t notify_func(struct bt_conn *conn,
