@@ -49,6 +49,21 @@ static struct bt_mesh_gatt_server {
 	};
 } servers[CONFIG_BT_MESH_MAX_CONN];
 
+static struct bt_mesh_gatt_server *create_server(struct bt_conn *conn)
+{
+	if (CONFIG_BT_MESH_MAX_CONN == CONFIG_BT_MAX_CONN) {
+		return &servers[bt_conn_index(conn)];
+	}
+
+	for (int i = 0; i < ARRAY_SIZE(servers); i++) {
+		if (!servers[i].conn) {
+			return &servers[i];
+		}
+	}
+
+	return NULL;
+}
+
 static struct bt_mesh_gatt_server *get_server(struct bt_conn *conn)
 {
 	if (CONFIG_BT_MESH_MAX_CONN == CONFIG_BT_MAX_CONN) {
@@ -253,6 +268,10 @@ int bt_mesh_gatt_cli_connect(const bt_addr_le_t *addr,
 		return -EALREADY;
 	}
 
+	if (bt_mesh_proxy_count_get() == CONFIG_BT_MESH_MAX_CONN) {
+		return -ENOMEM;
+	}
+
 	err = bt_mesh_scan_disable();
 	if (err) {
 		return err;
@@ -270,7 +289,7 @@ int bt_mesh_gatt_cli_connect(const bt_addr_le_t *addr,
 		return err;
 	}
 
-	server = get_server(conn);
+	server = create_server(conn);
 	server->conn = conn;
 	server->gatt = gatt;
 	server->user_data = user_data;
