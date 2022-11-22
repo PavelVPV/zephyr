@@ -21,10 +21,19 @@ enum bt_mesh_settings_flag {
 	BT_MESH_SETTINGS_FLAG_COUNT,
 };
 
+struct bt_mesh_settings_handler {
+	const char *name;
+	int (*h_set)(const char *key, size_t len, settings_read_cb read_cb,
+		     void *cb_arg);
+};
+
 #ifdef CONFIG_BT_SETTINGS
-#define BT_MESH_SETTINGS_DEFINE(_hname, _subtree, _set)			     \
-	SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh_##_hname, "bt/mesh/" _subtree, \
-				       NULL, _set, NULL, NULL)
+#define BT_MESH_SETTINGS_DEFINE(_hname, _subtree, _set)				     \
+	const STRUCT_SECTION_ITERABLE(bt_mesh_settings_handler,			     \
+				      bt_mesh_settings_handler_ ## _hname) = {       \
+		.name = _subtree,					     \
+		.h_set = _set,							     \
+	}
 #else
 /* Declaring non static settings handler helps avoid unnecessary ifdefs
  * as well as unused function warning. Since the declared handler structure is

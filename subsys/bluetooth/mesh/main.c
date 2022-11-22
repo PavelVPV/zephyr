@@ -366,6 +366,8 @@ int bt_mesh_init(const struct bt_mesh_prov *prov,
 		bt_mesh_settings_init();
 	}
 
+	atomic_set_bit(bt_mesh.flags, BT_MESH_INIT);
+
 	return 0;
 }
 

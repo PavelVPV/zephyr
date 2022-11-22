@@ -61,6 +61,49 @@ int bt_mesh_settings_set(settings_read_cb read_cb, void *cb_arg,
 	return 0;
 }
 
+static int mesh_set(const char *key, size_t len, settings_read_cb read_cb, void *cb_arg)
+{
+	int rc;
+	struct bt_mesh_settings_handler *bestmatch = NULL;
+	const char *tmpnext = NULL;
+	const char **next = &key;
+
+	if (!atomic_test_bit(bt_mesh.flags, BT_MESH_INIT)) {
+		BT_ERR("Mesh not initialized");
+		return 0;
+	}
+
+	STRUCT_SECTION_FOREACH(bt_mesh_settings_handler, ch) {
+		if (!settings_name_steq(key, ch->name, &tmpnext)) {
+			continue;
+		}
+		if (!bestmatch) {
+			bestmatch = ch;
+			if (next) {
+				*next = tmpnext;
+			}
+			continue;
+		}
+		if (settings_name_steq(ch->name, bestmatch->name, NULL)) {
+			bestmatch = ch;
+			if (next) {
+				*next = tmpnext;
+			}
+		}
+	}
+
+	if (bestmatch) {
+		if (bestmatch->h_set) {
+			rc = bestmatch->h_set(*next, len, read_cb, cb_arg);
+			return rc;
+		}
+	} else {
+		BT_ERR("Handler not found");
+	}
+
+	return 0;
+}
+
 static int mesh_commit(void)
 {
 	if (!atomic_test_bit(bt_dev.flags, BT_DEV_ENABLE)) {
@@ -92,7 +135,7 @@ static int mesh_commit(void)
 	return 0;
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh, "bt/mesh", NULL, NULL, mesh_commit,
+SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh, "bt/mesh", NULL, mesh_set, mesh_commit,
 			       NULL);
 
 /* Pending flags that use K_NO_WAIT as the storage timeout */

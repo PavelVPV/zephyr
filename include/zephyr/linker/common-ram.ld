@@ -12,6 +12,7 @@
 
 #if defined(CONFIG_BT_MESH)
 	ITERABLE_SECTION_RAM(bt_mesh_ext_adv, 4)
+	ITERABLE_SECTION_RAM(bt_mesh_settings_handler, 4)
 #endif
 
 #if defined(CONFIG_GEN_SW_ISR_TABLE) && defined(CONFIG_DYNAMIC_INTERRUPTS)

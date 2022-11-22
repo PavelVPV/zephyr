@@ -180,6 +180,8 @@ enum {
 	BT_MESH_GATT_PROXY,
 	BT_MESH_FRIEND,
 
+	BT_MESH_INIT,
+
 	/* Don't touch - intentionally last */
 	BT_MESH_FLAG_COUNT,
 };
