@@ -37,7 +37,6 @@
 #include "pb_gatt_cli.h"
 
 static struct bt_mesh_gatt_server {
-	struct bt_conn *conn;
 	uint16_t svc_start_handle;
 	uint16_t data_in_handle;
 	const struct bt_mesh_gatt_cli *gatt;
@@ -49,34 +48,9 @@ static struct bt_mesh_gatt_server {
 	};
 } servers[CONFIG_BT_MESH_MAX_CONN];
 
-static struct bt_mesh_gatt_server *create_server(struct bt_conn *conn)
-{
-	if (CONFIG_BT_MESH_MAX_CONN == CONFIG_BT_MAX_CONN) {
-		return &servers[bt_conn_index(conn)];
-	}
-
-	for (int i = 0; i < ARRAY_SIZE(servers); i++) {
-		if (!servers[i].conn) {
-			return &servers[i];
-		}
-	}
-
-	return NULL;
-}
-
 static struct bt_mesh_gatt_server *get_server(struct bt_conn *conn)
 {
-	if (CONFIG_BT_MESH_MAX_CONN == CONFIG_BT_MAX_CONN) {
-		return &servers[bt_conn_index(conn)];
-	}
-
-	for (int i = 0; i < ARRAY_SIZE(servers); i++) {
-		if (!servers[i].conn || servers[i].conn != conn) {
-			return &servers[i];
-		}
-	}
-
-	return NULL;
+	return &servers[bt_mesh_proxy_role_index(conn)];
 }
 
 static uint8_t notify_func(struct bt_conn *conn,
@@ -113,7 +87,9 @@ static void notify_enabled(struct bt_conn *conn, uint8_t err,
 
 	BT_DBG("[SUBSCRIBED]");
 
-	server->gatt->link_open(conn);
+	struct bt_mesh_proxy_role *role = bt_mesh_proxy_role_by_conn(conn);
+
+	server->gatt->link_open(role);
 }
 
 static uint8_t discover_func(struct bt_conn *conn,
@@ -210,8 +186,8 @@ static void gatt_connected(struct bt_conn *conn, uint8_t conn_err)
 	if (conn_err) {
 		BT_ERR("Failed to connect GATT Services(%u)", conn_err);
 
-		bt_conn_unref(server->conn);
-		server->conn = NULL;
+		bt_mesh_proxy_role_cleanup();
+		bt_conn_unref(conn);
 
 		(void)bt_mesh_scan_enable();
 
@@ -220,7 +196,9 @@ static void gatt_connected(struct bt_conn *conn, uint8_t conn_err)
 
 	BT_DBG("conn %p err 0x%02x", (void *)conn, conn_err);
 
-	server->gatt->connected(conn, server->user_data);
+	struct bt_mesh_proxy_role *role = bt_mesh_proxy_role_by_conn(conn);
+
+	server->gatt->connected(role, server->user_data);
 
 	(void)bt_mesh_scan_enable();
 
@@ -246,9 +224,11 @@ static void gatt_disconnected(struct bt_conn *conn, uint8_t reason)
 		return;
 	}
 
-	server->gatt->disconnected(conn);
+	struct bt_mesh_proxy_role *role = bt_mesh_proxy_role_by_conn(conn);
 
-	bt_conn_unref(server->conn);
+	server->gatt->disconnected(role);
+
+	bt_conn_unref(conn);
 
 	(void)memset(server, 0, sizeof(struct bt_mesh_gatt_server));
 }
@@ -268,10 +248,6 @@ int bt_mesh_gatt_cli_connect(const bt_addr_le_t *addr,
 		return -EALREADY;
 	}
 
-	if (bt_mesh_proxy_count_get() == CONFIG_BT_MESH_MAX_CONN) {
-		return -ENOMEM;
-	}
-
 	err = bt_mesh_scan_disable();
 	if (err) {
 		return err;
@@ -289,8 +265,7 @@ int bt_mesh_gatt_cli_connect(const bt_addr_le_t *addr,
 		return err;
 	}
 
-	server = create_server(conn);
-	server->conn = conn;
+	server = &servers[bt_mesh_proxy_role_alloc(conn)];
 	server->gatt = gatt;
 	server->user_data = user_data;
 
@@ -331,7 +306,7 @@ static void scan_recv(const struct bt_le_scan_recv_info *info,
 		return;
 	}
 
-	if (bt_mesh_proxy_conn_count_get() == CONFIG_BT_MESH_MAX_CONN) {
+	if (!bt_mesh_proxy_has_avail_conn()) {
 		return;
 	}
 

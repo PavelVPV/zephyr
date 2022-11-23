@@ -104,7 +104,8 @@ static void gatt_connected(struct bt_conn *conn, uint8_t err)
 		return;
 	}
 
-	cli = bt_mesh_proxy_role_setup(conn, gatt_send, proxy_msg_recv);
+	cli = bt_mesh_proxy_role_alloc(conn);
+	bt_mesh_proxy_role_setup(cli, gatt_send, proxy_msg_recv);
 
 	BT_DBG("conn %p err 0x%02x", (void *)conn, err);
 }
@@ -271,7 +272,7 @@ int bt_mesh_pb_gatt_srv_adv_start(void)
 	BT_DBG("");
 
 	if (!service_registered || bt_mesh_is_provisioned() ||
-	    bt_mesh_proxy_conn_count_get() == CONFIG_BT_MAX_CONN) {
+	    !bt_mesh_proxy_has_avail_conn()) {
 		return -ENOTSUP;
 	}
 

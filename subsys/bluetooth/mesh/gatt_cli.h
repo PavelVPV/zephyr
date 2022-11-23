@@ -11,9 +11,9 @@ struct bt_mesh_gatt_cli {
 	struct bt_uuid_16 data_out_uuid;
 	struct bt_uuid_16 data_out_cccd_uuid;
 
-	void (*connected)(struct bt_conn *conn, void *user_data);
-	void (*link_open)(struct bt_conn *conn);
-	void (*disconnected)(struct bt_conn *conn);
+	void (*connected)(struct bt_mesh_proxy_role *role, void *user_data);
+	void (*link_open)(struct bt_mesh_proxy_role *role);
+	void (*disconnected)(struct bt_mesh_proxy_role *role);
 };
 
 int bt_mesh_gatt_cli_connect(const bt_addr_le_t *addr,

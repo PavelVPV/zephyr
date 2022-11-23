@@ -67,7 +67,7 @@ static struct bt_mesh_proxy_server *find_proxy_srv(uint16_t net_idx,
 
 static struct bt_mesh_proxy_server *find_proxy_srv_by_conn(struct bt_conn *conn)
 {
-	return &servers[bt_mesh_proxy_msg_role_index(conn)];
+	return &servers[bt_mesh_proxy_role_index(conn)];
 }
 
 bool bt_mesh_proxy_cli_relay(struct net_buf *buf)
@@ -113,26 +113,26 @@ static void proxy_msg_recv(struct bt_mesh_proxy_role *role)
 	}
 }
 
-static void proxy_connected(struct bt_conn *conn, void *user_data)
+static void proxy_connected(struct bt_mesh_proxy_role *role, void *user_data)
 {
 	struct bt_mesh_proxy_server *srv = user_data;
 
-	srv->role = bt_mesh_proxy_role_setup(conn, bt_mesh_gatt_send,
-					     proxy_msg_recv);
+	srv->role = role;
+	bt_mesh_proxy_role_setup(role, bt_mesh_gatt_send, proxy_msg_recv);
 }
 
-static void proxy_link_open(struct bt_conn *conn)
+static void proxy_link_open(struct bt_mesh_proxy_role *role)
 {
-	struct bt_mesh_proxy_server *srv = find_proxy_srv_by_conn(conn);
+	struct bt_mesh_proxy_server *srv = &servers[bt_mesh_proxy_role_index(role)];
 
 	srv->link_opened = true;
 }
 
-static void proxy_disconnected(struct bt_conn *conn)
+static void proxy_disconnected(struct bt_mesh_proxy_role *role)
 {
-	struct bt_mesh_proxy_server *srv = find_proxy_srv_by_conn(conn);
+	struct bt_mesh_proxy_server *srv = &servers[bt_mesh_proxy_role_index(role)];
 
-	bt_mesh_proxy_role_cleanup(srv->role);
+	bt_mesh_proxy_role_cleanup(role);
 
 	srv->role = NULL;
 	srv->link_opened = false;

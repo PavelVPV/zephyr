@@ -51,7 +51,8 @@ struct bt_mesh_proxy_role {
  * The role must always be allocated through bt_mesh_proxy_role_setup() before using this function.
  * This function must not be used after bt_mesh_proxy_role_cleanup().
  */
-int bt_mesh_proxy_msg_role_index(struct bt_conn *conn);
+int bt_mesh_proxy_role_index_by_conn(struct bt_conn *conn);
+int bt_mesh_proxy_role_index(struct bt_mesh_proxy_role *role);
 
 ssize_t bt_mesh_proxy_msg_recv(struct bt_conn *conn,
 			       const void *buf, uint16_t len);
@@ -59,11 +60,13 @@ int bt_mesh_proxy_msg_send(struct bt_conn *conn, uint8_t type,
 			   struct net_buf_simple *msg,
 			   bt_gatt_complete_func_t end, void *user_data);
 int bt_mesh_proxy_relay_send(struct bt_conn *conn, struct net_buf *buf);
-struct bt_mesh_proxy_role *bt_mesh_proxy_role_setup(struct bt_conn *conn,
-						    proxy_send_cb_t send,
-						    proxy_recv_cb_t recv);
+struct bt_mesh_proxy_role *bt_mesh_proxy_role_alloc(struct bt_conn *conn);
+void bt_mesh_proxy_role_setup(struct bt_mesh_proxy_role *role,
+			    proxy_send_cb_t send,
+			    proxy_recv_cb_t recv);
 void bt_mesh_proxy_role_cleanup(struct bt_mesh_proxy_role *role);
 
-int bt_mesh_proxy_conn_count_get(void);
+bool bt_mesh_proxy_has_avail_conn(void);
 
 #endif /* ZEPHYR_SUBSYS_BLUETOOTH_MESH_PROXY_MSG_H_ */
+

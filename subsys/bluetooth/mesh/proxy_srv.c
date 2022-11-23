@@ -49,7 +49,6 @@ static int proxy_send(struct bt_conn *conn,
 		      bt_gatt_complete_func_t end, void *user_data);
 
 static struct bt_mesh_proxy_client {
-	struct bt_mesh_proxy_role *cli;
 	uint16_t filter[CONFIG_BT_MESH_PROXY_FILTER_SIZE];
 	enum __packed {
 		NONE,
@@ -67,7 +66,7 @@ static bool service_registered;
 
 static struct bt_mesh_proxy_client *find_client(struct bt_conn *conn)
 {
-	return &clients[bt_mesh_proxy_msg_role_index(conn)];
+	return &clients[bt_mesh_proxy_role_index(conn)];
 }
 
 static ssize_t gatt_recv(struct bt_conn *conn,
@@ -556,7 +555,7 @@ static int gatt_proxy_advertise(struct bt_mesh_subnet *sub)
 
 	BT_DBG("");
 
-	if (bt_mesh_proxy_conn_count_get() == CONFIG_BT_MESH_MAX_CONN) {
+	if (!bt_mesh_proxy_has_avail_conn()) {
 		BT_DBG("Connectable advertising deferred (max connections)");
 		return -ENOMEM;
 	}
@@ -752,10 +751,10 @@ int bt_mesh_proxy_gatt_disable(void)
 void bt_mesh_proxy_addr_add(struct net_buf_simple *buf, uint16_t addr)
 {
 	struct bt_mesh_proxy_client *client;
-	struct bt_mesh_proxy_role *cli =
-		CONTAINER_OF(buf, struct bt_mesh_proxy_role, buf);
+	struct bt_mesh_proxy_role *role  =
+		CONTAINER_OF(buf, uint16_t, buf);
 
-	client = find_client(cli->conn);
+	client = &clients[bt_mesh_proxy_role_index(role)];
 
 	BT_DBG("filter_type %u addr 0x%04x", client->filter_type, addr);
 
@@ -829,7 +828,6 @@ bool bt_mesh_proxy_relay(struct net_buf *buf, uint16_t dst)
 static void gatt_connected(struct bt_conn *conn, uint8_t err)
 {
 	struct bt_mesh_proxy_client *client;
-	struct bt_mesh_proxy_role *cli;
 	struct bt_conn_info info;
 
 	bt_conn_get_info(conn, &info);
@@ -840,15 +838,13 @@ static void gatt_connected(struct bt_conn *conn, uint8_t err)
 
 	BT_DBG("conn %p err 0x%02x", (void *)conn, err);
 
-	cli = bt_mesh_proxy_role_setup(conn, proxy_send, proxy_msg_recv);
-
-	client = find_client(conn);
-	client->cli = cli;
+	client = &clients[bt_mesh_proxy_role_alloc(conn)];
+	client->cli = bt_mesh_proxy_role_setup(conn, proxy_send, proxy_msg_recv);
 	client->filter_type = NONE;
 
 	(void)memset(client->filter, 0, sizeof(client->filter));
 	/* Try to re-enable advertising in case it's possible */
-	if (bt_mesh_proxy_conn_count_get() < CONFIG_BT_MESH_MAX_CONN) {
+	if (bt_mesh_proxy_has_avail_conn()) {
 		bt_mesh_adv_gatt_update();
 	}
 }
@@ -868,7 +864,7 @@ static void gatt_disconnected(struct bt_conn *conn, uint8_t reason)
 		return;
 	}
 
-	client = find_client(conn);
+	client = &clients[bt_mesh_proxy_role_index(conn)];
 	if (client->cli) {
 		bt_mesh_proxy_role_cleanup(client->cli);
 		client->cli = NULL;

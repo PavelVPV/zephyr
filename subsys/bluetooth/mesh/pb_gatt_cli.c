@@ -52,26 +52,26 @@ static void pb_gatt_msg_recv(struct bt_mesh_proxy_role *role)
 	}
 }
 
-static void pb_gatt_connected(struct bt_conn *conn, void *user_data)
+static void pb_gatt_connected(struct bt_mesh_proxy_role *role, void *user_data)
 {
-	server.srv = bt_mesh_proxy_role_setup(conn, bt_mesh_gatt_send,
-					      pb_gatt_msg_recv);
+	server.srv = role;
+	bt_mesh_proxy_role_setup(role, bt_mesh_gatt_send, pb_gatt_msg_recv);
 
 	server.target = NULL;
 
-	bt_mesh_pb_gatt_cli_start(conn);
+	bt_mesh_pb_gatt_cli_start(role->conn);
 }
 
-static void pb_gatt_link_open(struct bt_conn *conn)
+static void pb_gatt_link_open(struct bt_mesh_proxy_role *role)
 {
-	bt_mesh_pb_gatt_cli_open(conn);
+	bt_mesh_pb_gatt_cli_open(role->conn);
 }
 
-static void pb_gatt_disconnected(struct bt_conn *conn)
+static void pb_gatt_disconnected(struct bt_mesh_proxy_role *role)
 {
-	bt_mesh_pb_gatt_close(conn);
+	bt_mesh_pb_gatt_close(role->conn);
 
-	bt_mesh_proxy_role_cleanup(server.srv);
+	bt_mesh_proxy_role_cleanup(role);
 
 	server.srv = NULL;
 }

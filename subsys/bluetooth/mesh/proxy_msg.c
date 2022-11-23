@@ -53,8 +53,6 @@ static uint8_t __noinit bufs[CONFIG_BT_MESH_MAX_CONN * CONFIG_BT_MESH_PROXY_MSG_
 
 static struct bt_mesh_proxy_role roles[CONFIG_BT_MESH_MAX_CONN];
 
-static int conn_count;
-
 static void proxy_sar_timeout(struct k_work *work)
 {
 	struct bt_mesh_proxy_role *role;
@@ -73,7 +71,7 @@ ssize_t bt_mesh_proxy_msg_recv(struct bt_conn *conn,
 			       const void *buf, uint16_t len)
 {
 	const uint8_t *data = buf;
-	struct bt_mesh_proxy_role *role = &roles[bt_mesh_proxy_msg_role_index(conn)];
+	struct bt_mesh_proxy_role *role = &roles[bt_mesh_proxy_role_index(conn)];
 
 	switch (PDU_SAR(data)) {
 	case SAR_COMPLETE:
@@ -144,7 +142,7 @@ int bt_mesh_proxy_msg_send(struct bt_conn *conn, uint8_t type,
 {
 	int err;
 	uint16_t mtu;
-	struct bt_mesh_proxy_role *role = &roles[bt_mesh_proxy_msg_role_index(conn)];
+	struct bt_mesh_proxy_role *role = &roles[bt_mesh_proxy_role_index(conn)];
 
 	BT_DBG("conn %p type 0x%02x len %u: %s", (void *)conn, type, msg->len,
 	       bt_hex(msg->data, msg->len));
@@ -235,7 +233,7 @@ static void proxy_msg_init(struct bt_mesh_proxy_role *role)
 	}
 
 	net_buf_simple_init_with_data(&role->buf,
-				      &bufs[bt_mesh_proxy_msg_role_index(role->conn) *
+				      &bufs[bt_mesh_proxy_role_index(role->conn) *
 					    CONFIG_BT_MESH_PROXY_MSG_LEN],
 				      CONFIG_BT_MESH_PROXY_MSG_LEN);
 
@@ -244,30 +242,35 @@ static void proxy_msg_init(struct bt_mesh_proxy_role *role)
 	k_work_init_delayable(&role->sar_timer, proxy_sar_timeout);
 }
 
-struct bt_mesh_proxy_role *bt_mesh_proxy_role_setup(struct bt_conn *conn,
-						    proxy_send_cb_t send,
-						    proxy_recv_cb_t recv)
+struct bt_mesh_proxy_role *bt_mesh_proxy_role_alloc(struct bt_conn *conn)
 {
-	struct bt_mesh_proxy_role *role = NULL;
-
-	conn_count++;
+	if (CONFIG_BT_MESH_MAX_CONN == CONFIG_BT_MAX_CONN) {
+		int i = bt_conn_index(conn);
+		roles[i].conn = bt_conn_ref(conn);
+		return &roles[i];
+	}
 
 	for (int i = 0; i < ARRAY_SIZE(roles); i++) {
 		if (!roles[i].conn) {
-			role = &roles[i];
-			break;
+			roles[i].conn = bt_conn_ref(conn);
+			return &roles[i];
 		}
 	}
 
-	__ASSERT_NO_MSG(role);
+	__ASSERT_NO_MSG(false);
+	return NULL;
+}
 
-	role->conn = bt_conn_ref(conn);
+void bt_mesh_proxy_role_setup(struct bt_mesh_proxy_role *role,
+			    proxy_send_cb_t send,
+			    proxy_recv_cb_t recv)
+{
+	struct bt_mesh_proxy_role *role = &roles[bt_mesh_proxy_role_index(conn)];
+
 	proxy_msg_init(role);
 
 	role->cb.recv = recv;
 	role->cb.send = send;
-
-	return role;
 }
 
 void bt_mesh_proxy_role_cleanup(struct bt_mesh_proxy_role *role)
@@ -279,17 +282,27 @@ void bt_mesh_proxy_role_cleanup(struct bt_mesh_proxy_role *role)
 	bt_conn_unref(role->conn);
 	role->conn = NULL;
 
-	conn_count--;
-
 	bt_mesh_adv_gatt_update();
 }
 
-int bt_mesh_proxy_conn_count_get(void)
+void bt_mesh_proxy_role_free(struct bt_conn *conn)
 {
-	return conn_count;
+	struct bt_mesh_proxy_role *role = &roles[bt_mesh_proxy_role_index(conn)];
+	bt_conn_unref(role->conn);
 }
 
-int bt_mesh_proxy_msg_role_index(struct bt_conn *conn)
+bool bt_mesh_proxy_has_avail_conn(void)
+{
+	for (int i = 0; i < ARRAY_SIZE(roles); i++) {
+		if (!roles[i].conn) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+int bt_mesh_proxy_role_index_by_conn(struct bt_conn *conn)
 {
 	if (CONFIG_BT_MESH_MAX_CONN == CONFIG_BT_MAX_CONN) {
 		return bt_conn_index(conn);
@@ -305,4 +318,14 @@ int bt_mesh_proxy_msg_role_index(struct bt_conn *conn)
 
 	__ASSERT_NO_MSG(false);
 	return 0;
+}
+
+int bt_mesh_proxy_role_index(struct bt_mesh_proxy_role *role)
+{
+	int index;
+
+	index = role - roles;
+	__ASSERT_NO_MSG(index >= 0 && index < ARRAY_SIZE(roles));
+
+	return index;
 }
