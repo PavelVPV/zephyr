@@ -49,9 +49,29 @@
 
 #define PDU_HDR(sar, type) (sar << 6 | (type & BIT_MASK(6)))
 
-static uint8_t __noinit bufs[CONFIG_BT_MESH_MAX_CONN * CONFIG_BT_MESH_PROXY_MSG_LEN];
+#if defined(CONFIG_BT_MESH_PB_GATT)
+#define PB_GATT_SERVER_CONN 1
+#else
+#define PB_GATT_SERVER_CONN 0
+#endif
 
-static struct bt_mesh_proxy_role roles[CONFIG_BT_MESH_MAX_CONN];
+#if defined(CONFIG_BT_MESH_PB_GATT_CLIENT)
+#define PB_GATT_CLIENT_CONN 1
+#else
+#define PB_GATT_CLIENT_CONN 0
+#endif
+
+#define PROXY_ROLE_MAX_CONN CONFIG_BT_MESH_GATT_PROXY_CLIENT_MAX_CONN + \
+			    CONFIG_BT_MESH_GATT_PROXY_MAX_CONN + \
+			    PB_GATT_CLIENT_CONN + \
+			    PB_GATT_SERVER_CONN
+
+BUILD_ASSERT(PROXY_ROLE_MAX_CONN == CONFIG_BT_MAX_CONN,
+	     "Not enough available connections. Increase CONFIG_BT_MAX_CONN value.")
+
+static uint8_t __noinit bufs[PROXY_ROLE_MAX_CONN * CONFIG_BT_MESH_PROXY_MSG_LEN];
+
+static struct bt_mesh_proxy_role roles[PROXY_ROLE_MAX_CONN];
 
 static void proxy_sar_timeout(struct k_work *work)
 {
@@ -244,7 +264,7 @@ static void proxy_msg_init(struct bt_mesh_proxy_role *role)
 
 struct bt_mesh_proxy_role *bt_mesh_proxy_role_alloc(struct bt_conn *conn)
 {
-	if (CONFIG_BT_MESH_MAX_CONN == CONFIG_BT_MAX_CONN) {
+	if (PROXY_ROLE_MAX_CONN == CONFIG_BT_MAX_CONN) {
 		int i = bt_conn_index(conn);
 		roles[i].conn = bt_conn_ref(conn);
 		return &roles[i];
@@ -261,7 +281,7 @@ struct bt_mesh_proxy_role *bt_mesh_proxy_role_alloc(struct bt_conn *conn)
 	return NULL;
 }
 
-void bt_mesh_proxy_role_setup(struct bt_mesh_proxy_role *role,
+void bt_mesh_proxy_role_setup(struct bt_conn *conn,
 			    proxy_send_cb_t send,
 			    proxy_recv_cb_t recv)
 {
@@ -304,7 +324,7 @@ bool bt_mesh_proxy_has_avail_conn(void)
 
 int bt_mesh_proxy_role_index_by_conn(struct bt_conn *conn)
 {
-	if (CONFIG_BT_MESH_MAX_CONN == CONFIG_BT_MAX_CONN) {
+	if (PROXY_ROLE_MAX_CONN == CONFIG_BT_MAX_CONN) {
 		return bt_conn_index(conn);
 	}
 

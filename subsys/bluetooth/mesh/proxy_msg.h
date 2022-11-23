@@ -61,7 +61,7 @@ int bt_mesh_proxy_msg_send(struct bt_conn *conn, uint8_t type,
 			   bt_gatt_complete_func_t end, void *user_data);
 int bt_mesh_proxy_relay_send(struct bt_conn *conn, struct net_buf *buf);
 struct bt_mesh_proxy_role *bt_mesh_proxy_role_alloc(struct bt_conn *conn);
-void bt_mesh_proxy_role_setup(struct bt_mesh_proxy_role *role,
+void bt_mesh_proxy_role_setup(struct bt_conn *conn,
 			    proxy_send_cb_t send,
 			    proxy_recv_cb_t recv);
 void bt_mesh_proxy_role_cleanup(struct bt_mesh_proxy_role *role);

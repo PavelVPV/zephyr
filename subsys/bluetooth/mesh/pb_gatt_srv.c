@@ -97,6 +97,7 @@ static ssize_t gatt_recv(struct bt_conn *conn,
 static void gatt_connected(struct bt_conn *conn, uint8_t err)
 {
 	struct bt_conn_info info;
+	struct bt_mesh_proxy_role *role;
 
 	bt_conn_get_info(conn, &info);
 	if (info.role != BT_CONN_ROLE_PERIPHERAL || !service_registered ||
@@ -104,8 +105,12 @@ static void gatt_connected(struct bt_conn *conn, uint8_t err)
 		return;
 	}
 
-	cli = bt_mesh_proxy_role_alloc(conn);
-	bt_mesh_proxy_role_setup(cli, gatt_send, proxy_msg_recv);
+	role = bt_mesh_proxy_role_alloc(conn);
+	if (!role) {
+		return;
+	}
+
+	cli = bt_mesh_proxy_role_setup(conn, gatt_send, proxy_msg_recv);
 
 	BT_DBG("conn %p err 0x%02x", (void *)conn, err);
 }

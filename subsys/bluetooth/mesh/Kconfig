@@ -212,13 +212,21 @@ config BT_MESH_PROXY_FILTER_SIZE
 	  enough so that proxy client can communicate with several devices through
 	  this proxy server node using the default accept list filter type.
 
-config BT_MESH_MAX_CONN
-	int "Maximum number of simultaneous connections used by the stack"
-	default BT_MAX_CONN
+config BT_MESH_GATT_PROXY_CLIENT_MAX_CONN
+	int "Maximum number of outgoing simultaneous connections used by GATT Proxy Client"
 	range 1 BT_MAX_CONN
+	depends on BT_MESH_PROXY_CLIENT
 	help
 	  Maximum number of simultaneous Bluetooth connections that the stack
-	  can use.
+	  can use for GATT Proxy Client.
+
+config BT_MESH_GATT_PROXY_MAX_CONN
+	int "Maximum number of incoming simultaneous connections used by GATT Proxy Server"
+	range 1 BT_MAX_CONN
+	depends on BT_MESH_GATT_PROXY
+	help
+	  Maximum number of incoming simultaneous Bluetooth connections that the stack
+	  can use for GATT Proxy Server.
 
 endif # BT_CONN
 

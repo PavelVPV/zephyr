@@ -49,6 +49,7 @@ static int proxy_send(struct bt_conn *conn,
 		      bt_gatt_complete_func_t end, void *user_data);
 
 static struct bt_mesh_proxy_client {
+	struct bt_mesh_proxy_role *cli;
 	uint16_t filter[CONFIG_BT_MESH_PROXY_FILTER_SIZE];
 	enum __packed {
 		NONE,
@@ -56,17 +57,38 @@ static struct bt_mesh_proxy_client {
 		REJECT,
 	} filter_type;
 	struct k_work send_beacons;
-} clients[CONFIG_BT_MESH_MAX_CONN] = {
-	[0 ... (CONFIG_BT_MESH_MAX_CONN - 1)] = {
+} clients[CONFIG_BT_MESH_GATT_PROXY_MAX_CONN] = {
+	[0 ... (CONFIG_BT_MESH_GATT_PROXY_MAX_CONN - 1)] = {
 		.send_beacons = Z_WORK_INITIALIZER(proxy_send_beacons),
 	},
 };
 
 static bool service_registered;
 
-static struct bt_mesh_proxy_client *find_client(struct bt_conn *conn)
+static struct bt_mesh_proxy_client *client_alloc(struct bt_conn *conn)
 {
-	return &clients[bt_mesh_proxy_role_index(conn)];
+	for (int i = 0; i < ARRAY_SIZE(clients); i++) {
+		if (clients[i].cli) {
+			continue;
+		}
+
+		return &clients[i];
+	}
+
+	return NULL;
+}
+
+static struct bt_mesh_proxy_client *client_find(struct bt_conn *conn)
+{
+	for (int i = 0; i < ARRAY_SIZE(clients); i++) {
+		if (!clients[i].cli || clients[i].cli->conn != conn) {
+			continue;
+		}
+
+		return &clients[i];
+	}
+
+	return NULL;
 }
 
 static ssize_t gatt_recv(struct bt_conn *conn,
@@ -212,13 +234,13 @@ static void send_filter_status(struct bt_mesh_proxy_client *client,
 	}
 }
 
-static void proxy_filter_recv(struct bt_conn *conn,
+static void proxy_filter_recv(struct bt_mesh_proxy_role *role,
 			      struct bt_mesh_net_rx *rx, struct net_buf_simple *buf)
 {
 	struct bt_mesh_proxy_client *client;
 	uint8_t opcode;
 
-	client = find_client(conn);
+	client = client_find(role->conn);
 
 	opcode = net_buf_simple_pull_u8(buf);
 	switch (opcode) {
@@ -281,7 +303,7 @@ static void proxy_cfg(struct bt_mesh_proxy_role *role)
 		return;
 	}
 
-	proxy_filter_recv(role->conn, &rx, &buf);
+	proxy_filter_recv(role, &rx, &buf);
 }
 
 static void proxy_msg_recv(struct bt_mesh_proxy_role *role)
@@ -657,7 +679,7 @@ static ssize_t proxy_ccc_write(struct bt_conn *conn,
 		return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
 	}
 
-	client = find_client(conn);
+	client = client_find(conn);
 	if (client->filter_type == NONE) {
 		client->filter_type = ACCEPT;
 		k_work_submit(&client->send_beacons);
@@ -751,10 +773,10 @@ int bt_mesh_proxy_gatt_disable(void)
 void bt_mesh_proxy_addr_add(struct net_buf_simple *buf, uint16_t addr)
 {
 	struct bt_mesh_proxy_client *client;
-	struct bt_mesh_proxy_role *role  =
-		CONTAINER_OF(buf, uint16_t, buf);
+	struct bt_mesh_proxy_role *cli =
+		CONTAINER_OF(buf, struct bt_mesh_proxy_role, buf);
 
-	client = &clients[bt_mesh_proxy_role_index(role)];
+	client = client_find(cli->conn);
 
 	BT_DBG("filter_type %u addr 0x%04x", client->filter_type, addr);
 
@@ -828,6 +850,7 @@ bool bt_mesh_proxy_relay(struct net_buf *buf, uint16_t dst)
 static void gatt_connected(struct bt_conn *conn, uint8_t err)
 {
 	struct bt_mesh_proxy_client *client;
+	struct bt_mesh_proxy_role *role;
 	struct bt_conn_info info;
 
 	bt_conn_get_info(conn, &info);
@@ -838,8 +861,18 @@ static void gatt_connected(struct bt_conn *conn, uint8_t err)
 
 	BT_DBG("conn %p err 0x%02x", (void *)conn, err);
 
-	client = &clients[bt_mesh_proxy_role_alloc(conn)];
-	client->cli = bt_mesh_proxy_role_setup(conn, proxy_send, proxy_msg_recv);
+	client = client_alloc(conn);
+	if (!client) {
+		return;
+	}
+
+	role = bt_mesh_proxy_role_alloc(conn);
+	if (!role) {
+		return;
+	}
+
+	client->cli = role;
+	bt_mesh_proxy_role_setup(role, proxy_send, proxy_msg_recv);
 	client->filter_type = NONE;
 
 	(void)memset(client->filter, 0, sizeof(client->filter));
@@ -864,8 +897,8 @@ static void gatt_disconnected(struct bt_conn *conn, uint8_t reason)
 		return;
 	}
 
-	client = &clients[bt_mesh_proxy_role_index(conn)];
-	if (client->cli) {
+	client = client_find(conn);
+	if (client) {
 		bt_mesh_proxy_role_cleanup(client->cli);
 		client->cli = NULL;
 	}
