@@ -18,7 +18,6 @@
 #include <zephyr/bluetooth/uuid.h>
 
 #include "host/ecc.h"
-#include "host/testing.h"
 
 #include "crypto.h"
 #include "mesh.h"
