@@ -23,7 +23,6 @@
 #include "net.h"
 #include "foundation.h"
 #include "beacon.h"
-#include "host/ecc.h"
 #include "prov.h"
 
 #define LOG_LEVEL CONFIG_BT_MESH_ADV_LOG_LEVEL
