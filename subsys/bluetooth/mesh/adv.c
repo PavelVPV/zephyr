@@ -21,7 +21,7 @@
 #include "net.h"
 #include "foundation.h"
 #include "beacon.h"
-#include "prov.h"
+#include "pb_adv.h"
 #include "proxy.h"
 #include "pb_gatt_srv.h"
 

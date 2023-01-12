@@ -9,6 +9,7 @@
 #define ZEPHYR_SUBSYS_BLUETOOTH_MESH_PROV_H_
 
 #include "prov_bearer.h"
+#include "host/ecc.h"
 
 #define PROV_ERR_NONE          0x00
 #define PROV_ERR_NVAL_PDU      0x01
@@ -161,8 +162,6 @@ void bt_mesh_prov_complete(uint16_t net_idx, uint16_t addr);
 void bt_mesh_prov_reset(void);
 
 const struct prov_bearer_cb *bt_mesh_prov_bearer_cb_get(void);
-
-void bt_mesh_pb_adv_recv(struct net_buf_simple *buf);
 
 int bt_mesh_prov_init(const struct bt_mesh_prov *prov);
 

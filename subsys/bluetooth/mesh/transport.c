@@ -14,7 +14,6 @@
 
 #include <zephyr/net/buf.h>
 
-#include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/mesh.h>
 
 #include "common/bt_str.h"
