@@ -142,12 +142,37 @@ static void bt_ready(int err)
 	}
 }
 
+#ifndef CONFIG_ARCH_POSIX_LIBFUZZER
+uint8_t *posix_fuzz_buf, posix_fuzz_sz;
+#else
+extern uint8_t *posix_fuzz_buf, posix_fuzz_sz;
+#endif
+
+static void fuzz_work_handler(struct k_work *work)
+{
+	struct net_buf_simple buf;
+
+	net_buf_simple_init_with_data(&buf, posix_fuzz_buf, posix_fuzz_sz);
+	bt_mesh_scan_cb(NULL, 0, BT_GAP_ADV_TYPE_ADV_NONCONN_IND, &buf);
+}
+
+static struct k_work fuzz_work = Z_WORK_INITIALIZER(fuzz_work_handler);
+
+static void fuzz_isr(const void *arg)
+{
+	k_work_submit(&fuzz_work);
+}
+
 void main(void)
 {
 	int err;
 
 	printk("Initializing...\n");
 
+	IRQ_CONNECT(CONFIG_ARCH_POSIX_FUZZ_IRQ, 0, fuzz_isr, NULL, 0);
+	irq_enable(CONFIG_ARCH_POSIX_FUZZ_IRQ);
+
+#if 0
 	/* Initialize the Bluetooth Subsystem */
 	err = bt_enable(bt_ready);
 	if (err && err != -EALREADY) {
@@ -156,4 +181,5 @@ void main(void)
 
 	printk("Press the <Tab> button for supported commands.\n");
 	printk("Before any Mesh commands you must run \"mesh init\"\n");
+#endif
 }

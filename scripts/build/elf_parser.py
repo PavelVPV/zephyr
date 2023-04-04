@@ -169,7 +169,11 @@ class ZephyrElf:
     def _object_find_named(self, prefix, cb):
         for section in self.elf.iter_sections():
             if isinstance(section, SymbolTableSection):
+                print("section: ", section.name)
+                if section.name == '.dynsym':
+                    continue
                 for sym in section.iter_symbols():
+                    print("sym.entry value: {} type: {}", sym.entry.st_value, sym.entry.st_info.type)
                     if sym.entry.st_info.type != 'STT_OBJECT':
                         continue
                     if sym.name.startswith(prefix):
@@ -221,10 +225,14 @@ class ZephyrElf:
         self._object_find_named('__pm_device_', _on_pm)
 
         # Find all ordinal arrays
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
         ordinal_arrays = {}
         def _on_ordinal(sym):
+            print("st_value: ", sym.entry.st_value)
             ordinal_arrays[sym.entry.st_value] = DeviceOrdinals(self, sym)
         self._object_find_named('__devicehdl_', _on_ordinal)
+        print("ordinal_arrays: ", ordinal_arrays)
+        print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 
         # Find all device structs
         def _on_device(sym):

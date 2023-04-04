@@ -131,6 +131,7 @@ def main():
         fp.write('#include <zephyr/device.h>\n')
         fp.write('#include <zephyr/toolchain.h>\n')
         for dev in parsed_elf.devices:
+            print("Dev: {}".format(dev.ordinals.sym.name))
             # The device handle are collected up in a set, which has no
             # specified order.  Sort each sub-category of device handle types
             # separately, so that the generated C array is reproducible across

@@ -12,12 +12,12 @@
 
 	ITERABLE_SECTION_ROM(bt_gatt_service_static, 4)
 
-#if defined(CONFIG_BT_MESH)
+//#if defined(CONFIG_BT_MESH)
 	ITERABLE_SECTION_ROM(bt_mesh_subnet_cb, 4)
 	ITERABLE_SECTION_ROM(bt_mesh_app_key_cb, 4)
 
 	ITERABLE_SECTION_ROM(bt_mesh_hb_cb, 4)
-#endif
+//#endif
 
 #if defined(CONFIG_BT_MESH_FRIEND)
 	ITERABLE_SECTION_ROM(bt_mesh_friend_cb, 4)

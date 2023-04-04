@@ -129,10 +129,17 @@ int main(int argc, char *argv[])
  */
 uint8_t *posix_fuzz_buf, posix_fuzz_sz;
 
+static bool posix_initialized;
+
+#if 0
+int LLVMFuzzerInitialize(int *argc, char ***argv)
+{
+	return 0;
+}
+#endif
+
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t sz)
 {
-	static bool posix_initialized;
-
 	if (!posix_initialized) {
 		posix_init(0, NULL);
 		posix_initialized = true;
