@@ -11,6 +11,7 @@
 //#include "../../../../../subsys/bluetooth/hci/hci_core.h"
 #include <conn.h>
 #include <host/hci_core.h>
+#include <net.h>
 
 int bt_encrypt_be(const uint8_t key[16], const uint8_t plaintext[16],
 		  uint8_t enc_data[16])
@@ -106,6 +107,8 @@ void main(void)
 	int err;
 
 	printk("Initializing...\n");
+
+	atomic_set_bit(bt_mesh.flags, BT_MESH_VALID);
 
 	IRQ_CONNECT(CONFIG_ARCH_POSIX_FUZZ_IRQ, 0, fuzz_isr, NULL, 0);
 	irq_enable(CONFIG_ARCH_POSIX_FUZZ_IRQ);

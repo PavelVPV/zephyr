@@ -798,7 +798,7 @@ int bt_mesh_net_decode(struct net_buf_simple *in, enum bt_mesh_net_if net_if,
 
 	if (!bt_mesh_net_cred_find(rx, in, out, net_decrypt)) {
 		LOG_DBG("Unable to find matching net for packet");
-		return -ENOENT;
+//		return -ENOENT;
 	}
 
 	/* Initialize AppIdx to a sane value */
