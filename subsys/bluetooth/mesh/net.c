@@ -625,7 +625,7 @@ static bool net_decrypt(struct bt_mesh_net_rx *rx, struct net_buf_simple *in,
 	bool proxy = (rx->net_if == BT_MESH_NET_IF_PROXY_CFG);
 
 	if (NID(in->data) != cred->nid) {
-		return false;
+//		return false;
 	}
 
 	LOG_DBG("NID 0x%02x", NID(in->data));
@@ -644,17 +644,17 @@ static bool net_decrypt(struct bt_mesh_net_rx *rx, struct net_buf_simple *in,
 	rx->ctx.addr = SRC(out->data);
 	if (!BT_MESH_ADDR_IS_UNICAST(rx->ctx.addr)) {
 		LOG_DBG("Ignoring non-unicast src addr 0x%04x", rx->ctx.addr);
-		return false;
+//		return false;
 	}
 
 	if (bt_mesh_has_addr(rx->ctx.addr)) {
 		LOG_DBG("Dropping locally originated packet");
-		return false;
+//		return false;
 	}
 
 	if (rx->net_if == BT_MESH_NET_IF_ADV && msg_cache_match(out)) {
 		LOG_DBG("Duplicate found in Network Message Cache");
-		return false;
+//		return false;
 	}
 
 	LOG_DBG("src 0x%04x", rx->ctx.addr);

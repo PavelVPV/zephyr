@@ -28,6 +28,7 @@ target_sources(app
   ${ZEPHYR_BASE}/subsys/bluetooth/mesh/settings.c
   ${ZEPHYR_BASE}/subsys/bluetooth/mesh/transport.c
   ${ZEPHYR_BASE}/subsys/bluetooth/mesh/cfg_srv.c
+  ${ZEPHYR_BASE}/subsys/bluetooth/mesh/cfg_cli.c
   ${ZEPHYR_BASE}/subsys/bluetooth/mesh/health_srv.c
 
   ${ZEPHYR_BASE}/subsys/net/buf.c
@@ -67,6 +68,7 @@ target_compile_options(app
   -DCONFIG_BT_MESH_RX_SEG_MSG_COUNT=32
   -DCONFIG_BT_MESH_SEG_BUFS=255
   -DCONFIG_BT_MESH_LABEL_COUNT=1
+  -DCONFIG_BT_MESH_CFG_CLI_TIMEOUT=5
   -UCONFIG_BT_SETTINGS
   -DCONFIG_BT_LOG_LEVEL=0
   -DCONFIG_BT_ID_MAX=1

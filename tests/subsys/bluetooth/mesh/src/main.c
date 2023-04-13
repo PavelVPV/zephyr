@@ -102,6 +102,23 @@ static void fuzz_isr(const void *arg)
 	k_sem_give(&fuzz_sem);
 }
 
+static struct bt_mesh_cfg_cli cfg_cli;
+
+static struct bt_mesh_model root_models[] = {
+	BT_MESH_MODEL_CFG_SRV,
+	BT_MESH_MODEL_CFG_CLI(&cfg_cli),
+};
+
+static struct bt_mesh_elem elements[] = {
+	BT_MESH_ELEM(0, root_models, BT_MESH_MODEL_NONE),
+};
+
+static const struct bt_mesh_comp comp = {
+	.cid = 0x0001,
+	.elem = elements,
+	.elem_count = ARRAY_SIZE(elements),
+};
+
 void main(void)
 {
 	int err;
@@ -109,6 +126,9 @@ void main(void)
 	printk("Initializing...\n");
 
 	atomic_set_bit(bt_mesh.flags, BT_MESH_VALID);
+
+	bt_mesh_comp_register(&comp);
+	bt_mesh_subnet_add(0, (uint8_t[]){1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16});
 
 	IRQ_CONNECT(CONFIG_ARCH_POSIX_FUZZ_IRQ, 0, fuzz_isr, NULL, 0);
 	irq_enable(CONFIG_ARCH_POSIX_FUZZ_IRQ);

@@ -26,6 +26,7 @@ __weak void assert_post_action(void)
 __weak void assert_post_action(const char *file, unsigned int line)
 #endif
 {
+	while(1);
 #ifndef CONFIG_ASSERT_NO_FILE_INFO
 	ARG_UNUSED(file);
 	ARG_UNUSED(line);

@@ -368,7 +368,7 @@ int bt_mesh_net_obfuscate(uint8_t *pdu, uint32_t iv_index,
 
 	err = bt_encrypt_be(privacy_key, priv_rand, tmp);
 	if (err) {
-		return err;
+//		return err;
 	}
 
 	for (i = 0; i < 6; i++) {
@@ -495,9 +495,9 @@ int bt_mesh_app_decrypt(const uint8_t key[16],
 	err = bt_ccm_decrypt(key, nonce, buf->data, buf->len, ctx->ad,
 			     ctx->ad ? 16 : 0, out->data,
 			     APP_MIC_LEN(ctx->aszmic));
-	if (!err) {
+//	if (!err) {
 		net_buf_simple_add(out, buf->len);
-	}
+//	}
 
 	return err;
 }

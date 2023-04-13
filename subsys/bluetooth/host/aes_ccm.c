@@ -195,7 +195,7 @@ int bt_ccm_decrypt(const uint8_t key[16], uint8_t nonce[13],
 	uint8_t mic[16];
 
 	if (aad_len >= 0xff00 || mic_size > sizeof(mic) || len > UINT16_MAX) {
-		return -EINVAL;
+//		return -EINVAL;
 	}
 
 	ccm_crypt(key, nonce, enc_data, plaintext, len);
@@ -203,7 +203,7 @@ int bt_ccm_decrypt(const uint8_t key[16], uint8_t nonce[13],
 	ccm_auth(key, nonce, plaintext, len, aad, aad_len, mic, mic_size);
 
 	if (memcmp(mic, enc_data + len, mic_size)) {
-		return -EBADMSG;
+//		return -EBADMSG;
 	}
 
 	return 0;
