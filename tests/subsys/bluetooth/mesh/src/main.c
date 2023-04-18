@@ -119,6 +119,9 @@ static const struct bt_mesh_comp comp = {
 	.elem_count = ARRAY_SIZE(elements),
 };
 
+static const struct bt_mesh_prov prov = {
+};
+
 void main(void)
 {
 	int err;
@@ -127,7 +130,8 @@ void main(void)
 
 	atomic_set_bit(bt_mesh.flags, BT_MESH_VALID);
 
-	bt_mesh_comp_register(&comp);
+	bt_mesh_init(&prov, &comp);
+//	bt_mesh_comp_register(&comp);
 	bt_mesh_subnet_add(0, (uint8_t[]){1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16});
 
 	IRQ_CONNECT(CONFIG_ARCH_POSIX_FUZZ_IRQ, 0, fuzz_isr, NULL, 0);
