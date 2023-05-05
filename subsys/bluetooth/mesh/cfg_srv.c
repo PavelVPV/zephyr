@@ -179,7 +179,7 @@ static uint8_t _mod_pub_set(struct bt_mesh_model *model, uint16_t pub_addr,
 
 #if CONFIG_BT_MESH_LABEL_COUNT > 0
 	if (BT_MESH_ADDR_IS_VIRTUAL(model->pub->addr)) {
-		uint8_t *uuid = bt_mesh_va_label_get(model->pub->addr);
+		const uint8_t *uuid = bt_mesh_va_label_get(model->pub->addr, NULL);
 
 		if (uuid) {
 			bt_mesh_va_del(uuid, NULL);
@@ -813,7 +813,7 @@ send_status:
 
 static size_t mod_sub_list_clear(struct bt_mesh_model *mod)
 {
-	uint8_t *label_uuid;
+	const uint8_t *label_uuid;
 	size_t clear_count;
 	int i;
 
@@ -828,7 +828,7 @@ static size_t mod_sub_list_clear(struct bt_mesh_model *mod)
 			continue;
 		}
 
-		label_uuid = bt_mesh_va_label_get(mod->groups[i]);
+		label_uuid = bt_mesh_va_label_get(mod->groups[i], NULL);
 
 		mod->groups[i] = BT_MESH_ADDR_UNASSIGNED;
 		clear_count++;
@@ -1429,13 +1429,14 @@ static int mod_sub_va_add(struct bt_mesh_model *model,
 		goto send_status;
 	}
 
+#if 0
 	if (bt_mesh_model_find_group(&mod, sub_addr)) {
 		/* Tried to add existing subscription */
 		status = STATUS_SUCCESS;
 		bt_mesh_va_del(label_uuid, NULL);
 		goto send_status;
 	}
-
+#endif
 
 	entry = bt_mesh_model_find_group(&mod, BT_MESH_ADDR_UNASSIGNED);
 	if (!entry) {

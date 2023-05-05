@@ -613,7 +613,7 @@ static int trans_encrypt(const struct bt_mesh_net_tx *tx, const uint8_t *key,
 	};
 
 	if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
-		crypto.ad = bt_mesh_va_label_get(tx->ctx->addr);
+		crypto.ad = bt_mesh_va_label_get(tx->ctx->addr, NULL);
 	}
 
 	return bt_mesh_app_encrypt(key, &crypto, msg);
@@ -720,15 +720,29 @@ struct decrypt_ctx {
 static int sdu_try_decrypt(struct bt_mesh_net_rx *rx, const uint8_t key[16],
 			   void *cb_data)
 {
-	const struct decrypt_ctx *ctx = cb_data;
+	struct decrypt_ctx *ctx = cb_data;
+	int err;
 
 	if (ctx->seg) {
 		seg_rx_assemble(ctx->seg, ctx->buf, ctx->crypto.aszmic);
 	}
 
-	net_buf_simple_reset(ctx->sdu);
+	do {
+		if (BT_MESH_ADDR_IS_VIRTUAL(rx->ctx.recv_dst)) {
+			ctx->crypto.ad = bt_mesh_va_label_get(rx->ctx.recv_dst, ctx->crypto.ad);
 
-	return bt_mesh_app_decrypt(key, &ctx->crypto, ctx->buf, ctx->sdu);
+			if (!ctx->crypto.ad) {
+				return false;
+			}
+		}
+
+		net_buf_simple_reset(ctx->sdu);
+
+		err = bt_mesh_app_decrypt(key, &ctx->crypto, ctx->buf, ctx->sdu);
+	} while (err && ctx->crypto.ad != NULL);
+
+	return err;
+
 }
 
 static int sdu_recv(struct bt_mesh_net_rx *rx, uint8_t hdr, uint8_t aszmic,
@@ -753,10 +767,6 @@ static int sdu_recv(struct bt_mesh_net_rx *rx, uint8_t hdr, uint8_t aszmic,
 
 	if (!rx->local_match) {
 		return 0;
-	}
-
-	if (BT_MESH_ADDR_IS_VIRTUAL(rx->ctx.recv_dst)) {
-		ctx.crypto.ad = bt_mesh_va_label_get(rx->ctx.recv_dst);
 	}
 
 	rx->ctx.app_idx = bt_mesh_app_key_find(ctx.crypto.dev_key, AID(&hdr),
@@ -1745,7 +1755,7 @@ uint8_t bt_mesh_va_del(const uint8_t uuid[16], uint16_t *addr)
 	return STATUS_SUCCESS;
 }
 
-uint8_t *bt_mesh_va_label_get(uint16_t addr)
+const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid)
 {
 	int i;
 
@@ -1753,9 +1763,13 @@ uint8_t *bt_mesh_va_label_get(uint16_t addr)
 
 	for (i = 0; i < ARRAY_SIZE(virtual_addrs); i++) {
 		if (virtual_addrs[i].ref && virtual_addrs[i].addr == addr) {
-			LOG_DBG("Found Label UUID for 0x%04x: %s", addr,
-				bt_hex(virtual_addrs[i].uuid, 16));
-			return virtual_addrs[i].uuid;
+			if (!uuid) {
+				LOG_DBG("Found Label UUID for 0x%04x: %s", addr,
+					bt_hex(virtual_addrs[i].uuid, 16));
+				return virtual_addrs[i].uuid;
+			} else if (uuid == virtual_addrs[i].uuid) {
+				uuid = NULL;
+			}
 		}
 	}
 

@@ -12,6 +12,8 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
+#include "common/bt_str.h"
+
 /* Max number of messages that can be pending on RX at the same time */
 #define RECV_QUEUE_SIZE 32
 
@@ -300,7 +302,7 @@ static struct bt_mesh_test_msg *blocking_recv(k_timeout_t timeout)
 	return k_queue_get(&recv, timeout);
 }
 
-int bt_mesh_test_recv(uint16_t len, uint16_t dst, k_timeout_t timeout)
+int bt_mesh_test_recv(uint16_t len, uint16_t dst, const uint8_t *uuid, k_timeout_t timeout)
 {
 	struct bt_mesh_test_msg *msg = blocking_recv(timeout);
 
@@ -387,7 +389,7 @@ static void tx_ended(int err, void *data)
 	k_sem_give(&send_ctx->sem);
 }
 
-int bt_mesh_test_send_async(uint16_t addr, size_t len,
+int bt_mesh_test_send_async(uint16_t addr, const uint8_t *uuid, size_t len,
 			    enum bt_mesh_test_send_flags flags,
 			    const struct bt_mesh_send_cb *send_cb,
 			    void *cb_data)
@@ -438,11 +440,11 @@ int bt_mesh_test_send_async(uint16_t addr, size_t len,
 	return 0;
 }
 
-int bt_mesh_test_send(uint16_t addr, size_t len,
+int bt_mesh_test_send(uint16_t addr, const uint8_t *uuid, size_t len,
 		      enum bt_mesh_test_send_flags flags, k_timeout_t timeout)
 {
 	if (K_TIMEOUT_EQ(timeout, K_NO_WAIT)) {
-		return bt_mesh_test_send_async(addr, len, flags, NULL, NULL);
+		return bt_mesh_test_send_async(addr, uuid, len, flags, NULL, NULL);
 	}
 
 	static const struct bt_mesh_send_cb send_cb = {
@@ -454,7 +456,7 @@ int bt_mesh_test_send(uint16_t addr, size_t len,
 	int err;
 
 	k_sem_init(&send_ctx.sem, 0, 1);
-	err = bt_mesh_test_send_async(addr, len, flags, &send_cb, &send_ctx);
+	err = bt_mesh_test_send_async(addr, uuid, len, flags, &send_cb, &send_ctx);
 	if (err) {
 		return err;
 	}
