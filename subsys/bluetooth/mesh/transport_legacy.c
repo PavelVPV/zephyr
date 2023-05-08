@@ -613,7 +613,11 @@ static int trans_encrypt(const struct bt_mesh_net_tx *tx, const uint8_t *key,
 	};
 
 	if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
-		crypto.ad = bt_mesh_va_label_get(tx->ctx->addr, NULL);
+		if (bt_mesh_va_addr_get(tx->ctx->label_uuid) == BT_MESH_ADDR_UNASSIGNED) {
+			return -EINVAL;
+		}
+
+		crypto.ad = tx->ctx->label_uuid;
 	}
 
 	return bt_mesh_app_encrypt(key, &crypto, msg);
@@ -1687,7 +1691,7 @@ static inline void va_store(struct virtual_addr *store)
 	}
 }
 
-uint8_t bt_mesh_va_add(const uint8_t uuid[16], uint16_t *addr)
+uint8_t bt_mesh_va_add(const uint8_t uuid[16], uint16_t *addr, const uint8_t **label_uuid)
 {
 	struct virtual_addr *va = NULL;
 	int err;
@@ -1704,6 +1708,7 @@ uint8_t bt_mesh_va_add(const uint8_t uuid[16], uint16_t *addr)
 		if (!memcmp(uuid, virtual_addrs[i].uuid,
 			    ARRAY_SIZE(virtual_addrs[i].uuid))) {
 			*addr = virtual_addrs[i].addr;
+			*label_uuid = virtual_addrs[i].uuid;
 			virtual_addrs[i].ref++;
 			va_store(&virtual_addrs[i]);
 			return STATUS_SUCCESS;
@@ -1725,11 +1730,12 @@ uint8_t bt_mesh_va_add(const uint8_t uuid[16], uint16_t *addr)
 	va_store(va);
 
 	*addr = va->addr;
+	*label_uuid = va->uuid;
 
 	return STATUS_SUCCESS;
 }
 
-uint8_t bt_mesh_va_del(const uint8_t uuid[16], uint16_t *addr)
+uint8_t bt_mesh_va_del(const uint8_t uuid[16], uint16_t *addr, const uint8_t **label_uuid)
 {
 	struct virtual_addr *va = NULL;
 
@@ -1749,6 +1755,7 @@ uint8_t bt_mesh_va_del(const uint8_t uuid[16], uint16_t *addr)
 	va->ref--;
 	if (addr) {
 		*addr = va->addr;
+		*label_uuid = va->uuid;
 	}
 
 	va_store(va);
@@ -1776,6 +1783,34 @@ const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid)
 	LOG_WRN("No matching Label UUID for 0x%04x", addr);
 
 	return NULL;
+}
+
+const uint8_t bt_mesh_va_addr_get(const uint8_t *uuid)
+{
+	struct virtual_addr *va;
+
+	va = CONTAINER_OF(uuid, struct virtual_addr, uuid);
+	return va->ref ? va->addr : BT_MESH_ADDR_UNASSIGNED;
+}
+
+const uint8_t *bt_mesh_label_uuid_get_by_idx(uint16_t idx)
+{
+	if (idx >= ARRAY_SIZE(virtual_addrs)) {
+		return NULL;
+	}
+
+	return virtual_addrs[idx].uuid;
+}
+
+uint16_t bt_mesh_label_uuid_idx_get(const uint8_t *label_uuid)
+{
+	struct virtual_addr *va = CONTAINER_OF(label_uuid, struct virtual_addr, uuid);
+
+	if (!PART_OF_ARRAY(virtual_addrs, va)) {
+		return BT_MESH_ADDR_UNASSIGNED;
+	}
+
+	return va->ref ? va->addr : BT_MESH_ADDR_UNASSIGNED;
 }
 
 #if CONFIG_BT_MESH_LABEL_COUNT > 0

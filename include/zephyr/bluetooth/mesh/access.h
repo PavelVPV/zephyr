@@ -508,6 +508,7 @@ struct bt_mesh_model_pub {
 	struct bt_mesh_model *mod;
 
 	uint16_t addr;          /**< Publish Address. */
+	const uint8_t *label_uuid;
 	uint16_t key:12,        /**< Publish AppKey Index. */
 		 cred:1,        /**< Friendship Credentials Flag. */
 		 send_rel:1,    /**< Force reliable sending (segment acks) */
@@ -696,6 +697,8 @@ struct bt_mesh_model {
 	/** Subscription List (group or virtual addresses) */
 	uint16_t * const groups;
 	const uint16_t groups_cnt;
+
+	const uint8_t ** const label_uuids;
 
 	/** Opcode handler list */
 	const struct bt_mesh_model_op * const op;

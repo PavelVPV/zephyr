@@ -159,12 +159,13 @@ static void test_tx_group(void)
  */
 static void test_tx_va(void)
 {
+	const uint8_t *label_uuid;
 	uint16_t virtual_addr;
 	int err;
 
 	bt_mesh_test_setup();
 
-	err = bt_mesh_va_add(test_va_uuid, &virtual_addr);
+	err = bt_mesh_va_add(test_va_uuid, &virtual_addr, &label_uuid);
 	ASSERT_OK_MSG(err, "Virtual addr add failed (err %d)", err);
 
 	/* Wait for the receiver to subscribe on address. */
@@ -189,13 +190,14 @@ static uint16_t test_va_col_addr = 0x809D;
 
 static void test_tx_va_collision(void)
 {
+	const uint8_t *label_uuid;
 	uint16_t virtual_addr;
 	int err;
 
 	bt_mesh_test_setup();
 
 	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
-		err = bt_mesh_va_add(test_va_col_uuid[0], &virtual_addr);
+		err = bt_mesh_va_add(test_va_col_uuid[0], &virtual_addr, &label_uuid);
 		ASSERT_OK_MSG(err, "Virtual addr add failed (err %d)", err);
 		ASSERT_EQUAL(test_va_col_addr, virtual_addr);
 	}

@@ -86,6 +86,9 @@ struct bt_mesh_msg_ctx {
 	/** Destination address of a received message. Not used for sending. */
 	uint16_t recv_dst;
 
+	/** Virtual address UUID, or NULL if this is not a virtual address. */
+	const uint8_t *label_uuid;
+
 	/** RSSI of received packet. Not used for sending. */
 	int8_t  recv_rssi;
 

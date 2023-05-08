@@ -295,6 +295,7 @@ static void test_friend_overflow(void)
  */
 static void test_friend_group(void)
 {
+	const uint8_t *label_uuid;
 	uint16_t virtual_addr;
 
 	bt_mesh_test_setup();
@@ -306,7 +307,7 @@ static void test_friend_group(void)
 		      "Friendship not established");
 	bt_mesh_test_friendship_evt_clear(BT_MESH_TEST_FRIEND_POLLED);
 
-	ASSERT_OK(bt_mesh_va_add(test_va_uuid, &virtual_addr));
+	ASSERT_OK(bt_mesh_va_add(test_va_uuid, &virtual_addr, &label_uuid));
 
 	/* The other mesh device will send its messages in the first poll */
 	ASSERT_OK(bt_mesh_test_friendship_evt_wait(BT_MESH_TEST_FRIEND_POLLED,
@@ -880,11 +881,12 @@ static void test_other_msg(void)
  */
 static void test_other_group(void)
 {
+	const uint8_t *label_uuid;
 	uint16_t virtual_addr;
 
 	bt_mesh_test_setup();
 
-	ASSERT_OK(bt_mesh_va_add(test_va_uuid, &virtual_addr));
+	ASSERT_OK(bt_mesh_va_add(test_va_uuid, &virtual_addr, &label_uuid));
 
 	/* Wait for LPN to send us a message after establishing the friendship */
 	ASSERT_OK(bt_mesh_test_recv(5, cfg->addr, NULL, K_SECONDS(1)));

@@ -103,10 +103,16 @@ int bt_mesh_trans_recv(struct net_buf_simple *buf, struct bt_mesh_net_rx *rx);
 void bt_mesh_trans_init(void);
 void bt_mesh_trans_reset(void);
 
-uint8_t bt_mesh_va_add(const uint8_t uuid[16], uint16_t *addr);
+uint8_t bt_mesh_va_add(const uint8_t uuid[16], uint16_t *addr, const uint8_t **label_uuid);
+uint8_t bt_mesh_va_del(const uint8_t uuid[16], uint16_t *addr, const uint8_t **label_uuid);
 
-uint8_t bt_mesh_va_del(const uint8_t uuid[16], uint16_t *addr);
-
+// FIXME: Function is wrong! Remove it!
 const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid);
+
+const uint8_t bt_mesh_va_addr_get(const uint8_t *uuid);
+
+//FIXME: Add _va_ suffix: bt_mesh_va_label_...
+const uint8_t *bt_mesh_label_uuid_get_by_idx(uint16_t idx);
+uint16_t bt_mesh_label_uuid_idx_get(const uint8_t *label_uuid);
 
 void bt_mesh_va_pending_store(void);
