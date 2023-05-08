@@ -271,6 +271,7 @@ struct bt_mesh_model_op {
 	.keys_cnt = _keys,							\
 	.groups = (uint16_t []) BT_MESH_MODEL_GROUPS_UNASSIGNED(_grps),		\
 	.groups_cnt = _grps,							\
+	.label_uuids = (const uint8_t *[CONFIG_BT_MESH_LABEL_COUNT]){ 0 },      \
 	.op = _op,								\
 	.cb = _cb,								\
 	.user_data = _user_data,						\
@@ -301,6 +302,7 @@ struct bt_mesh_model_op {
 	.keys_cnt = _keys,									\
 	.groups = (uint16_t []) BT_MESH_MODEL_GROUPS_UNASSIGNED(_grps),				\
 	.groups_cnt = _grps,									\
+	.label_uuids = (const uint8_t *[CONFIG_BT_MESH_LABEL_COUNT]){ 0 },        \
 	.user_data = _user_data,								\
 	.cb = _cb,										\
 }
@@ -340,6 +342,7 @@ struct bt_mesh_model_op {
 	.keys_cnt = CONFIG_BT_MESH_MODEL_KEY_COUNT,                          \
 	.groups = (uint16_t []) BT_MESH_MODEL_GROUPS_UNASSIGNED(CONFIG_BT_MESH_MODEL_GROUP_COUNT), \
 	.groups_cnt = CONFIG_BT_MESH_MODEL_GROUP_COUNT,                      \
+	.label_uuids = (const uint8_t *[CONFIG_BT_MESH_LABEL_COUNT]){ 0 },        \
 	.op = _op,                                                           \
 	.cb = _cb,                                                           \
 	.user_data = _user_data,                                             \
@@ -388,6 +391,7 @@ struct bt_mesh_model_op {
 	.keys_cnt = CONFIG_BT_MESH_MODEL_KEY_COUNT,                          \
 	.groups = (uint16_t []) BT_MESH_MODEL_GROUPS_UNASSIGNED(CONFIG_BT_MESH_MODEL_GROUP_COUNT), \
 	.groups_cnt = CONFIG_BT_MESH_MODEL_GROUP_COUNT,                      \
+	.label_uuids = (const uint8_t *[CONFIG_BT_MESH_LABEL_COUNT]){ 0 },        \
 	.user_data = _user_data,                                             \
 	.cb = _cb,                                                           \
 	.metadata = _metadata,                                               \

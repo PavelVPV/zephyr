@@ -745,6 +745,10 @@ static int sdu_try_decrypt(struct bt_mesh_net_rx *rx, const uint8_t key[16],
 		err = bt_mesh_app_decrypt(key, &ctx->crypto, ctx->buf, ctx->sdu);
 	} while (err && ctx->crypto.ad != NULL);
 
+	if (!err && BT_MESH_ADDR_IS_VIRTUAL(rx->ctx.recv_dst)) {
+		rx->ctx.label_uuid = ctx->crypto.ad;
+	}
+
 	return err;
 
 }
@@ -1762,6 +1766,7 @@ uint8_t bt_mesh_va_del(const uint8_t uuid[16], uint16_t *addr, const uint8_t **l
 	return STATUS_SUCCESS;
 }
 
+// FIXME: to be removed
 const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid)
 {
 	int i;
