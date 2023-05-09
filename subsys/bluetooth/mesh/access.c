@@ -1781,23 +1781,24 @@ static int mod_set(bool vnd, const char *name, size_t len_rd,
 		return -ENOENT;
 	}
 
-	if (!strncmp(next, "bind", len)) {
+	if (!strncmp(next, "bind", 4)) {
 		return mod_set_bind(mod, len_rd, read_cb, cb_arg);
 	}
 
-	if (!strncmp(next, "sub", len)) {
-		return mod_set_sub(mod, len_rd, read_cb, cb_arg);
-	}
-
-	if (!strncmp(next, "subv", len)) {
+	/* Should go before 'sub' */
+	if (!strncmp(next, "subv", 4)) {
 		return mod_set_sub_va(mod, len_rd, read_cb, cb_arg);
 	}
 
-	if (!strncmp(next, "pub", len)) {
+	if (!strncmp(next, "sub", 3)) {
+		return mod_set_sub(mod, len_rd, read_cb, cb_arg);
+	}
+
+	if (!strncmp(next, "pub", 3)) {
 		return mod_set_pub(mod, len_rd, read_cb, cb_arg);
 	}
 
-	if (!strncmp(next, "data", len)) {
+	if (!strncmp(next, "data", 4)) {
 		return mod_data_set(mod, next, len_rd, read_cb, cb_arg);
 	}
 

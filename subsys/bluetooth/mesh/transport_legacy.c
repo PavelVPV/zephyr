@@ -1811,11 +1811,11 @@ uint16_t bt_mesh_label_uuid_idx_get(const uint8_t *label_uuid)
 {
 	struct virtual_addr *va = CONTAINER_OF(label_uuid, struct virtual_addr, uuid);
 
-	if (!PART_OF_ARRAY(virtual_addrs, va)) {
-		return BT_MESH_ADDR_UNASSIGNED;
+	if (!PART_OF_ARRAY(virtual_addrs, va) || va->ref == 0) {
+		return (uint16_t)(-1);
 	}
 
-	return va->ref ? va->addr : BT_MESH_ADDR_UNASSIGNED;
+	return ARRAY_INDEX(virtual_addrs, va);
 }
 
 #if CONFIG_BT_MESH_LABEL_COUNT > 0

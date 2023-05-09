@@ -826,6 +826,10 @@ static size_t mod_sub_list_clear(struct bt_mesh_model *mod)
 
 	/* Unref stored labels related to this model */
 	for (i = 0; i < CONFIG_BT_MESH_LABEL_COUNT; i++) {
+		if (mod->label_uuids[i] == NULL) {
+			continue;
+		}
+
 		uint16_t addr = bt_mesh_va_addr_get(mod->label_uuids[i]);
 
 		if (addr == BT_MESH_ADDR_UNASSIGNED) {
