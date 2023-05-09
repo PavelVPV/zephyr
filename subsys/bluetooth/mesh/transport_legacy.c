@@ -1790,7 +1790,7 @@ const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid)
 	return NULL;
 }
 
-const uint8_t bt_mesh_va_addr_get(const uint8_t *uuid)
+const uint16_t bt_mesh_va_addr_get(const uint8_t *uuid)
 {
 	struct virtual_addr *va;
 

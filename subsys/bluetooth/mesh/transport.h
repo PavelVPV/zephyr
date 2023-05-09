@@ -109,7 +109,7 @@ uint8_t bt_mesh_va_del(const uint8_t uuid[16], uint16_t *addr, const uint8_t **l
 // FIXME: Function is wrong! Remove it!
 const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid);
 
-const uint8_t bt_mesh_va_addr_get(const uint8_t *uuid);
+const uint16_t bt_mesh_va_addr_get(const uint8_t *uuid);
 
 //FIXME: Add _va_ suffix: bt_mesh_va_label_...
 const uint8_t *bt_mesh_label_uuid_get_by_idx(uint16_t idx);

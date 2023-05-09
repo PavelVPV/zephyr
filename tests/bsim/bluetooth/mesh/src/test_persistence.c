@@ -54,6 +54,9 @@ static uint8_t test_prov_devkey[16] = { 0x11 };
 #define TEST_VA_1_ADDR 0x8700
 #define TEST_VA_1_UUID (uint8_t[16]) { 0xdf, 0xca, 0xa3, 0x54, 0x23, 0xfa, 0x33, 0xed, \
 				       0x1a, 0xbe, 0xa0, 0xaa, 0xbd, 0xfa, 0x0f, 0xaf }
+#define TEST_VA_1_ADDR_COL 0x8700
+#define TEST_VA_1_UUID_COL (uint8_t[16]) { 0x01, 0xcc, 0x74, 0x51, 0x71, 0x9e, 0x56, 0x71, \
+					   0x5b, 0x8a, 0x18, 0xaf, 0x13, 0x86, 0x0e, 0x4a }
 
 #define TEST_APPKEY_0_IDX 0x12
 #define TEST_APPKEY_0_KEY { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, \
@@ -120,7 +123,8 @@ static const struct access_cfg access_cfgs[][2] = {
 		{
 			.pub_params = TEST_MOD_PUB_PARAMS,
 			.appkeys_count = 2, .appkeys = { TEST_APPKEY_0_IDX, TEST_APPKEY_1_IDX },
-			.subs_count = 2, .subs = { TEST_GROUP_0, TEST_VA_0_ADDR },
+			.subs_count = 4, .subs = { TEST_GROUP_0, TEST_VA_0_ADDR, TEST_VA_1_ADDR,
+						   TEST_VA_1_ADDR /* collision */ },
 			.mod_data_len = sizeof(test_mod_data),
 		},
 
@@ -128,7 +132,8 @@ static const struct access_cfg access_cfgs[][2] = {
 		{
 			.pub_params = TEST_VND_MOD_PUB_PARAMS,
 			.appkeys_count = 2, .appkeys = { TEST_APPKEY_0_IDX, TEST_APPKEY_1_IDX },
-			.subs_count = 2, .subs = { TEST_GROUP_0, TEST_VA_0_ADDR },
+			.subs_count = 4, .subs = { TEST_GROUP_0, TEST_VA_0_ADDR, TEST_VA_1_ADDR,
+						   TEST_VA_1_ADDR /* collision */ },
 			.mod_data_len = sizeof(vnd_test_mod_data),
 		},
 	},
@@ -523,12 +528,23 @@ static void node_configure(void)
 		FAIL("Mod sub add failed (err %d, status %u)", err, status);
 	}
 
-	err = bt_mesh_cfg_cli_mod_sub_va_add(test_netkey_idx, TEST_ADDR, TEST_ADDR, TEST_VA_0_UUID,
-					 TEST_MOD_ID, &va, &status);
-	if (err || status) {
-		FAIL("Mod sub add failed (err %d, status %u)", err, status);
+	struct {
+		const uint8_t *uuid;
+		uint16_t addr;
+	} va_subs[] = {
+		{ .uuid = TEST_VA_0_UUID,     .addr = TEST_VA_0_ADDR, },
+		{ .uuid = TEST_VA_1_UUID,     .addr = TEST_VA_1_ADDR, },
+		{ .uuid = TEST_VA_1_UUID_COL, .addr = TEST_VA_1_ADDR, },
+	};
+
+	for (size_t i = 0; i < ARRAY_SIZE(va_subs); i++) {
+		err = bt_mesh_cfg_cli_mod_sub_va_add(test_netkey_idx, TEST_ADDR, TEST_ADDR,
+						     va_subs[i].uuid, TEST_MOD_ID, &va, &status);
+		if (err || status) {
+			FAIL("Mod sub add failed (err %d, status %u)", err, status);
+		}
+		ASSERT_EQUAL(va_subs[i].addr, va);
 	}
-	ASSERT_EQUAL(TEST_VA_0_ADDR, va);
 
 	memcpy(&pub_params, &(struct bt_mesh_cfg_cli_mod_pub)TEST_MOD_PUB_PARAMS,
 	       sizeof(struct bt_mesh_cfg_cli_mod_pub));
@@ -561,14 +577,15 @@ static void node_configure(void)
 		FAIL("Mod sub add failed (err %d, status %u)", err, status);
 	}
 
-	err = bt_mesh_cfg_cli_mod_sub_va_add_vnd(test_netkey_idx, TEST_ADDR, TEST_ADDR,
-						 TEST_VA_0_UUID, TEST_VND_MOD_ID,
-						 TEST_VND_COMPANY_ID, &va, &status);
-	if (err || status) {
-		FAIL("Mod sub add failed (err %d, status %u)", err, status);
+	for (size_t i = 0; i < ARRAY_SIZE(va_subs); i++) {
+		err = bt_mesh_cfg_cli_mod_sub_va_add_vnd(test_netkey_idx, TEST_ADDR, TEST_ADDR,
+							 va_subs[i].uuid, TEST_VND_MOD_ID,
+							 TEST_VND_COMPANY_ID, &va, &status);
+		if (err || status) {
+			FAIL("Mod sub add failed (err %d, status %u)", err, status);
+		}
+		ASSERT_EQUAL(va_subs[i].addr, va);
 	}
-
-	ASSERT_EQUAL(TEST_VA_0_ADDR, va);
 
 	memcpy(&pub_params, &(struct bt_mesh_cfg_cli_mod_pub)TEST_VND_MOD_PUB_PARAMS,
 	       sizeof(struct bt_mesh_cfg_cli_mod_pub));

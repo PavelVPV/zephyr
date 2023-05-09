@@ -588,13 +588,19 @@ static void test_rx_seg_ivu(void)
 static void test_rx_va_collision_find(void)
 {
 	bt_mesh_test_setup();
+	bt_mesh_test_cfg_set(&tx_cfg, 7000);
 
-	uint8_t uuid1[16];
-	uint16_t addr1;
+//	uint8_t uuid1[16] = { 0xca, 0xcd, 0x13, 0xbd, 0x54, 0xfe, 0x43, 0xed,
+//			      0x12, 0x3d, 0xa3, 0xe3, 0xb9, 0x03, 0x70, 0xaa };
+//	uint16_t addr1 = 0xb6f0;
+	uint8_t uuid1[16] = { 0xdf, 0xca, 0xa3, 0x54, 0x23, 0xfa, 0x33, 0xed,
+				       0x1a, 0xbe, 0xa0, 0xaa, 0xbd, 0xfa, 0x0f, 0xaf };
+	uint16_t addr1 = 0x8700;
 	uint8_t uuid2[16];
 	uint16_t addr2;
 	int err;
 
+#if 0
 	err = bt_rand(uuid1, 16);
 	if (err) {
 		FAIL("Unable to generate uuid 1: %d", err);
@@ -604,7 +610,7 @@ static void test_rx_va_collision_find(void)
 	if (err) {
 		FAIL("Unable to generated addr 1: %d", err);
 	}
-
+#endif
 	LOG_WRN("Generated first UUID: %s, addr: %04X", bt_hex(uuid1, 16), addr1);
 
 	do {
