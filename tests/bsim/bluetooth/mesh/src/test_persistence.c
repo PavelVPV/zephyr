@@ -85,6 +85,26 @@ static uint8_t test_prov_devkey[16] = { 0x11 };
 		.transmit = BT_MESH_TRANSMIT(2, 20),                                               \
 	}
 
+#define TEST_MOD_PUB_PARAMS_2 {                                                                    \
+		.addr = TEST_GROUP_1,                                                              \
+		.uuid = NULL,                                                                      \
+		.app_idx = TEST_APPKEY_1_IDX,                                                      \
+		.cred_flag = false,                                                                \
+		.ttl = 3,                                                                          \
+		.period = BT_MESH_PUB_PERIOD_10SEC(3),                                             \
+		.transmit = BT_MESH_TRANSMIT(3, 20),                                               \
+	}
+
+#define TEST_VND_MOD_PUB_PARAMS_2 {                                                                \
+		.addr = TEST_VA_1_ADDR,                                                            \
+		.uuid = TEST_VA_1_UUID,                                                            \
+		.app_idx = TEST_APPKEY_0_IDX,                                                      \
+		.cred_flag = false,                                                                \
+		.ttl = 3,                                                                          \
+		.period = BT_MESH_PUB_PERIOD_10SEC(2),                                             \
+		.transmit = BT_MESH_TRANSMIT(3, 20),                                               \
+	}
+
 #define DISABLED_MOD_PUB_PARAMS {                                                                  \
 		.addr = 0,                                                                         \
 		.uuid = NULL,                                                                      \
@@ -141,7 +161,7 @@ static const struct access_cfg access_cfgs[][2] = {
 	[NEW_SUBS] = {
 		/* SIG model. */
 		{
-			.pub_params = TEST_MOD_PUB_PARAMS,
+			.pub_params = TEST_MOD_PUB_PARAMS_2,
 			.appkeys_count = 2, .appkeys = { TEST_APPKEY_0_IDX, TEST_APPKEY_1_IDX },
 			.subs_count = 1, .subs = { TEST_GROUP_0 },
 			.mod_data_len = sizeof(test_mod_data),
@@ -149,7 +169,7 @@ static const struct access_cfg access_cfgs[][2] = {
 
 		/* Vendor model. */
 		{
-			.pub_params = TEST_VND_MOD_PUB_PARAMS,
+			.pub_params = TEST_VND_MOD_PUB_PARAMS_2,
 			.appkeys_count = 2, .appkeys = { TEST_APPKEY_0_IDX, TEST_APPKEY_1_IDX },
 			.subs_count = 1, .subs = { TEST_VA_0_ADDR },
 			.mod_data_len = sizeof(vnd_test_mod_data),
@@ -703,6 +723,7 @@ static void test_access_data_load(void)
 
 static void test_access_sub_overwrite(void)
 {
+	struct bt_mesh_cfg_cli_mod_pub pub_params;
 	uint16_t va;
 	uint8_t status;
 	int err;
@@ -720,6 +741,15 @@ static void test_access_sub_overwrite(void)
 		FAIL("Mod sub overwrite failed (err %d, status %u)", err, status);
 	}
 
+	memcpy(&pub_params, &(struct bt_mesh_cfg_cli_mod_pub)TEST_MOD_PUB_PARAMS_2,
+	       sizeof(struct bt_mesh_cfg_cli_mod_pub));
+	err = bt_mesh_cfg_cli_mod_pub_set(test_netkey_idx, TEST_ADDR, TEST_ADDR, TEST_MOD_ID,
+				      &pub_params, &status);
+	if (err || status) {
+		FAIL("Mod pub set failed (err %d, status %u)", err, status);
+	}
+
+	/* Vendor model. */
 	err = bt_mesh_cfg_cli_mod_sub_va_overwrite_vnd(test_netkey_idx, TEST_ADDR, TEST_ADDR,
 						   TEST_VA_0_UUID, TEST_VND_MOD_ID,
 						   TEST_VND_COMPANY_ID, &va, &status);
@@ -727,6 +757,15 @@ static void test_access_sub_overwrite(void)
 		FAIL("Mod sub va overwrite failed (err %d, status %u)", err, status);
 	}
 	ASSERT_EQUAL(TEST_VA_0_ADDR, va);
+
+	memcpy(&pub_params, &(struct bt_mesh_cfg_cli_mod_pub)TEST_VND_MOD_PUB_PARAMS_2,
+	       sizeof(struct bt_mesh_cfg_cli_mod_pub));
+	err = bt_mesh_cfg_cli_mod_pub_set_vnd(test_netkey_idx, TEST_ADDR, TEST_ADDR,
+					      TEST_VND_MOD_ID, TEST_VND_COMPANY_ID, &pub_params,
+					      &status);
+	if (err || status) {
+		FAIL("Mod pub set failed (err %d, status %u)", err, status);
+	}
 
 	k_sleep(K_SECONDS(CONFIG_BT_MESH_STORE_TIMEOUT));
 
