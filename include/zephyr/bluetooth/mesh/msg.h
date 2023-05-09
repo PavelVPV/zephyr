@@ -105,6 +105,8 @@ struct bt_mesh_msg_ctx {
 /**
  * @brief Helper for bt_mesh_msg_ctx structure initialization.
  *
+ * @note If @c dst is a Virtual Address, Label UUID should initalized separately.
+ *
  * @param net_key_idx NetKey Index of the subnet to send the message on. Only used if
  * @c app_key_idx points to devkey.
  * @param app_key_idx AppKey Index to encrypt the message with.
@@ -144,7 +146,12 @@ struct bt_mesh_msg_ctx {
  * @param pub Pointer to a model publication context.
  */
 #define BT_MESH_MSG_CTX_INIT_PUB(pub) \
-	BT_MESH_MSG_CTX_INIT(0, (pub)->key, (pub)->addr, (pub)->ttl)
+	{ \
+		.app_idx = (pub)->key, \
+		.addr = (pub)->addr, \
+		.send_ttl = (pub)->ttl, \
+		.label_uuid = (pub)->label_uuid, \
+	}
 
 /** @brief Initialize a model message.
  *
