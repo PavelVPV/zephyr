@@ -810,7 +810,9 @@ static void test_lpn_loopback(void)
 	ASSERT_OK(bt_mesh_test_send_async(GROUP_ADDR, NULL, 5, 0, NULL, NULL));
 	ASSERT_OK(bt_mesh_test_recv(5, GROUP_ADDR, NULL, K_SECONDS(1)));
 
-	//FIXME: Add virtual addr?
+	/* Loopback on virtual address, should not come back from the friend */
+	ASSERT_OK(bt_mesh_test_send_async(va->addr, va->uuid, 5, 0, NULL, NULL));
+	ASSERT_OK(bt_mesh_test_recv(5, va->addr, va->uuid, K_SECONDS(1)));
 
 	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
 	err = bt_mesh_test_recv_msg(&msg, K_SECONDS(2));
