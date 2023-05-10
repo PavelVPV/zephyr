@@ -320,7 +320,7 @@ static void test_friend_group(void)
 	ASSERT_OK_MSG(bt_mesh_test_send(GROUP_ADDR, NULL, 5, 0, K_SECONDS(1)),
 		      "Failed to send to LPN");
 	/* Send a virtual message to the LPN */
-	ASSERT_OK_MSG(bt_mesh_test_send(va->addr, NULL, 5, 0, K_SECONDS(1)),
+	ASSERT_OK_MSG(bt_mesh_test_send(va->addr, va->uuid, 5, 0, K_SECONDS(1)),
 		      "Failed to send to LPN");
 
 	/* Wait for the LPN to poll for each message, then for adding the
@@ -665,6 +665,7 @@ static void test_lpn_overflow(void)
 static void test_lpn_group(void)
 {
 	struct bt_mesh_test_msg msg;
+	const struct bt_mesh_va *va;
 	uint16_t vaddr;
 	uint8_t status = 0;
 	int err;
@@ -683,6 +684,10 @@ static void test_lpn_group(void)
 	if (err || status) {
 		FAIL("VA addr add failed with err %d status 0x%x", err, status);
 	}
+
+	va = bt_mesh_va_get(test_va_uuid);
+	ASSERT_TRUE(va != NULL);
+	ASSERT_EQUAL(vaddr, va->addr);
 
 	bt_mesh_lpn_set(true);
 	ASSERT_OK_MSG(bt_mesh_test_friendship_evt_wait(BT_MESH_TEST_LPN_ESTABLISHED,
@@ -707,7 +712,8 @@ static void test_lpn_group(void)
 	}
 
 	ASSERT_OK(bt_mesh_test_recv_msg(&msg, K_SECONDS(1)));
-	if (msg.ctx.recv_dst != vaddr || msg.ctx.addr != other_cfg.addr) {
+	if (msg.ctx.recv_dst != va->addr || msg.ctx.addr != other_cfg.addr ||
+	    msg.ctx.label_uuid != va->uuid) {
 		FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
 		     msg.ctx.recv_dst);
 	}
@@ -723,7 +729,7 @@ static void test_lpn_group(void)
 	}
 
 	ASSERT_OK(bt_mesh_test_recv_msg(&msg, K_SECONDS(1)));
-	if (msg.ctx.recv_dst != vaddr || msg.ctx.addr != friend_cfg.addr) {
+	if (msg.ctx.recv_dst != va->addr || msg.ctx.addr != friend_cfg.addr) {
 		FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
 		     msg.ctx.recv_dst);
 	}
@@ -764,6 +770,7 @@ static void test_lpn_group(void)
 static void test_lpn_loopback(void)
 {
 	struct bt_mesh_test_msg msg;
+	const struct bt_mesh_va *va;
 	uint16_t vaddr;
 	uint8_t status = 0;
 	int err;
@@ -783,6 +790,10 @@ static void test_lpn_loopback(void)
 		FAIL("VA addr add failed with err %d status 0x%x", err, status);
 	}
 
+	va = bt_mesh_va_get(test_va_uuid);
+	ASSERT_TRUE(va != NULL);
+	ASSERT_EQUAL(vaddr, va->addr);
+
 	bt_mesh_lpn_set(true);
 	ASSERT_OK_MSG(bt_mesh_test_friendship_evt_wait(BT_MESH_TEST_LPN_ESTABLISHED,
 						       K_SECONDS(5)),
@@ -799,6 +810,8 @@ static void test_lpn_loopback(void)
 	ASSERT_OK(bt_mesh_test_send_async(GROUP_ADDR, NULL, 5, 0, NULL, NULL));
 	ASSERT_OK(bt_mesh_test_recv(5, GROUP_ADDR, NULL, K_SECONDS(1)));
 
+	//FIXME: Add virtual addr?
+
 	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
 	err = bt_mesh_test_recv_msg(&msg, K_SECONDS(2));
 	if (err != -ETIMEDOUT) {
@@ -806,8 +819,8 @@ static void test_lpn_loopback(void)
 	}
 
 	/* Loopback on virtual address, should not come back from the friend */
-	ASSERT_OK(bt_mesh_test_send_async(vaddr, NULL, 5, 0, NULL, NULL));
-	ASSERT_OK(bt_mesh_test_recv(5, vaddr, NULL, K_SECONDS(1)));
+	ASSERT_OK(bt_mesh_test_send_async(va->addr, va->uuid, 5, 0, NULL, NULL));
+	ASSERT_OK(bt_mesh_test_recv(5, va->addr, va->uuid, K_SECONDS(1)));
 
 	k_sleep(K_SECONDS(2));
 
@@ -893,7 +906,7 @@ static void test_other_group(void)
 	ASSERT_OK_MSG(bt_mesh_test_send(GROUP_ADDR, NULL, 5, 0, K_SECONDS(1)),
 		      "Failed to send to LPN");
 	/* Send a virtual message to the LPN */
-	ASSERT_OK_MSG(bt_mesh_test_send(va->addr, NULL, 5, 0, K_SECONDS(1)),
+	ASSERT_OK_MSG(bt_mesh_test_send(va->addr, va->uuid, 5, 0, K_SECONDS(1)),
 		      "Failed to send to LPN");
 
 	PASS();

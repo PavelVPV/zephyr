@@ -112,6 +112,7 @@ struct bt_mesh_va {
 
 uint8_t bt_mesh_va_add(const uint8_t uuid[16], const struct bt_mesh_va **entry);
 uint8_t bt_mesh_va_del(const uint8_t uuid[16], const struct bt_mesh_va **entry);
+const struct bt_mesh_va *bt_mesh_va_get(const uint8_t *uuid);
 
 // FIXME: Function is wrong! Remove it!
 const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid);

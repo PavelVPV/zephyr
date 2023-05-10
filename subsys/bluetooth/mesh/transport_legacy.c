@@ -1792,6 +1792,19 @@ const uint16_t bt_mesh_va_addr_get(const uint8_t *uuid)
 	return va->ref ? va->addr : BT_MESH_ADDR_UNASSIGNED;
 }
 
+const struct bt_mesh_va *bt_mesh_va_get(const uint8_t *uuid)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(virtual_addrs); i++) {
+		if (virtual_addrs[i].ref && !memcmp(virtual_addrs[i].uuid, uuid, 16)) {
+			return &virtual_addrs[i];
+		}
+	}
+
+	return NULL;
+}
+
 const uint8_t *bt_mesh_label_uuid_get_by_idx(uint16_t idx)
 {
 	if (idx >= ARRAY_SIZE(virtual_addrs)) {
@@ -1813,7 +1826,7 @@ uint16_t bt_mesh_label_uuid_idx_get(const uint8_t *label_uuid)
 }
 
 #if CONFIG_BT_MESH_LABEL_COUNT > 0
-static struct bt_mesh_va *bt_mesh_va_get(uint16_t index)
+static struct bt_mesh_va *bt_mesh_va_get_by_index(uint16_t index)
 {
 	if (index >= ARRAY_SIZE(virtual_addrs)) {
 		return NULL;
@@ -1853,7 +1866,7 @@ static int va_set(const char *name, size_t len_rd,
 		return 0;
 	}
 
-	lab = bt_mesh_va_get(index);
+	lab = bt_mesh_va_get_by_index(index);
 	if (lab == NULL) {
 		LOG_WRN("Out of labels buffers");
 		return -ENOBUFS;
@@ -1879,7 +1892,7 @@ void bt_mesh_va_pending_store(void)
 	uint16_t i;
 	int err;
 
-	for (i = 0; (lab = bt_mesh_va_get(i)) != NULL; i++) {
+	for (i = 0; (lab = bt_mesh_va_get_by_index(i)) != NULL; i++) {
 		if (!lab->changed) {
 			continue;
 		}

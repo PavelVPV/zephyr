@@ -320,12 +320,16 @@ int bt_mesh_test_recv(uint16_t len, uint16_t dst, const uint8_t *uuid, k_timeout
 		return -EINVAL;
 	}
 
-	if ((uuid != NULL && msg->ctx.label_uuid == NULL) ||
-	    (uuid == NULL && msg->ctx.label_uuid != NULL) ||
-	    memcmp(uuid, msg->ctx.label_uuid, 16)) {
+	if (BT_MESH_ADDR_IS_VIRTUAL(msg->ctx.recv_dst) &&
+	    ((uuid != NULL && msg->ctx.label_uuid == NULL) ||
+	     (uuid == NULL && msg->ctx.label_uuid != NULL) ||
+	     memcmp(uuid, msg->ctx.label_uuid, 16))) {
 		LOG_ERR("Recv: Label UUID mismatch for virtual address 0x%04x");
-		LOG_ERR("Got: %s", bt_hex(msg->ctx.label_uuid, 16));
-		LOG_ERR("Expected: %s", bt_hex(uuid, 16));
+		if (uuid && msg->ctx.label_uuid) {
+			LOG_ERR("Got: %s", bt_hex(msg->ctx.label_uuid, 16));
+			LOG_ERR("Expected: %s", bt_hex(uuid, 16));
+		}
+
 		return -EINVAL;
 	}
 
