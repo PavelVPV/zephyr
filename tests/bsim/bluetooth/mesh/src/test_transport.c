@@ -159,20 +159,19 @@ static void test_tx_group(void)
  */
 static void test_tx_va(void)
 {
-	const uint8_t *label_uuid;
-	uint16_t virtual_addr;
+	const struct bt_mesh_va *va;
 	int err;
 
 	bt_mesh_test_setup();
 
-	err = bt_mesh_va_add(test_va_uuid, &virtual_addr, &label_uuid);
+	err = bt_mesh_va_add(test_va_uuid, &va);
 	ASSERT_OK_MSG(err, "Virtual addr add failed (err %d)", err);
 
 	/* Wait for the receiver to subscribe on address. */
 	k_sleep(K_SECONDS(1));
 
 	for (int i = 0; i < ARRAY_SIZE(test_vector); i++) {
-		err = bt_mesh_test_send(virtual_addr, test_va_uuid, test_vector[i].len,
+		err = bt_mesh_test_send(va->addr, test_va_uuid, test_vector[i].len,
 					test_vector[i].flags, K_SECONDS(20));
 		ASSERT_OK_MSG(err, "Failed sending vector %d", i);
 	}
@@ -190,23 +189,22 @@ static uint16_t test_va_col_addr = 0x809D;
 
 static void test_tx_va_collision(void)
 {
-	const uint8_t *label_uuid[ARRAY_SIZE(test_va_col_uuid)];
-	uint16_t virtual_addr;
+	const struct bt_mesh_va *va[ARRAY_SIZE(test_va_col_uuid)];
 	int err;
 
 	bt_mesh_test_setup();
 
 	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
-		err = bt_mesh_va_add(test_va_col_uuid[i], &virtual_addr, &label_uuid[i]);
+		err = bt_mesh_va_add(test_va_col_uuid[i], &va[i]);
 		ASSERT_OK_MSG(err, "Virtual addr add failed (err %d)", err);
-		ASSERT_EQUAL(test_va_col_addr, virtual_addr);
+		ASSERT_EQUAL(test_va_col_addr, va[i]->addr);
 	}
 
 	/* Wait for the receiver to subscribe on address. */
 	k_sleep(K_SECONDS(1));
 
 	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
-		err = bt_mesh_test_send(virtual_addr, label_uuid[i], test_vector[0].len,
+		err = bt_mesh_test_send(test_va_col_addr, va[i]->uuid, test_vector[0].len,
 					test_vector[0].flags, K_SECONDS(20));
 		ASSERT_OK_MSG(err, "Failed sending vector %d", i);
 	}

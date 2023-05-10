@@ -386,25 +386,18 @@ static int unseg_app_sdu_unpack(struct bt_mesh_friend *frnd,
 	meta->crypto.dev_key = BT_MESH_IS_DEV_KEY(app_idx);
 	meta->crypto.seq_num = net.seq;
 	meta->crypto.aszmic = 0;
-
-	if (BT_MESH_ADDR_IS_VIRTUAL(meta->crypto.dst)) {
-		meta->crypto.ad = bt_mesh_va_label_get(meta->crypto.dst, NULL);
-		if (!meta->crypto.ad) {
-			return -ENOENT;
-		}
-	} else {
-		meta->crypto.ad = NULL;
-	}
+	meta->crypto.ad = NULL;
 
 	return 0;
 }
 
 static int unseg_app_sdu_decrypt(struct bt_mesh_friend *frnd,
 				 struct net_buf *buf,
-				 const struct unseg_app_sdu_meta *meta)
+				 struct unseg_app_sdu_meta *meta)
 {
 	struct net_buf_simple in;
 	struct net_buf_simple out;
+	int err;
 
 	/* Direct the input buffer at the Upper Transport Access PDU, accounting for
 	 * the network header and the 1 byte lower transport header
@@ -417,8 +410,19 @@ static int unseg_app_sdu_decrypt(struct bt_mesh_friend *frnd,
 	net_buf_simple_clone(&in, &out);
 	out.len = 0; /* length will be set by decrypt */
 
-	/* Decrypt in place, as we only need to test one key: */
-	return bt_mesh_app_decrypt(meta->key, &meta->crypto, &in, &out);
+	do {
+		if (BT_MESH_ADDR_IS_VIRTUAL(meta->crypto.dst)) {
+			meta->crypto.ad = bt_mesh_va_label_get(meta->crypto.dst, meta->crypto.ad);
+			if (!meta->crypto.ad) {
+				return -ENOENT;
+			}
+		}
+
+		/* Decrypt in place, as we only need to test one key: */
+		err = bt_mesh_app_decrypt(meta->key, &meta->crypto, &in, &out);
+	} while (err && meta->crypto.ad != NULL);
+
+	return err;
 }
 
 static int unseg_app_sdu_encrypt(struct bt_mesh_friend *frnd,

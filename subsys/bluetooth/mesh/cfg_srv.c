@@ -180,7 +180,7 @@ static uint8_t _mod_pub_set(struct bt_mesh_model *model, uint16_t pub_addr, cons
 
 #if CONFIG_BT_MESH_LABEL_COUNT > 0
 	if (BT_MESH_ADDR_IS_VIRTUAL(model->pub->addr)) {
-		bt_mesh_va_del(model->pub->label_uuid, NULL, NULL);
+		bt_mesh_va_del(model->pub->label_uuid, NULL);
 	}
 #endif
 
@@ -837,7 +837,7 @@ static size_t mod_sub_list_clear(struct bt_mesh_model *mod)
 		}
 
 		clear_count++;
-		bt_mesh_va_del(mod->label_uuids[i], NULL, NULL);
+		bt_mesh_va_del(mod->label_uuids[i], NULL);
 		mod->label_uuids[i] = NULL;
 	}
 
@@ -848,6 +848,7 @@ static int mod_pub_va_set(struct bt_mesh_model *model,
 			  struct bt_mesh_msg_ctx *ctx,
 			  struct net_buf_simple *buf)
 {
+	const struct bt_mesh_va *va;
 	uint8_t retransmit, status, pub_ttl, pub_period, cred_flag;
 	uint16_t elem_addr, pub_addr, pub_app_idx;
 	struct bt_mesh_model *mod;
@@ -903,15 +904,17 @@ static int mod_pub_va_set(struct bt_mesh_model *model,
 		goto send_status;
 	}
 
-	status = bt_mesh_va_add(label_uuid, &pub_addr, &label_uuid);
+	status = bt_mesh_va_add(label_uuid, &va);
 	if (status != STATUS_SUCCESS) {
 		goto send_status;
 	}
 
-	status = _mod_pub_set(mod, pub_addr, label_uuid, pub_app_idx, cred_flag, pub_ttl,
+	pub_addr = va->addr;
+
+	status = _mod_pub_set(mod, pub_addr, va->uuid, pub_app_idx, cred_flag, pub_ttl,
 			      pub_period, retransmit, true);
 	if (status != STATUS_SUCCESS) {
-		bt_mesh_va_del(label_uuid, NULL, NULL);
+		bt_mesh_va_del(label_uuid, NULL);
 	}
 
 send_status:
@@ -1400,6 +1403,7 @@ static int mod_sub_va_add(struct bt_mesh_model *model,
 			  struct bt_mesh_msg_ctx *ctx,
 			  struct net_buf_simple *buf)
 {
+	const struct bt_mesh_va *va;
 	uint16_t elem_addr, sub_addr;
 	struct bt_mesh_model *mod;
 	struct bt_mesh_elem *elem;
@@ -1442,15 +1446,17 @@ static int mod_sub_va_add(struct bt_mesh_model *model,
 		goto send_status;
 	}
 
-	status = bt_mesh_va_add(label_uuid, &sub_addr, &label_uuid);
+	status = bt_mesh_va_add(label_uuid, &va);
 	if (status != STATUS_SUCCESS) {
 		goto send_status;
 	}
 
-	if (bt_mesh_model_find_label(&mod, label_uuid)) {
+	sub_addr = va->addr;
+
+	if (bt_mesh_model_find_label(&mod, va->uuid)) {
 		/* Tried to add existing subscription */
 		status = STATUS_SUCCESS;
-		bt_mesh_va_del(label_uuid, NULL, NULL);
+		bt_mesh_va_del(label_uuid, NULL);
 		goto send_status;
 	}
 
@@ -1458,15 +1464,14 @@ static int mod_sub_va_add(struct bt_mesh_model *model,
 	group_entry = bt_mesh_model_find_group(&mod, BT_MESH_ADDR_UNASSIGNED);
 	if (!group_entry || !label_entry) {
 		status = STATUS_INSUFF_RESOURCES;
-		bt_mesh_va_del(label_uuid, NULL, NULL);
+		bt_mesh_va_del(label_uuid, NULL);
 		goto send_status;
 	}
 
 	*group_entry = sub_addr;
-	*label_entry = label_uuid;
+	*label_entry = va->uuid;
 
-	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER)) {
-		//FIXME:
+	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 1) {
 		bt_mesh_lpn_group_add(sub_addr);
 	}
 
@@ -1485,6 +1490,7 @@ static int mod_sub_va_del(struct bt_mesh_model *model,
 			  struct bt_mesh_msg_ctx *ctx,
 			  struct net_buf_simple *buf)
 {
+	const struct bt_mesh_va *va;
 	uint16_t elem_addr, sub_addr;
 	struct bt_mesh_model *mod;
 	struct bt_mesh_elem *elem;
@@ -1528,16 +1534,18 @@ static int mod_sub_va_del(struct bt_mesh_model *model,
 		goto send_status;
 	}
 
-	status = bt_mesh_va_del(label_uuid, &sub_addr, &label_uuid);
-	if (sub_addr == BT_MESH_ADDR_UNASSIGNED) {
+	status = bt_mesh_va_del(label_uuid, &va);
+	if (status != STATUS_SUCCESS) {
 		goto send_status;
 	}
 
-	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER)) {
+	sub_addr = va->addr;
+
+	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 0) {
 		bt_mesh_lpn_group_del(&sub_addr, 1);
 	}
 
-	label_match = bt_mesh_model_find_label(&mod, label_uuid);
+	label_match = bt_mesh_model_find_label(&mod, va->uuid);
 	if (label_match) {
 		group_match = bt_mesh_model_find_group(&mod, sub_addr);
 		if (group_match) {
@@ -1547,7 +1555,7 @@ static int mod_sub_va_del(struct bt_mesh_model *model,
 			     CONFIG_BT_MESH_LABEL_COUNT > 1; i++) {
 				uint16_t group_addr;
 
-				if (mod->label_uuids[i] == label_uuid) {
+				if (mod->label_uuids[i] == va->uuid) {
 					continue;
 				}
 
@@ -1583,6 +1591,7 @@ static int mod_sub_va_overwrite(struct bt_mesh_model *model,
 				struct bt_mesh_msg_ctx *ctx,
 				struct net_buf_simple *buf)
 {
+	const struct bt_mesh_va *va;
 	uint16_t elem_addr, sub_addr = BT_MESH_ADDR_UNASSIGNED;
 	struct bt_mesh_model *mod;
 	struct bt_mesh_elem *elem;
@@ -1623,17 +1632,18 @@ static int mod_sub_va_overwrite(struct bt_mesh_model *model,
 	}
 
 	if (mod->groups_cnt > 0 && CONFIG_BT_MESH_LABEL_COUNT) {
-		status = bt_mesh_va_add(label_uuid, &sub_addr, &label_uuid);
+		status = bt_mesh_va_add(label_uuid, &va);
 		if (status == STATUS_SUCCESS) {
+			sub_addr = va->addr;
 			bt_mesh_model_extensions_walk(mod, mod_sub_clear_visitor, NULL);
 			mod->groups[0] = sub_addr;
-			mod->label_uuids[0] = label_uuid;
+			mod->label_uuids[0] = va->uuid;
 
 			if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
 				bt_mesh_model_sub_store(mod);
 			}
 
-			if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER)) {
+			if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 1) {
 				bt_mesh_lpn_group_add(sub_addr);
 			}
 		}

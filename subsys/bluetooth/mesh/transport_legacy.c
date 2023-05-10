@@ -78,13 +78,6 @@ LOG_MODULE_REGISTER(bt_mesh_transport);
 /* How long to wait for available buffers before giving up */
 #define BUF_TIMEOUT                 K_NO_WAIT
 
-struct virtual_addr {
-	uint16_t ref:15,
-		 changed:1;
-	uint16_t addr;
-	uint8_t  uuid[16];
-};
-
 /* Virtual Address information for persistent storage. */
 struct va_val {
 	uint16_t ref;
@@ -138,7 +131,7 @@ static struct seg_rx {
 
 K_MEM_SLAB_DEFINE(segs, BT_MESH_APP_SEG_SDU_MAX, CONFIG_BT_MESH_SEG_BUFS, 4);
 
-static struct virtual_addr virtual_addrs[CONFIG_BT_MESH_LABEL_COUNT];
+static struct bt_mesh_va virtual_addrs[CONFIG_BT_MESH_LABEL_COUNT];
 
 static int send_unseg(struct bt_mesh_net_tx *tx, struct net_buf_simple *sdu,
 		      const struct bt_mesh_send_cb *cb, void *cb_data,
@@ -736,7 +729,7 @@ static int sdu_try_decrypt(struct bt_mesh_net_rx *rx, const uint8_t key[16],
 			ctx->crypto.ad = bt_mesh_va_label_get(rx->ctx.recv_dst, ctx->crypto.ad);
 
 			if (!ctx->crypto.ad) {
-				return false;
+				return -ENOENT;
 			}
 		}
 
@@ -1687,7 +1680,7 @@ void bt_mesh_trans_init(void)
 	}
 }
 
-static inline void va_store(struct virtual_addr *store)
+static inline void va_store(struct bt_mesh_va *store)
 {
 	store->changed = 1U;
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
@@ -1695,9 +1688,9 @@ static inline void va_store(struct virtual_addr *store)
 	}
 }
 
-uint8_t bt_mesh_va_add(const uint8_t uuid[16], uint16_t *addr, const uint8_t **label_uuid)
+uint8_t bt_mesh_va_add(const uint8_t uuid[16], const struct bt_mesh_va **entry)
 {
-	struct virtual_addr *va = NULL;
+	struct bt_mesh_va *va = NULL;
 	int err;
 
 	for (int i = 0; i < ARRAY_SIZE(virtual_addrs); i++) {
@@ -1711,8 +1704,9 @@ uint8_t bt_mesh_va_add(const uint8_t uuid[16], uint16_t *addr, const uint8_t **l
 
 		if (!memcmp(uuid, virtual_addrs[i].uuid,
 			    ARRAY_SIZE(virtual_addrs[i].uuid))) {
-			*addr = virtual_addrs[i].addr;
-			*label_uuid = virtual_addrs[i].uuid;
+			if (entry) {
+				*entry = &virtual_addrs[i];
+			}
 			virtual_addrs[i].ref++;
 			va_store(&virtual_addrs[i]);
 			return STATUS_SUCCESS;
@@ -1733,15 +1727,16 @@ uint8_t bt_mesh_va_add(const uint8_t uuid[16], uint16_t *addr, const uint8_t **l
 	va->ref = 1;
 	va_store(va);
 
-	*addr = va->addr;
-	*label_uuid = va->uuid;
+	if (entry) {
+		*entry = va;
+	}
 
 	return STATUS_SUCCESS;
 }
 
-uint8_t bt_mesh_va_del(const uint8_t uuid[16], uint16_t *addr, const uint8_t **label_uuid)
+uint8_t bt_mesh_va_del(const uint8_t uuid[16], const struct bt_mesh_va **entry)
 {
-	struct virtual_addr *va = NULL;
+	struct bt_mesh_va *va = NULL;
 
 	for (int i = 0; i < ARRAY_SIZE(virtual_addrs); i++) {
 		if (virtual_addrs[i].ref &&
@@ -1757,9 +1752,8 @@ uint8_t bt_mesh_va_del(const uint8_t uuid[16], uint16_t *addr, const uint8_t **l
 	}
 
 	va->ref--;
-	if (addr) {
-		*addr = va->addr;
-		*label_uuid = va->uuid;
+	if (entry) {
+		*entry = va;
 	}
 
 	va_store(va);
@@ -1792,9 +1786,9 @@ const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid)
 
 const uint16_t bt_mesh_va_addr_get(const uint8_t *uuid)
 {
-	struct virtual_addr *va;
+	struct bt_mesh_va *va;
 
-	va = CONTAINER_OF(uuid, struct virtual_addr, uuid);
+	va = CONTAINER_OF(uuid, struct bt_mesh_va, uuid);
 	return va->ref ? va->addr : BT_MESH_ADDR_UNASSIGNED;
 }
 
@@ -1809,7 +1803,7 @@ const uint8_t *bt_mesh_label_uuid_get_by_idx(uint16_t idx)
 
 uint16_t bt_mesh_label_uuid_idx_get(const uint8_t *label_uuid)
 {
-	struct virtual_addr *va = CONTAINER_OF(label_uuid, struct virtual_addr, uuid);
+	struct bt_mesh_va *va = CONTAINER_OF(label_uuid, struct bt_mesh_va, uuid);
 
 	if (!PART_OF_ARRAY(virtual_addrs, va) || va->ref == 0) {
 		return (uint16_t)(-1);
@@ -1819,7 +1813,7 @@ uint16_t bt_mesh_label_uuid_idx_get(const uint8_t *label_uuid)
 }
 
 #if CONFIG_BT_MESH_LABEL_COUNT > 0
-static struct virtual_addr *bt_mesh_va_get(uint16_t index)
+static struct bt_mesh_va *bt_mesh_va_get(uint16_t index)
 {
 	if (index >= ARRAY_SIZE(virtual_addrs)) {
 		return NULL;
@@ -1832,7 +1826,7 @@ static int va_set(const char *name, size_t len_rd,
 		  settings_read_cb read_cb, void *cb_arg)
 {
 	struct va_val va;
-	struct virtual_addr *lab;
+	struct bt_mesh_va *lab;
 	uint16_t index;
 	int err;
 
@@ -1879,7 +1873,7 @@ BT_MESH_SETTINGS_DEFINE(va, "Va", va_set);
 #define IS_VA_DEL(_label)	((_label)->ref == 0)
 void bt_mesh_va_pending_store(void)
 {
-	struct virtual_addr *lab;
+	struct bt_mesh_va *lab;
 	struct va_val va;
 	char path[18];
 	uint16_t i;

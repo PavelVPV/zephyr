@@ -295,8 +295,7 @@ static void test_friend_overflow(void)
  */
 static void test_friend_group(void)
 {
-	const uint8_t *label_uuid;
-	uint16_t virtual_addr;
+	const struct bt_mesh_va *va;
 
 	bt_mesh_test_setup();
 
@@ -307,7 +306,7 @@ static void test_friend_group(void)
 		      "Friendship not established");
 	bt_mesh_test_friendship_evt_clear(BT_MESH_TEST_FRIEND_POLLED);
 
-	ASSERT_OK(bt_mesh_va_add(test_va_uuid, &virtual_addr, &label_uuid));
+	ASSERT_OK(bt_mesh_va_add(test_va_uuid, &va));
 
 	/* The other mesh device will send its messages in the first poll */
 	ASSERT_OK(bt_mesh_test_friendship_evt_wait(BT_MESH_TEST_FRIEND_POLLED,
@@ -321,7 +320,7 @@ static void test_friend_group(void)
 	ASSERT_OK_MSG(bt_mesh_test_send(GROUP_ADDR, NULL, 5, 0, K_SECONDS(1)),
 		      "Failed to send to LPN");
 	/* Send a virtual message to the LPN */
-	ASSERT_OK_MSG(bt_mesh_test_send(virtual_addr, NULL, 5, 0, K_SECONDS(1)),
+	ASSERT_OK_MSG(bt_mesh_test_send(va->addr, NULL, 5, 0, K_SECONDS(1)),
 		      "Failed to send to LPN");
 
 	/* Wait for the LPN to poll for each message, then for adding the
@@ -881,12 +880,11 @@ static void test_other_msg(void)
  */
 static void test_other_group(void)
 {
-	const uint8_t *label_uuid;
-	uint16_t virtual_addr;
+	const struct bt_mesh_va *va;
 
 	bt_mesh_test_setup();
 
-	ASSERT_OK(bt_mesh_va_add(test_va_uuid, &virtual_addr, &label_uuid));
+	ASSERT_OK(bt_mesh_va_add(test_va_uuid, &va));
 
 	/* Wait for LPN to send us a message after establishing the friendship */
 	ASSERT_OK(bt_mesh_test_recv(5, cfg->addr, NULL, K_SECONDS(1)));
@@ -895,7 +893,7 @@ static void test_other_group(void)
 	ASSERT_OK_MSG(bt_mesh_test_send(GROUP_ADDR, NULL, 5, 0, K_SECONDS(1)),
 		      "Failed to send to LPN");
 	/* Send a virtual message to the LPN */
-	ASSERT_OK_MSG(bt_mesh_test_send(virtual_addr, NULL, 5, 0, K_SECONDS(1)),
+	ASSERT_OK_MSG(bt_mesh_test_send(va->addr, NULL, 5, 0, K_SECONDS(1)),
 		      "Failed to send to LPN");
 
 	PASS();
