@@ -386,45 +386,54 @@ static void test_friend_va_collision(void)
 
 	bt_mesh_test_friendship_evt_wait(BT_MESH_TEST_FRIEND_POLLED, K_SECONDS(10));
 
+	LOG_INF("Step 1: Sending msgs to LPN.");
+
+	/* LPN shall receive the first 2 messages. */
 	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
 		/* Send a message to the first virtual address. LPN should receive it. */
 		ASSERT_OK_MSG(bt_mesh_test_send(test_va_col_addr, va[i]->uuid, 5, 0, K_SECONDS(1)),
 			      "Failed to send to LPN");
 	}
-
-	LOG_ERR("%d", __LINE__);
-	/* One per msg + 1 (md==0) */
+	/* One poll per message + Friend Update with md == 0 */
 	friend_wait_for_polls(3);
 
-	// sub del
-	//FIXME: Should here be one more pull for Friend Update with mp == 0?
-	LOG_ERR("%d", __LINE__);
+	LOG_INF("Let LPN unsubscribe from the first address.");
+
+	/* Manual poll by LPN test case after removing the first Label UUID from subscription. */
+	// FIXME: Should here be one more pull for Friend Update with mp == 0?
 	friend_wait_for_polls(1);
 
-	LOG_ERR("%d", __LINE__);
+	LOG_INF("Step 2: Sending msgs to LPN.");
+
+	/* Friend will send both messages as the virtual address is the same, but LPN shall
+	 * receive only the second message.
+	 */
 	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
-		/* Send a message to the first virtual address. LPN should receive it. */
 		ASSERT_OK_MSG(bt_mesh_test_send(test_va_col_addr, va[i]->uuid, 5, 0, K_SECONDS(1)),
 			      "Failed to send to LPN");
 	}
-
-	LOG_ERR("%d", __LINE__);
-	/* LPN polls 2 msgs, +1 FU (md==0)*/
+	/* One poll per message + Friend Update with md == 0 */
 	friend_wait_for_polls(3);
 
-	LOG_ERR("%d", __LINE__);
-	/* subs delete */
+	LOG_INF("Let LPN unsubscribe from the second address.");
+
+	/* Manual poll by LPN test case after removing the second Label UUID from subscription.
+	 * After this step, the virtual address shall be removed from the subscription list.
+	 */
+	// FIXME: Should here be one more pull for Friend Update with mp == 0?
 	friend_wait_for_polls(1);
 
-	LOG_ERR("%d", __LINE__);
+	LOG_INF("Step 3: Sending msgs to LPN.");
+
+	/* Friend shall not send the messages to LPN because it is not subscribed to any virtual
+	 * address.
+	 */
 	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
-		/* Send a message to the first virtual address. LPN should receive it. */
 		ASSERT_OK_MSG(bt_mesh_test_send(test_va_col_addr, va[i]->uuid, 5, 0, K_SECONDS(1)),
 			      "Failed to send to LPN");
 	}
-	LOG_ERR("%d", __LINE__);
+	/* Shall be only one Friend Poll as the Friend Queue is empty. */
 	friend_wait_for_polls(1);
-	LOG_ERR("%d", __LINE__);
 
 	PASS();
 }
@@ -1056,69 +1065,82 @@ static void test_lpn_va_collision(void)
 						       K_SECONDS(5)), "LPN not established");
 	bt_mesh_test_friendship_evt_clear(BT_MESH_TEST_LPN_POLLED);
 
-	k_sleep(K_SECONDS(3)); /* Let friend prepare msgs */
+	LOG_INF("Step 1: Waiting for msgs from Friend");
+
+	/* Let Friend prepare messages and the poll them. */
+	k_sleep(K_SECONDS(3));
 	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
-	/* Should receive both messages. */
+	/* LPN shall receive both messages. */
 	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
-		LOG_ERR("msg n: %d", i);
 		ASSERT_OK(bt_mesh_test_recv_msg(&msg, K_SECONDS(10)));
-		if (msg.ctx.recv_dst != va[i]->addr || msg.ctx.label_uuid != va[i]->uuid ||
+		if (msg.ctx.recv_dst != va[i]->addr ||
+		    msg.ctx.label_uuid != va[i]->uuid ||
 		    msg.ctx.addr != friend_cfg.addr) {
-			FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
-			     msg.ctx.recv_dst);
+			FAIL("Unexpected message: 0x%04x -> 0x%04x, uuid: %p", msg.ctx.addr,
+			     msg.ctx.recv_dst, msg.ctx.label_uuid);
 		}
 	}
-
-	/* Let Frined poll call timeout*/
+	/* Wait for the extra poll timeout in friend_wait_for_polls(). */
 	k_sleep(K_SECONDS(3));
-	LOG_ERR("%d", __LINE__);
 
+	LOG_INF("Unsubscribing from the first address.");
+
+	/* Remove the first virtual address from subscription and poll messages from Friend. This
+	 * call shall not generate Friend Subscription List Remove message because LPN is still
+	 * subscribed to another Label UUID with the same  virtual address.
+	 */
 	err = bt_mesh_cfg_cli_mod_sub_va_del(0, cfg->addr, cfg->addr, test_va_col_uuid[0],
 				      TEST_MOD_ID, &vaddr, &status);
 	if (err || status) {
-		FAIL("Group addr add failed with err %d status 0x%x", err,
-		     status);
+		FAIL("Virtual addr add failed with err %d status 0x%x", err, status);
 	}
-
 	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
+	/* Wait for the extra poll timeout in friend_wait_for_polls(). */
 	k_sleep(K_SECONDS(3));
 
-	LOG_ERR("%d", __LINE__);
-	/* Should not receive a message from the first address. */
+	LOG_INF("Step 2: Waiting for msgs from Friend");
+
+	/* LPN will still receive both messages as the virtual address is the same  for both Label
+	 * UUIDs, but the first message shall not be decrypted and shall be dropped.
+	 */
 	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
-	/* Receive a message from second UUID, but not the first */
 	ASSERT_OK(bt_mesh_test_recv_msg(&msg, K_SECONDS(1)));
 	if (msg.ctx.recv_dst != va[1]->addr || msg.ctx.label_uuid != va[1]->uuid ||
 	    msg.ctx.addr != friend_cfg.addr) {
-		FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
-		     msg.ctx.recv_dst);
+		FAIL("Unexpected message: 0x%04x -> 0x%04x, uuid: %p", msg.ctx.addr,
+		     msg.ctx.recv_dst, msg.ctx.label_uuid);
 	}
 
-	LOG_ERR("%d", __LINE__);
+	/* Check that there are no more messages from Friend. */
 	err = bt_mesh_test_recv_msg(&msg, K_SECONDS(1));
 	if (!err) {
-		FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
-		     msg.ctx.recv_dst);
+		FAIL("Unexpected message: 0x%04x -> 0x%04x, uuid: %p", msg.ctx.addr,
+		     msg.ctx.recv_dst, msg.ctx.label_uuid);
 	}
-
-	LOG_ERR("%d", __LINE__);
+	/* Wait for the extra poll timeout in friend_wait_for_polls(). */
 	k_sleep(K_SECONDS(3));
-	/* Remove the second message. */
+
+	LOG_INF("Unsubscribing from the second address.");
+
+	/* Unsubscribe from the second address. Now there are no subscriptions to the same virtual
+	 * address. LPN shall send  Subscription List Remove message.
+	 */
 	err = bt_mesh_cfg_cli_mod_sub_va_del(0, cfg->addr, cfg->addr, test_va_col_uuid[1],
 				      TEST_MOD_ID, &vaddr, &status);
 	if (err || status) {
-		FAIL("Group addr del failed with err %d status 0x%x", err,
-		     status);
+		FAIL("Virtual addr del failed with err %d status 0x%x", err, status);
 	}
-
 	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
+	/* Wait for the extra poll timeout in friend_wait_for_polls(). */
 	k_sleep(K_SECONDS(3));
 
-	LOG_ERR("%d", __LINE__);
-	/* Should not receive both messages. */
+	LOG_INF("Step 3: Waiting for msgs from Friend");
+
+	/* As now there shall be no virtual addresses in the subscription list, Friend Queue shall
+	 * be empty.
+	 */
 	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
 	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
-		LOG_ERR("%d", __LINE__);
 		err = bt_mesh_test_recv_msg(&msg, K_SECONDS(1));
 		if (!err) {
 			FAIL("Unexpected message: 0x%04x -> 0x%04x, uuid: %p", msg.ctx.addr,
