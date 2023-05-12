@@ -322,6 +322,7 @@ static void friend_sub_rem(struct bt_mesh_friend *frnd, uint16_t addr)
 
 	for (i = 0; i < ARRAY_SIZE(frnd->sub_list); i++) {
 		if (frnd->sub_list[i] == addr) {
+			LOG_ERR("Removing %04x from sub_list", addr);
 			frnd->sub_list[i] = BT_MESH_ADDR_UNASSIGNED;
 			return;
 		}

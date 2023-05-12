@@ -22,7 +22,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
  */
 
 #define GROUP_ADDR 0xc000
-#define WAIT_TIME 60 /*seconds*/
+#define WAIT_TIME 70 /*seconds*/
 #define LPN_ADDR_START 0x0003
 #define POLL_TIMEOUT_MS (100 * CONFIG_BT_MESH_LPN_POLL_TIMEOUT)
 
@@ -395,16 +395,12 @@ static void test_friend_va_collision(void)
 	LOG_ERR("%d", __LINE__);
 	/* One per msg + 1 (md==0) */
 	friend_wait_for_polls(3);
-	LOG_ERR("%d", __LINE__);
-	k_sleep(K_SECONDS(10));
 
-	LOG_ERR("%d", __LINE__);
-//	/* 1 for Subs List Add, 1 for Subs List Conf, 1 (md == 0)*/
-//	friend_wait_for_polls(3);
+	// sub del
 	//FIXME: Should here be one more pull for Friend Update with mp == 0?
+	LOG_ERR("%d", __LINE__);
 	friend_wait_for_polls(1);
 
-	//friend_wait_for_polls(5);
 	LOG_ERR("%d", __LINE__);
 	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
 		/* Send a message to the first virtual address. LPN should receive it. */
@@ -413,14 +409,19 @@ static void test_friend_va_collision(void)
 	}
 
 	LOG_ERR("%d", __LINE__);
-	k_sleep(K_SECONDS(10));
-
-	LOG_ERR("%d", __LINE__);
-	/* 2 manual polls + FU (md==0)*/
+	/* LPN polls 2 msgs, +1 FU (md==0)*/
 	friend_wait_for_polls(3);
 
 	LOG_ERR("%d", __LINE__);
-	k_sleep(K_SECONDS(10));
+	/* subs delete */
+	friend_wait_for_polls(1);
+
+	LOG_ERR("%d", __LINE__);
+	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
+		/* Send a message to the first virtual address. LPN should receive it. */
+		ASSERT_OK_MSG(bt_mesh_test_send(test_va_col_addr, va[i]->uuid, 5, 0, K_SECONDS(1)),
+			      "Failed to send to LPN");
+	}
 	LOG_ERR("%d", __LINE__);
 	friend_wait_for_polls(1);
 	LOG_ERR("%d", __LINE__);
@@ -1055,6 +1056,7 @@ static void test_lpn_va_collision(void)
 						       K_SECONDS(5)), "LPN not established");
 	bt_mesh_test_friendship_evt_clear(BT_MESH_TEST_LPN_POLLED);
 
+	k_sleep(K_SECONDS(3)); /* Let friend prepare msgs */
 	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
 	/* Should receive both messages. */
 	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
@@ -1067,7 +1069,8 @@ static void test_lpn_va_collision(void)
 		}
 	}
 
-	k_sleep(K_SECONDS(10));
+	/* Let Frined poll call timeout*/
+	k_sleep(K_SECONDS(3));
 	LOG_ERR("%d", __LINE__);
 
 	err = bt_mesh_cfg_cli_mod_sub_va_del(0, cfg->addr, cfg->addr, test_va_col_uuid[0],
@@ -1077,30 +1080,29 @@ static void test_lpn_va_collision(void)
 		     status);
 	}
 
-	k_sleep(K_SECONDS(10));
+	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
+	k_sleep(K_SECONDS(3));
 
 	LOG_ERR("%d", __LINE__);
 	/* Should not receive a message from the first address. */
 	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
-	err = bt_mesh_test_recv_msg(&msg, K_SECONDS(10));
-	if (!err) {
-		FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
-		     msg.ctx.recv_dst);
-	}
-
-	LOG_ERR("%d", __LINE__);
-	/* Should still receive a message from second address. */
-	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
-	ASSERT_OK(bt_mesh_test_recv_msg(&msg, K_SECONDS(10)));
+	/* Receive a message from second UUID, but not the first */
+	ASSERT_OK(bt_mesh_test_recv_msg(&msg, K_SECONDS(1)));
 	if (msg.ctx.recv_dst != va[1]->addr || msg.ctx.label_uuid != va[1]->uuid ||
 	    msg.ctx.addr != friend_cfg.addr) {
 		FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
 		     msg.ctx.recv_dst);
 	}
 
-	k_sleep(K_SECONDS(10));
+	LOG_ERR("%d", __LINE__);
+	err = bt_mesh_test_recv_msg(&msg, K_SECONDS(1));
+	if (!err) {
+		FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
+		     msg.ctx.recv_dst);
+	}
 
 	LOG_ERR("%d", __LINE__);
+	k_sleep(K_SECONDS(3));
 	/* Remove the second message. */
 	err = bt_mesh_cfg_cli_mod_sub_va_del(0, cfg->addr, cfg->addr, test_va_col_uuid[1],
 				      TEST_MOD_ID, &vaddr, &status);
@@ -1109,17 +1111,18 @@ static void test_lpn_va_collision(void)
 		     status);
 	}
 
-	k_sleep(K_SECONDS(10));
+	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
+	k_sleep(K_SECONDS(3));
 
 	LOG_ERR("%d", __LINE__);
 	/* Should not receive both messages. */
 	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
 	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
 		LOG_ERR("%d", __LINE__);
-		err = bt_mesh_test_recv_msg(&msg, K_SECONDS(10));
-		if (err) {
-			FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
-			     msg.ctx.recv_dst);
+		err = bt_mesh_test_recv_msg(&msg, K_SECONDS(1));
+		if (!err) {
+			FAIL("Unexpected message: 0x%04x -> 0x%04x, uuid: %p", msg.ctx.addr,
+			     msg.ctx.recv_dst, msg.ctx.label_uuid);
 		}
 	}
 
