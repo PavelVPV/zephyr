@@ -832,7 +832,7 @@ static size_t mod_sub_list_clear(struct bt_mesh_model *mod)
 
 		(void)bt_mesh_va_del(mod->uuids[i]);
 		mod->uuids[i] = NULL;
-		clear_count++;
+		/* No need to increment `clear_count` as `groups` contains virtual addresses. */
 	}
 
 	return clear_count;
@@ -1244,8 +1244,7 @@ static enum bt_mesh_walk mod_sub_list_visitor(struct bt_mesh_model *mod, void *c
 	}
 
 	for (i = 0; i < mod->groups_cnt; i++) {
-		if (mod->groups[i] == BT_MESH_ADDR_UNASSIGNED ||
-		    BT_MESH_ADDR_IS_VIRTUAL(mod->groups[i])) {
+		if (mod->groups[i] == BT_MESH_ADDR_UNASSIGNED) {
 			continue;
 		}
 
@@ -1256,21 +1255,6 @@ static enum bt_mesh_walk mod_sub_list_visitor(struct bt_mesh_model *mod, void *c
 		}
 
 		net_buf_simple_add_le16(visit->msg, mod->groups[i]);
-		count++;
-	}
-
-	for (i = 0; i < CONFIG_BT_MESH_LABEL_COUNT; i++) {
-		if (mod->uuids[i] == NULL) {
-			continue;
-		}
-
-		if (net_buf_simple_tailroom(visit->msg) <
-		    2 + BT_MESH_MIC_SHORT) {
-			LOG_WRN("No room for all groups");
-			return BT_MESH_WALK_STOP;
-		}
-
-		net_buf_simple_add_le16(visit->msg, bt_mesh_va_addr_get(mod->uuids[i]));
 		count++;
 	}
 
