@@ -1780,8 +1780,8 @@ static int mod_set(bool vnd, const char *name, size_t len_rd,
 		return -ENOENT;
 	}
 
-	/* len contains length of mod id string represntation. Call settings_name_next() again
-	 * to get length of next.
+	/* `len` contains length of model id string representation. Call settings_name_next() again
+	 * to get length of `next`.
 	 */
 	switch (settings_name_next(next, NULL)) {
 	case 4:
