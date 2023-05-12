@@ -133,6 +133,8 @@ K_MEM_SLAB_DEFINE(segs, BT_MESH_APP_SEG_SDU_MAX, CONFIG_BT_MESH_SEG_BUFS, 4);
 
 static struct bt_mesh_va virtual_addrs[CONFIG_BT_MESH_LABEL_COUNT];
 
+static const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid);
+
 static int send_unseg(struct bt_mesh_net_tx *tx, struct net_buf_simple *sdu,
 		      const struct bt_mesh_send_cb *cb, void *cb_data,
 		      const uint8_t *ctl_op)
@@ -607,10 +609,6 @@ static int trans_encrypt(const struct bt_mesh_net_tx *tx, const uint8_t *key,
 	};
 
 	if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
-//		if (bt_mesh_va_addr_get(tx->ctx->uuid) == BT_MESH_ADDR_UNASSIGNED) {
-//			return -EINVAL;
-//		}
-
 		crypto.ad = tx->ctx->uuid;
 		LOG_ERR("Encrypting %04x using %p", tx->ctx->addr, tx->ctx->uuid);
 	}
@@ -1753,7 +1751,8 @@ uint8_t bt_mesh_va_del(const uint8_t *uuid)
 }
 
 // FIXME: to be removed
-const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid)
+/* Iterate over Label UUIDs that have the same virtual address. */
+static const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid)
 {
 	int i;
 
@@ -1789,19 +1788,6 @@ bool bt_mesh_va_has_collision(const struct bt_mesh_va *va)
 	return false;
 }
 
-const uint16_t bt_mesh_va_addr_get(const uint8_t *uuid)
-{
-	struct bt_mesh_va *va;
-
-	va = CONTAINER_OF(uuid, struct bt_mesh_va, uuid);
-
-	if (!PART_OF_ARRAY(virtual_addrs, va) || va->ref == 0) {
-		return BT_MESH_ADDR_UNASSIGNED;
-	}
-
-	return va->ref ? va->addr : BT_MESH_ADDR_UNASSIGNED;
-}
-
 const struct bt_mesh_va *bt_mesh_va_get(const uint8_t *uuid)
 {
 	int i;
@@ -1815,7 +1801,7 @@ const struct bt_mesh_va *bt_mesh_va_get(const uint8_t *uuid)
 	return NULL;
 }
 
-const uint8_t *bt_mesh_label_uuid_get_by_idx(uint16_t idx)
+const uint8_t *bt_mesh_va_get_uuid_by_idx(uint16_t idx)
 {
 	if (idx >= ARRAY_SIZE(virtual_addrs)) {
 		return NULL;
@@ -1824,7 +1810,7 @@ const uint8_t *bt_mesh_label_uuid_get_by_idx(uint16_t idx)
 	return virtual_addrs[idx].uuid;
 }
 
-uint16_t bt_mesh_label_uuid_idx_get(const uint8_t *uuid)
+uint16_t bt_mesh_va_get_idx_by_uuid(const uint8_t *uuid)
 {
 	struct bt_mesh_va *va = CONTAINER_OF(uuid, struct bt_mesh_va, uuid);
 

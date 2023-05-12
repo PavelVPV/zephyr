@@ -1533,7 +1533,7 @@ static int mod_sub_va_del(struct bt_mesh_model *model,
 	}
 
 	LOG_ERR("Del Addr: %d, %p, col:%d", va->addr, va->uuid, bt_mesh_va_has_collision(va));
-	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 0 &&
+	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 1 &&
 	    !bt_mesh_va_has_collision(va)) {
 		bt_mesh_lpn_group_del(&va->addr, 1);
 	}

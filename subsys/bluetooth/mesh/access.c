@@ -1672,7 +1672,7 @@ static int mod_set_sub_va(struct bt_mesh_model *mod, size_t len_rd,
 	LOG_HEXDUMP_DBG(uuidxs, len, "val");
 
 	for (i = 0, count = 0; i < len / sizeof(uint16_t); i++) {
-		mod->uuids[count] = bt_mesh_label_uuid_get_by_idx(uuidxs[i]);
+		mod->uuids[count] = bt_mesh_va_get_uuid_by_idx(uuidxs[i]);
 		if (mod->uuids[count] != NULL) {
 			count++;
 		}
@@ -1735,7 +1735,7 @@ static int mod_set_pub(struct bt_mesh_model *mod, size_t len_rd,
 
 	if (pub.uuidx != (uint16_t)(-1)) {
 		//FIXME: This won't work
-		mod->pub->uuid = bt_mesh_label_uuid_get_by_idx(pub.uuidx);
+		mod->pub->uuid = bt_mesh_va_get_uuid_by_idx(pub.uuidx);
 	} else {
 		mod->pub->uuid = NULL;
 	}
@@ -1929,7 +1929,7 @@ static void store_pending_mod_sub_va(struct bt_mesh_model *mod, bool vnd)
 
 	for (i = 0, count = 0; i < CONFIG_BT_MESH_LABEL_COUNT; i++) {
 		if (mod->uuids[i] != NULL) {
-			uuidxs[count++] = bt_mesh_label_uuid_idx_get(mod->uuids[i]);
+			uuidxs[count++] = bt_mesh_va_get_idx_by_uuid(mod->uuids[i]);
 		}
 	}
 
@@ -1968,7 +1968,7 @@ static void store_pending_mod_pub(struct bt_mesh_model *mod, bool vnd)
 		pub.base.cred = mod->pub->cred;
 
 		if (BT_MESH_ADDR_IS_VIRTUAL(mod->pub->addr)) {
-			pub.uuidx = bt_mesh_label_uuid_idx_get(mod->pub->uuid);
+			pub.uuidx = bt_mesh_va_get_idx_by_uuid(mod->pub->uuid);
 		}
 
 		err = settings_save_one(path, &pub,

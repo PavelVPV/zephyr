@@ -397,9 +397,12 @@ static int unseg_app_sdu_unpack(struct bt_mesh_friend *frnd,
 	meta->crypto.aszmic = 0;
 
 	if (BT_MESH_ADDR_IS_VIRTUAL(meta->crypto.dst)) {
-		meta->crypto.ad = bt_mesh_label_uuid_get_by_idx(uuid_idx);
-		LOG_WRN("Addr: %04x, uuid: %p", meta->crypto.dst, meta->crypto.ad);
+		meta->crypto.ad = bt_mesh_va_get_uuid_by_idx(uuid_idx);
+	} else {
+		meta->crypto.ad = NULL;
 	}
+
+	LOG_WRN("Addr: %04x, uuid: %p", meta->crypto.dst, meta->crypto.ad);
 
 	return 0;
 }
@@ -1510,13 +1513,15 @@ static void friend_lpn_enqueue_tx(struct bt_mesh_friend *frnd,
 	if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
 		uint16_t uuid_idx;
 
-		uuid_idx = bt_mesh_label_uuid_idx_get(tx->ctx->uuid);
+		uuid_idx = bt_mesh_va_get_idx_by_uuid(tx->ctx->uuid);
 		if (uuid_idx >= 0xfff) {
 			LOG_ERR("Index (%d) for Label UUID %p is too big", uuid_idx,
 				tx->ctx->uuid);
 			net_buf_unref(buf);
 			return;
 		}
+
+		LOG_WRN("encr: %d %p", uuid_idx, tx->ctx->uuid);
 
 		FRIEND_ADV(buf)->uuid_idx = uuid_idx;
 	}

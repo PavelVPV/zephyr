@@ -115,13 +115,7 @@ uint8_t bt_mesh_va_del(const uint8_t *uuid);
 const struct bt_mesh_va *bt_mesh_va_get(const uint8_t *uuid);
 bool bt_mesh_va_has_collision(const struct bt_mesh_va *va);
 
-// FIXME: Function is wrong! Remove it!
-const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid);
-
-const uint16_t bt_mesh_va_addr_get(const uint8_t *uuid);
-
-//FIXME: Add _va_ suffix: bt_mesh_va_label_...
-const uint8_t *bt_mesh_label_uuid_get_by_idx(uint16_t idx);
-uint16_t bt_mesh_label_uuid_idx_get(const uint8_t *uuid);
+const uint8_t *bt_mesh_va_get_uuid_by_idx(uint16_t idx);
+uint16_t bt_mesh_va_get_idx_by_uuid(const uint8_t *uuid);
 
 void bt_mesh_va_pending_store(void);
