@@ -1712,7 +1712,7 @@ static int mod_set_pub(struct bt_mesh_model *mod, size_t len_rd,
 			return err;
 		}
 
-		pub.uuidx = 0;
+		pub.uuidx = (uint16_t)(-1);
 	}
 
 	// FIXME: Convert va addrs stored in group to uuids.
@@ -1725,9 +1725,15 @@ static int mod_set_pub(struct bt_mesh_model *mod, size_t len_rd,
 	mod->pub->retransmit = pub.base.retransmit;
 	mod->pub->period_div = pub.base.period_div;
 	mod->pub->count = 0U;
-	mod->pub->uuid = bt_mesh_label_uuid_get_by_idx(pub.uuidx);
 
-	LOG_DBG("Restored model publication, dst 0x%04x app_idx 0x%03x", pub.base.addr, pub.base.key);
+	if (pub.uuidx != (uint16_t)(-1)) {
+		mod->pub->uuid = bt_mesh_label_uuid_get_by_idx(pub.uuidx);
+	} else {
+		mod->pub->uuid = NULL;
+	}
+
+	LOG_DBG("Restored model publication, dst 0x%04x app_idx 0x%03x", pub.base.addr,
+		pub.base.key);
 
 	return 0;
 }
@@ -1952,9 +1958,14 @@ static void store_pending_mod_pub(struct bt_mesh_model *mod, bool vnd)
 		pub.base.period = mod->pub->period;
 		pub.base.period_div = mod->pub->period_div;
 		pub.base.cred = mod->pub->cred;
-		pub.uuidx = bt_mesh_label_uuid_idx_get(mod->pub->uuid);
 
-		err = settings_save_one(path, &pub, sizeof(pub));
+		if (BT_MESH_ADDR_IS_VIRTUAL(mod->pub->addr)) {
+			pub.uuidx = bt_mesh_label_uuid_idx_get(mod->pub->uuid);
+		}
+
+		err = settings_save_one(path, &pub,
+					BT_MESH_ADDR_IS_VIRTUAL(mod->pub->addr) ? sizeof(pub) :
+										  sizeof(pub.base));
 	}
 
 	if (err) {
