@@ -607,12 +607,12 @@ static int trans_encrypt(const struct bt_mesh_net_tx *tx, const uint8_t *key,
 	};
 
 	if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
-		if (bt_mesh_va_addr_get(tx->ctx->label_uuid) == BT_MESH_ADDR_UNASSIGNED) {
+		if (bt_mesh_va_addr_get(tx->ctx->uuid) == BT_MESH_ADDR_UNASSIGNED) {
 			return -EINVAL;
 		}
 
-		crypto.ad = tx->ctx->label_uuid;
-		LOG_ERR("Encrypting %04x using %p", tx->ctx->addr, tx->ctx->label_uuid);
+		crypto.ad = tx->ctx->uuid;
+		LOG_ERR("Encrypting %04x using %p", tx->ctx->addr, tx->ctx->uuid);
 	}
 
 	return bt_mesh_app_encrypt(key, &crypto, msg);
@@ -741,7 +741,7 @@ static int sdu_try_decrypt(struct bt_mesh_net_rx *rx, const uint8_t key[16],
 	} while (err && ctx->crypto.ad != NULL);
 
 	if (!err && BT_MESH_ADDR_IS_VIRTUAL(rx->ctx.recv_dst)) {
-		rx->ctx.label_uuid = ctx->crypto.ad;
+		rx->ctx.uuid = ctx->crypto.ad;
 	}
 
 	return err;
@@ -1829,9 +1829,9 @@ const uint8_t *bt_mesh_label_uuid_get_by_idx(uint16_t idx)
 	return virtual_addrs[idx].uuid;
 }
 
-uint16_t bt_mesh_label_uuid_idx_get(const uint8_t *label_uuid)
+uint16_t bt_mesh_label_uuid_idx_get(const uint8_t *uuid)
 {
-	struct bt_mesh_va *va = CONTAINER_OF(label_uuid, struct bt_mesh_va, uuid);
+	struct bt_mesh_va *va = CONTAINER_OF(uuid, struct bt_mesh_va, uuid);
 
 	if (!PART_OF_ARRAY(virtual_addrs, va) || va->ref == 0) {
 		return (uint16_t)(-1);

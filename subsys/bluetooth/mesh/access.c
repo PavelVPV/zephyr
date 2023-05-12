@@ -43,7 +43,7 @@ struct mod_pub_val {
 		uint8_t  period_div:4,
 			 cred:1;
 	} base;
-	uint16_t label_uuid_idx;
+	uint16_t uuidx;
 };
 
 struct comp_foreach_model_arg {
@@ -1010,8 +1010,8 @@ static const uint8_t **model_label_get(struct bt_mesh_model *mod, const uint8_t 
 	int i;
 
 	for (i = 0; i < CONFIG_BT_MESH_LABEL_COUNT; i++) {
-		if (mod->label_uuids[i] == label) {
-			return &mod->label_uuids[i];
+		if (mod->uuids[i] == label) {
+			return &mod->uuids[i];
 		}
 	}
 
@@ -1291,7 +1291,7 @@ static int element_model_recv(struct bt_mesh_msg_ctx *ctx, struct net_buf_simple
 		return ACCESS_STATUS_WRONG_KEY;
 	}
 
-	if (!model_has_dst(model, ctx->recv_dst, ctx->label_uuid)) {
+	if (!model_has_dst(model, ctx->recv_dst, ctx->uuid)) {
 		LOG_ERR("Invalid address 0x%02x", ctx->recv_dst);
 		return ACCESS_STATUS_INVALID_ADDRESS;
 	}
@@ -1636,37 +1636,37 @@ static int mod_set_sub(struct bt_mesh_model *mod, size_t len_rd,
 
 	LOG_DBG("Decoded %zu subscribed group addresses for model", len / sizeof(mod->groups[0]));
 
-	// FIXME: Convert va addrs stored in group to label_uuids.
+	// FIXME: Convert va addrs stored in group to uuids.
 	return 0;
 }
 
 static int mod_set_sub_va(struct bt_mesh_model *mod, size_t len_rd,
 			  settings_read_cb read_cb, void *cb_arg)
 {
-	uint16_t luidx[CONFIG_BT_MESH_LABEL_COUNT];
+	uint16_t uuidxs[CONFIG_BT_MESH_LABEL_COUNT];
 	ssize_t len;
 	int i;
 	int count;
 
 	/* Start with empty array regardless of cleared or set value */
-	(void)memset(mod->label_uuids, 0, CONFIG_BT_MESH_LABEL_COUNT * sizeof(mod->label_uuids[0]));
+	(void)memset(mod->uuids, 0, CONFIG_BT_MESH_LABEL_COUNT * sizeof(mod->uuids[0]));
 
 	if (len_rd == 0) {
 		LOG_DBG("Cleared subscriptions for model");
 		return 0;
 	}
 
-	len = read_cb(cb_arg, luidx, sizeof(luidx));
+	len = read_cb(cb_arg, uuidxs, sizeof(uuidxs));
 	if (len < 0) {
 		LOG_ERR("Failed to read value (err %zd)", len);
 		return len;
 	}
 
-	LOG_HEXDUMP_DBG(luidx, len, "val");
+	LOG_HEXDUMP_DBG(uuidxs, len, "val");
 
 	for (i = 0, count = 0; i < len / sizeof(uint16_t); i++) {
-		mod->label_uuids[count] = bt_mesh_label_uuid_get_by_idx(luidx[i]);
-		if (mod->label_uuids[count] != NULL) {
+		mod->uuids[count] = bt_mesh_label_uuid_get_by_idx(uuidxs[i]);
+		if (mod->uuids[count] != NULL) {
 			count++;
 		}
 	}
@@ -1694,7 +1694,7 @@ static int mod_set_pub(struct bt_mesh_model *mod, size_t len_rd,
 		mod->pub->period = 0U;
 		mod->pub->retransmit = 0U;
 		mod->pub->count = 0U;
-		mod->pub->label_uuid = NULL;
+		mod->pub->uuid = NULL;
 
 		LOG_DBG("Cleared publication for model");
 		return 0;
@@ -1712,10 +1712,10 @@ static int mod_set_pub(struct bt_mesh_model *mod, size_t len_rd,
 			return err;
 		}
 
-		pub.label_uuid_idx = 0;
+		pub.uuidx = 0;
 	}
 
-	// FIXME: Convert va addrs stored in group to label_uuids.
+	// FIXME: Convert va addrs stored in group to uuids.
 
 	mod->pub->addr = pub.base.addr;
 	mod->pub->key = pub.base.key;
@@ -1725,7 +1725,7 @@ static int mod_set_pub(struct bt_mesh_model *mod, size_t len_rd,
 	mod->pub->retransmit = pub.base.retransmit;
 	mod->pub->period_div = pub.base.period_div;
 	mod->pub->count = 0U;
-	mod->pub->label_uuid = bt_mesh_label_uuid_get_by_idx(pub.label_uuid_idx);
+	mod->pub->uuid = bt_mesh_label_uuid_get_by_idx(pub.uuidx);
 
 	LOG_DBG("Restored model publication, dst 0x%04x app_idx 0x%03x", pub.base.addr, pub.base.key);
 
@@ -1905,20 +1905,20 @@ static void store_pending_mod_sub(struct bt_mesh_model *mod, bool vnd)
 
 static void store_pending_mod_sub_va(struct bt_mesh_model *mod, bool vnd)
 {
-	uint16_t luidx[CONFIG_BT_MESH_LABEL_COUNT];
+	uint16_t uuidxs[CONFIG_BT_MESH_LABEL_COUNT];
 	char path[20];
 	int i, count, err;
 
 	for (i = 0, count = 0; i < CONFIG_BT_MESH_LABEL_COUNT; i++) {
-		if (mod->label_uuids[i] != NULL) {
-			luidx[count++] = bt_mesh_label_uuid_idx_get(mod->label_uuids[i]);
+		if (mod->uuids[i] != NULL) {
+			uuidxs[count++] = bt_mesh_label_uuid_idx_get(mod->uuids[i]);
 		}
 	}
 
 	encode_mod_path(mod, vnd, "subv", path, sizeof(path));
 
 	if (count) {
-		err = settings_save_one(path, luidx, count * sizeof(luidx[0]));
+		err = settings_save_one(path, uuidxs, count * sizeof(uuidxs[0]));
 	} else {
 		err = settings_delete(path);
 	}
@@ -1948,7 +1948,7 @@ static void store_pending_mod_pub(struct bt_mesh_model *mod, bool vnd)
 		pub.base.period = mod->pub->period;
 		pub.base.period_div = mod->pub->period_div;
 		pub.base.cred = mod->pub->cred;
-		pub.label_uuid_idx = bt_mesh_label_uuid_idx_get(mod->pub->label_uuid);
+		pub.uuidx = bt_mesh_label_uuid_idx_get(mod->pub->uuid);
 
 		err = settings_save_one(path, &pub, sizeof(pub));
 	}

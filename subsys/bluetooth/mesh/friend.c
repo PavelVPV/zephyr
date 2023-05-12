@@ -1510,10 +1510,10 @@ static void friend_lpn_enqueue_tx(struct bt_mesh_friend *frnd,
 	if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
 		uint16_t uuid_idx;
 
-		uuid_idx = bt_mesh_label_uuid_idx_get(tx->ctx->label_uuid);
+		uuid_idx = bt_mesh_label_uuid_idx_get(tx->ctx->uuid);
 		if (uuid_idx >= 0xfff) {
 			LOG_ERR("Index (%d) for Label UUID %p is too big", uuid_idx,
-				tx->ctx->label_uuid);
+				tx->ctx->uuid);
 			net_buf_unref(buf);
 			return;
 		}
@@ -1523,7 +1523,7 @@ static void friend_lpn_enqueue_tx(struct bt_mesh_friend *frnd,
 
 	enqueue_friend_pdu(frnd, type, info.src, seg_count, buf);
 
-	LOG_DBG("Queued message for LPN 0x%04x, dst: %04x, uuid: %p", frnd->lpn, tx->ctx->addr, tx->ctx->label_uuid);
+	LOG_DBG("Queued message for LPN 0x%04x, dst: %04x, uuid: %p", frnd->lpn, tx->ctx->addr, tx->ctx->uuid);
 }
 
 static bool friend_lpn_matches(struct bt_mesh_friend *frnd, uint16_t net_idx,

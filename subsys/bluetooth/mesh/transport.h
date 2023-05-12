@@ -122,6 +122,6 @@ const uint16_t bt_mesh_va_addr_get(const uint8_t *uuid);
 
 //FIXME: Add _va_ suffix: bt_mesh_va_label_...
 const uint8_t *bt_mesh_label_uuid_get_by_idx(uint16_t idx);
-uint16_t bt_mesh_label_uuid_idx_get(const uint8_t *label_uuid);
+uint16_t bt_mesh_label_uuid_idx_get(const uint8_t *uuid);
 
 void bt_mesh_va_pending_store(void);

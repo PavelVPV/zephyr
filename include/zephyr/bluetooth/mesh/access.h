@@ -271,7 +271,7 @@ struct bt_mesh_model_op {
 	.keys_cnt = _keys,							\
 	.groups = (uint16_t []) BT_MESH_MODEL_GROUPS_UNASSIGNED(_grps),		\
 	.groups_cnt = _grps,							\
-	.label_uuids = (const uint8_t *[CONFIG_BT_MESH_LABEL_COUNT]){ 0 },      \
+	.uuids = (const uint8_t *[CONFIG_BT_MESH_LABEL_COUNT]){ 0 },		\
 	.op = _op,								\
 	.cb = _cb,								\
 	.user_data = _user_data,						\
@@ -302,7 +302,7 @@ struct bt_mesh_model_op {
 	.keys_cnt = _keys,									\
 	.groups = (uint16_t []) BT_MESH_MODEL_GROUPS_UNASSIGNED(_grps),				\
 	.groups_cnt = _grps,									\
-	.label_uuids = (const uint8_t *[CONFIG_BT_MESH_LABEL_COUNT]){ 0 },        \
+	.uuids = (const uint8_t *[CONFIG_BT_MESH_LABEL_COUNT]){ 0 },				\
 	.user_data = _user_data,								\
 	.cb = _cb,										\
 }
@@ -342,7 +342,7 @@ struct bt_mesh_model_op {
 	.keys_cnt = CONFIG_BT_MESH_MODEL_KEY_COUNT,                          \
 	.groups = (uint16_t []) BT_MESH_MODEL_GROUPS_UNASSIGNED(CONFIG_BT_MESH_MODEL_GROUP_COUNT), \
 	.groups_cnt = CONFIG_BT_MESH_MODEL_GROUP_COUNT,                      \
-	.label_uuids = (const uint8_t *[CONFIG_BT_MESH_LABEL_COUNT]){ 0 },        \
+	.uuids = (const uint8_t *[CONFIG_BT_MESH_LABEL_COUNT]){ 0 },         \
 	.op = _op,                                                           \
 	.cb = _cb,                                                           \
 	.user_data = _user_data,                                             \
@@ -391,7 +391,7 @@ struct bt_mesh_model_op {
 	.keys_cnt = CONFIG_BT_MESH_MODEL_KEY_COUNT,                          \
 	.groups = (uint16_t []) BT_MESH_MODEL_GROUPS_UNASSIGNED(CONFIG_BT_MESH_MODEL_GROUP_COUNT), \
 	.groups_cnt = CONFIG_BT_MESH_MODEL_GROUP_COUNT,                      \
-	.label_uuids = (const uint8_t *[CONFIG_BT_MESH_LABEL_COUNT]){ 0 },        \
+	.uuids = (const uint8_t *[CONFIG_BT_MESH_LABEL_COUNT]){ 0 },         \
 	.user_data = _user_data,                                             \
 	.cb = _cb,                                                           \
 	.metadata = _metadata,                                               \
@@ -512,7 +512,7 @@ struct bt_mesh_model_pub {
 	struct bt_mesh_model *mod;
 
 	uint16_t addr;          /**< Publish Address. */
-	const uint8_t *label_uuid;
+	const uint8_t *uuid;
 	uint16_t key:12,        /**< Publish AppKey Index. */
 		 cred:1,        /**< Friendship Credentials Flag. */
 		 send_rel:1,    /**< Force reliable sending (segment acks) */
@@ -702,7 +702,8 @@ struct bt_mesh_model {
 	uint16_t * const groups;
 	const uint16_t groups_cnt;
 
-	const uint8_t ** const label_uuids;
+	/** List of Label UUIDs the model is subscribed to. */
+	const uint8_t ** const uuids;
 
 	/** Opcode handler list */
 	const struct bt_mesh_model_op * const op;

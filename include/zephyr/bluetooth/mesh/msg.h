@@ -87,7 +87,7 @@ struct bt_mesh_msg_ctx {
 	uint16_t recv_dst;
 
 	/** Virtual address UUID, or NULL if this is not a virtual address. */
-	const uint8_t *label_uuid;
+	const uint8_t *uuid;
 
 	/** RSSI of received packet. Not used for sending. */
 	int8_t  recv_rssi;
@@ -150,7 +150,7 @@ struct bt_mesh_msg_ctx {
 		.app_idx = (pub)->key, \
 		.addr = (pub)->addr, \
 		.send_ttl = (pub)->ttl, \
-		.label_uuid = (pub)->label_uuid, \
+		.uuid = (pub)->uuid, \
 	}
 
 /** @brief Initialize a model message.

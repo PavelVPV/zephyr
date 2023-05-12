@@ -795,7 +795,7 @@ static void test_lpn_group(void)
 
 	ASSERT_OK(bt_mesh_test_recv_msg(&msg, K_SECONDS(1)));
 	if (msg.ctx.recv_dst != va->addr || msg.ctx.addr != other_cfg.addr ||
-	    msg.ctx.label_uuid != va->uuid) {
+	    msg.ctx.uuid != va->uuid) {
 		FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
 		     msg.ctx.recv_dst);
 	}
@@ -1074,10 +1074,10 @@ static void test_lpn_va_collision(void)
 	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
 		ASSERT_OK(bt_mesh_test_recv_msg(&msg, K_SECONDS(10)));
 		if (msg.ctx.recv_dst != va[i]->addr ||
-		    msg.ctx.label_uuid != va[i]->uuid ||
+		    msg.ctx.uuid != va[i]->uuid ||
 		    msg.ctx.addr != friend_cfg.addr) {
 			FAIL("Unexpected message: 0x%04x -> 0x%04x, uuid: %p", msg.ctx.addr,
-			     msg.ctx.recv_dst, msg.ctx.label_uuid);
+			     msg.ctx.recv_dst, msg.ctx.uuid);
 		}
 	}
 	/* Wait for the extra poll timeout in friend_wait_for_polls(). */
@@ -1105,17 +1105,17 @@ static void test_lpn_va_collision(void)
 	 */
 	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
 	ASSERT_OK(bt_mesh_test_recv_msg(&msg, K_SECONDS(1)));
-	if (msg.ctx.recv_dst != va[1]->addr || msg.ctx.label_uuid != va[1]->uuid ||
+	if (msg.ctx.recv_dst != va[1]->addr || msg.ctx.uuid != va[1]->uuid ||
 	    msg.ctx.addr != friend_cfg.addr) {
 		FAIL("Unexpected message: 0x%04x -> 0x%04x, uuid: %p", msg.ctx.addr,
-		     msg.ctx.recv_dst, msg.ctx.label_uuid);
+		     msg.ctx.recv_dst, msg.ctx.uuid);
 	}
 
 	/* Check that there are no more messages from Friend. */
 	err = bt_mesh_test_recv_msg(&msg, K_SECONDS(1));
 	if (!err) {
 		FAIL("Unexpected message: 0x%04x -> 0x%04x, uuid: %p", msg.ctx.addr,
-		     msg.ctx.recv_dst, msg.ctx.label_uuid);
+		     msg.ctx.recv_dst, msg.ctx.uuid);
 	}
 	/* Wait for the extra poll timeout in friend_wait_for_polls(). */
 	k_sleep(K_SECONDS(3));
@@ -1144,7 +1144,7 @@ static void test_lpn_va_collision(void)
 		err = bt_mesh_test_recv_msg(&msg, K_SECONDS(1));
 		if (!err) {
 			FAIL("Unexpected message: 0x%04x -> 0x%04x, uuid: %p", msg.ctx.addr,
-			     msg.ctx.recv_dst, msg.ctx.label_uuid);
+			     msg.ctx.recv_dst, msg.ctx.uuid);
 		}
 	}
 
