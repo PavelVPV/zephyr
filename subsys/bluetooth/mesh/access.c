@@ -1005,12 +1005,19 @@ uint16_t *bt_mesh_model_find_group(struct bt_mesh_model **mod, uint16_t addr)
 	return ctx.entry;
 }
 
-static const uint8_t **model_uuid_get(struct bt_mesh_model *mod, const uint8_t *label)
+static const uint8_t **model_uuid_get(struct bt_mesh_model *mod, const uint8_t *uuid)
 {
 	int i;
 
 	for (i = 0; i < CONFIG_BT_MESH_LABEL_COUNT; i++) {
-		if (mod->uuids[i] == label) {
+		if (mod->uuids[i] == uuid) {
+			/* If we are looking for a new entry, ensure that we find a model where
+			 * there is empty entry in both, uuids and groups list.
+			 */
+			if (uuid == NULL && !model_group_get(mod, BT_MESH_ADDR_UNASSIGNED)) {
+				continue;
+			}
+
 			return &mod->uuids[i];
 		}
 	}
@@ -1727,6 +1734,7 @@ static int mod_set_pub(struct bt_mesh_model *mod, size_t len_rd,
 	mod->pub->count = 0U;
 
 	if (pub.uuidx != (uint16_t)(-1)) {
+		//FIXME: This won't work
 		mod->pub->uuid = bt_mesh_label_uuid_get_by_idx(pub.uuidx);
 	} else {
 		mod->pub->uuid = NULL;

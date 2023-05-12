@@ -607,9 +607,9 @@ static int trans_encrypt(const struct bt_mesh_net_tx *tx, const uint8_t *key,
 	};
 
 	if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
-		if (bt_mesh_va_addr_get(tx->ctx->uuid) == BT_MESH_ADDR_UNASSIGNED) {
-			return -EINVAL;
-		}
+//		if (bt_mesh_va_addr_get(tx->ctx->uuid) == BT_MESH_ADDR_UNASSIGNED) {
+//			return -EINVAL;
+//		}
 
 		crypto.ad = tx->ctx->uuid;
 		LOG_ERR("Encrypting %04x using %p", tx->ctx->addr, tx->ctx->uuid);
@@ -1736,29 +1736,19 @@ uint8_t bt_mesh_va_add(const uint8_t uuid[16], const struct bt_mesh_va **entry)
 	return STATUS_SUCCESS;
 }
 
-uint8_t bt_mesh_va_del(const uint8_t uuid[16], const struct bt_mesh_va **entry)
+uint8_t bt_mesh_va_del(const uint8_t *uuid)
 {
-	struct bt_mesh_va *va = NULL;
+	struct bt_mesh_va *va;
 
-	for (int i = 0; i < ARRAY_SIZE(virtual_addrs); i++) {
-		if (virtual_addrs[i].ref &&
-		    !memcmp(uuid, virtual_addrs[i].uuid,
-			    ARRAY_SIZE(virtual_addrs[i].uuid))) {
-			va = &virtual_addrs[i];
-			break;
-		}
-	}
+	va = CONTAINER_OF(uuid, struct bt_mesh_va, uuid);
 
-	if (!va) {
+	if (!PART_OF_ARRAY(virtual_addrs, va) || va->ref == 0) {
 		return STATUS_CANNOT_REMOVE;
 	}
 
 	va->ref--;
-	if (entry) {
-		*entry = va;
-	}
-
 	va_store(va);
+
 	return STATUS_SUCCESS;
 }
 
@@ -1804,6 +1794,11 @@ const uint16_t bt_mesh_va_addr_get(const uint8_t *uuid)
 	struct bt_mesh_va *va;
 
 	va = CONTAINER_OF(uuid, struct bt_mesh_va, uuid);
+
+	if (!PART_OF_ARRAY(virtual_addrs, va) || va->ref == 0) {
+		return BT_MESH_ADDR_UNASSIGNED;
+	}
+
 	return va->ref ? va->addr : BT_MESH_ADDR_UNASSIGNED;
 }
 

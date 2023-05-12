@@ -180,7 +180,7 @@ static uint8_t _mod_pub_set(struct bt_mesh_model *model, uint16_t pub_addr, cons
 
 #if CONFIG_BT_MESH_LABEL_COUNT > 0
 	if (BT_MESH_ADDR_IS_VIRTUAL(model->pub->addr)) {
-		bt_mesh_va_del(model->pub->uuid, NULL);
+		(void)bt_mesh_va_del(model->pub->uuid);
 	}
 #endif
 
@@ -830,15 +830,9 @@ static size_t mod_sub_list_clear(struct bt_mesh_model *mod)
 			continue;
 		}
 
-		uint16_t addr = bt_mesh_va_addr_get(mod->uuids[i]);
-
-		if (addr == BT_MESH_ADDR_UNASSIGNED) {
-			continue;
-		}
-
-		clear_count++;
-		bt_mesh_va_del(mod->uuids[i], NULL);
+		(void)bt_mesh_va_del(mod->uuids[i]);
 		mod->uuids[i] = NULL;
+		clear_count++;
 	}
 
 	return clear_count;
@@ -914,7 +908,7 @@ static int mod_pub_va_set(struct bt_mesh_model *model,
 	status = _mod_pub_set(mod, pub_addr, va->uuid, pub_app_idx, cred_flag, pub_ttl,
 			      pub_period, retransmit, true);
 	if (status != STATUS_SUCCESS) {
-		bt_mesh_va_del(uuid, NULL);
+		(void)bt_mesh_va_del(va->uuid);
 	}
 
 send_status:
@@ -1451,31 +1445,42 @@ static int mod_sub_va_add(struct bt_mesh_model *model,
 		goto send_status;
 	}
 
-	sub_addr = va->addr;
-
 	if (bt_mesh_model_find_uuid(&mod, va->uuid)) {
 		/* Tried to add existing subscription */
 		status = STATUS_SUCCESS;
-		bt_mesh_va_del(uuid, NULL);
+		(void)bt_mesh_va_del(va->uuid);
 		goto send_status;
 	}
 
 	label_entry = bt_mesh_model_find_uuid(&mod, NULL);
-	group_entry = bt_mesh_model_find_group(&mod, BT_MESH_ADDR_UNASSIGNED);
-	if (!group_entry || !label_entry) {
+	if (!label_entry) {
 		status = STATUS_INSUFF_RESOURCES;
-		bt_mesh_va_del(uuid, NULL);
+		(void)bt_mesh_va_del(va->uuid);
 		goto send_status;
 	}
 
-	*group_entry = sub_addr;
+	group_entry = NULL;
+
+	for (int i = 0; i < mod->groups_cnt; i++) {
+		if (mod->groups[i] == BT_MESH_ADDR_UNASSIGNED) {
+			group_entry = &mod->groups[i];
+			break;
+		}
+	}
+
+	/* bt_mesh_model_find_uuid() should find a model where both, uuids and groups lists have
+	 * empty entry.
+	 */
+	__ASSERT_NO_MSG(group_entry);
+
+	*group_entry = va->addr;
 	*label_entry = va->uuid;
 
 	LOG_ERR("Add Addr: %d, %p, col:%d", va->addr, va->uuid, bt_mesh_va_has_collision(va));
 
 	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 1 &&
 	    !bt_mesh_va_has_collision(va)) {
-		bt_mesh_lpn_group_add(sub_addr);
+		bt_mesh_lpn_group_add(va->addr);
 	}
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
@@ -1483,6 +1488,7 @@ static int mod_sub_va_add(struct bt_mesh_model *model,
 	}
 
 	status = STATUS_SUCCESS;
+	sub_addr = va->addr;
 
 send_status:
 	return send_mod_sub_status(model, ctx, status, elem_addr, sub_addr,
@@ -1500,7 +1506,6 @@ static int mod_sub_va_del(struct bt_mesh_model *model,
 	const uint8_t *uuid;
 	uint8_t *mod_id;
 	const uint8_t **label_match;
-	uint16_t *group_match;
 	uint8_t status;
 	bool vnd;
 
@@ -1537,55 +1542,40 @@ static int mod_sub_va_del(struct bt_mesh_model *model,
 		goto send_status;
 	}
 
-	status = bt_mesh_va_del(uuid, &va);
-	if (status != STATUS_SUCCESS) {
+	va = bt_mesh_va_get(uuid);
+	if (!va) {
+		status = STATUS_CANNOT_REMOVE;
 		goto send_status;
 	}
-
-	sub_addr = va->addr;
 
 	LOG_ERR("Del Addr: %d, %p, col:%d", va->addr, va->uuid, bt_mesh_va_has_collision(va));
 	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 0 &&
 	    !bt_mesh_va_has_collision(va)) {
-		bt_mesh_lpn_group_del(&sub_addr, 1);
+		bt_mesh_lpn_group_del(&va->addr, 1);
 	}
 
 	label_match = bt_mesh_model_find_uuid(&mod, va->uuid);
-	if (label_match) {
-		group_match = bt_mesh_model_find_group(&mod, sub_addr);
-		if (group_match) {
-			bool collision = false;
-
-			for (int i = 0; i < CONFIG_BT_MESH_LABEL_COUNT &&
-			     CONFIG_BT_MESH_LABEL_COUNT > 1; i++) {
-				uint16_t group_addr;
-
-				if (mod->uuids[i] == va->uuid || mod->uuids[i] == NULL) {
-					continue;
-				}
-
-				group_addr = bt_mesh_va_addr_get(mod->uuids[i]);
-				if (group_addr == *group_match) {
-					collision = true;
-					break;
-				}
-			}
-
-			if (!collision) {
-				*group_match = BT_MESH_ADDR_UNASSIGNED;
-			}
-		}
-
-		*label_match = NULL;
-
-		if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-			bt_mesh_model_sub_store(mod);
-		}
-
-		status = STATUS_SUCCESS;
-	} else {
+	if (!label_match) {
 		status = STATUS_CANNOT_REMOVE;
+		goto send_status;
 	}
+
+	for (int i = 0; i < mod->groups_cnt; i++) {
+		if (mod->groups[i] == va->addr) {
+			mod->groups[i] = BT_MESH_ADDR_UNASSIGNED;
+			break;
+		}
+	}
+
+	*label_match = NULL;
+
+	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+		bt_mesh_model_sub_store(mod);
+	}
+
+	sub_addr = va->addr;
+	(void)bt_mesh_va_del(va->uuid);
+	status = STATUS_SUCCESS;
 
 send_status:
 	return send_mod_sub_status(model, ctx, status, elem_addr, sub_addr,
@@ -1636,27 +1626,31 @@ static int mod_sub_va_overwrite(struct bt_mesh_model *model,
 		goto send_status;
 	}
 
-	if (mod->groups_cnt > 0 && CONFIG_BT_MESH_LABEL_COUNT) {
-		status = bt_mesh_va_add(uuid, &va);
-		if (status == STATUS_SUCCESS) {
-			sub_addr = va->addr;
-			bt_mesh_model_extensions_walk(mod, mod_sub_clear_visitor, NULL);
-			mod->groups[0] = sub_addr;
-			mod->uuids[0] = va->uuid;
-
-			if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-				bt_mesh_model_sub_store(mod);
-			}
-
-			LOG_ERR("Over Addr: %d, %p, col:%d", va->addr, va->uuid, bt_mesh_va_has_collision(va));
-			if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 1 &&
-			    !bt_mesh_va_has_collision(va)) {
-				bt_mesh_lpn_group_add(sub_addr);
-			}
-		}
-	} else {
+	if (CONFIG_BT_MESH_LABEL_COUNT == 0 || mod->groups_cnt == 0) {
 		status = STATUS_INSUFF_RESOURCES;
+		goto send_status;
 	}
+
+	status = bt_mesh_va_add(uuid, &va);
+	if (status != STATUS_SUCCESS) {
+		goto send_status;
+	}
+
+	bt_mesh_model_extensions_walk(mod, mod_sub_clear_visitor, NULL);
+	mod->groups[0] = va->addr;
+	mod->uuids[0] = va->uuid;
+
+	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+		bt_mesh_model_sub_store(mod);
+	}
+
+	LOG_ERR("Over Addr: %d, %p, col:%d", va->addr, va->uuid, bt_mesh_va_has_collision(va));
+	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 1 &&
+	    !bt_mesh_va_has_collision(va)) {
+		bt_mesh_lpn_group_add(va->addr);
+	}
+
+	sub_addr = va->addr;
 
 send_status:
 	return send_mod_sub_status(model, ctx, status, elem_addr, sub_addr,
