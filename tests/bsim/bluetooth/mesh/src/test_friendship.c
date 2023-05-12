@@ -357,6 +357,78 @@ static void test_friend_no_est(void)
 	PASS();
 }
 
+static uint8_t test_va_col_uuid[][16] = {
+	{ 0xe3, 0x94, 0xe7, 0xc1, 0xc5, 0x14, 0x72, 0x11,
+	  0x68, 0x36, 0x19, 0x30, 0x99, 0x34, 0x53, 0x62 },
+	{ 0x5e, 0x49, 0x5a, 0xd9, 0x44, 0xdf, 0xae, 0xc0,
+	  0x62, 0xd8, 0x0d, 0xed, 0x16, 0x82, 0xd1, 0x7d },
+};
+static uint16_t test_va_col_addr = 0x809D;
+
+/** TBA */
+static void test_friend_va_collision(void)
+{
+	const struct bt_mesh_va *va[2];
+
+	bt_mesh_test_setup();
+
+	bt_mesh_friend_set(BT_MESH_FEATURE_ENABLED);
+
+	ASSERT_OK_MSG(bt_mesh_test_friendship_evt_wait(BT_MESH_TEST_FRIEND_ESTABLISHED,
+						       K_SECONDS(5)),
+		      "Friendship not established");
+	bt_mesh_test_friendship_evt_clear(BT_MESH_TEST_FRIEND_POLLED);
+
+	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
+		ASSERT_OK(bt_mesh_va_add(test_va_col_uuid[i], &va[i]));
+		ASSERT_EQUAL(test_va_col_addr, va[i]->addr);
+	}
+
+	bt_mesh_test_friendship_evt_wait(BT_MESH_TEST_FRIEND_POLLED, K_SECONDS(10));
+
+	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
+		/* Send a message to the first virtual address. LPN should receive it. */
+		ASSERT_OK_MSG(bt_mesh_test_send(test_va_col_addr, va[i]->uuid, 5, 0, K_SECONDS(1)),
+			      "Failed to send to LPN");
+	}
+
+	LOG_ERR("%d", __LINE__);
+	/* One per msg + 1 (md==0) */
+	friend_wait_for_polls(3);
+	LOG_ERR("%d", __LINE__);
+	k_sleep(K_SECONDS(10));
+
+	LOG_ERR("%d", __LINE__);
+//	/* 1 for Subs List Add, 1 for Subs List Conf, 1 (md == 0)*/
+//	friend_wait_for_polls(3);
+	//FIXME: Should here be one more pull for Friend Update with mp == 0?
+	friend_wait_for_polls(1);
+
+	//friend_wait_for_polls(5);
+	LOG_ERR("%d", __LINE__);
+	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
+		/* Send a message to the first virtual address. LPN should receive it. */
+		ASSERT_OK_MSG(bt_mesh_test_send(test_va_col_addr, va[i]->uuid, 5, 0, K_SECONDS(1)),
+			      "Failed to send to LPN");
+	}
+
+	LOG_ERR("%d", __LINE__);
+	k_sleep(K_SECONDS(10));
+
+	LOG_ERR("%d", __LINE__);
+	/* 2 manual polls + FU (md==0)*/
+	friend_wait_for_polls(3);
+
+	LOG_ERR("%d", __LINE__);
+	k_sleep(K_SECONDS(10));
+	LOG_ERR("%d", __LINE__);
+	friend_wait_for_polls(1);
+	LOG_ERR("%d", __LINE__);
+
+	PASS();
+}
+
+
 /* LPN test functions */
 
 /** Enable the LPN role, and verify that the friendship is established.
@@ -953,6 +1025,107 @@ static void test_lpn_term_cb_check(void)
 	PASS();
 }
 
+static void test_lpn_va_collision(void)
+{
+	struct bt_mesh_test_msg msg;
+	const struct bt_mesh_va *va[2];
+	uint16_t vaddr;
+	uint8_t status = 0;
+	int err;
+
+	bt_mesh_test_setup();
+
+	/* Subscripbe LPN on both virtual address with collision. */
+	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
+		err = bt_mesh_cfg_cli_mod_sub_va_add(0, cfg->addr, cfg->addr, test_va_col_uuid[i],
+						 TEST_MOD_ID, &vaddr, &status);
+		if (err || status) {
+			FAIL("VA addr add failed with err %d status 0x%x", err, status);
+		}
+
+		ASSERT_EQUAL(test_va_col_addr, vaddr);
+
+		va[i] = bt_mesh_va_get(test_va_col_uuid[i]);
+		ASSERT_TRUE(va[i] != NULL);
+		ASSERT_EQUAL(vaddr, va[i]->addr);
+	}
+
+	bt_mesh_lpn_set(true);
+	ASSERT_OK_MSG(bt_mesh_test_friendship_evt_wait(BT_MESH_TEST_LPN_ESTABLISHED,
+						       K_SECONDS(5)), "LPN not established");
+	bt_mesh_test_friendship_evt_clear(BT_MESH_TEST_LPN_POLLED);
+
+	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
+	/* Should receive both messages. */
+	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
+		LOG_ERR("msg n: %d", i);
+		ASSERT_OK(bt_mesh_test_recv_msg(&msg, K_SECONDS(10)));
+		if (msg.ctx.recv_dst != va[i]->addr || msg.ctx.label_uuid != va[i]->uuid ||
+		    msg.ctx.addr != friend_cfg.addr) {
+			FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
+			     msg.ctx.recv_dst);
+		}
+	}
+
+	k_sleep(K_SECONDS(10));
+	LOG_ERR("%d", __LINE__);
+
+	err = bt_mesh_cfg_cli_mod_sub_va_del(0, cfg->addr, cfg->addr, test_va_col_uuid[0],
+				      TEST_MOD_ID, &vaddr, &status);
+	if (err || status) {
+		FAIL("Group addr add failed with err %d status 0x%x", err,
+		     status);
+	}
+
+	k_sleep(K_SECONDS(10));
+
+	LOG_ERR("%d", __LINE__);
+	/* Should not receive a message from the first address. */
+	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
+	err = bt_mesh_test_recv_msg(&msg, K_SECONDS(10));
+	if (!err) {
+		FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
+		     msg.ctx.recv_dst);
+	}
+
+	LOG_ERR("%d", __LINE__);
+	/* Should still receive a message from second address. */
+	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
+	ASSERT_OK(bt_mesh_test_recv_msg(&msg, K_SECONDS(10)));
+	if (msg.ctx.recv_dst != va[1]->addr || msg.ctx.label_uuid != va[1]->uuid ||
+	    msg.ctx.addr != friend_cfg.addr) {
+		FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
+		     msg.ctx.recv_dst);
+	}
+
+	k_sleep(K_SECONDS(10));
+
+	LOG_ERR("%d", __LINE__);
+	/* Remove the second message. */
+	err = bt_mesh_cfg_cli_mod_sub_va_del(0, cfg->addr, cfg->addr, test_va_col_uuid[1],
+				      TEST_MOD_ID, &vaddr, &status);
+	if (err || status) {
+		FAIL("Group addr del failed with err %d status 0x%x", err,
+		     status);
+	}
+
+	k_sleep(K_SECONDS(10));
+
+	LOG_ERR("%d", __LINE__);
+	/* Should not receive both messages. */
+	ASSERT_OK_MSG(bt_mesh_lpn_poll(), "Poll failed");
+	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
+		LOG_ERR("%d", __LINE__);
+		err = bt_mesh_test_recv_msg(&msg, K_SECONDS(10));
+		if (err) {
+			FAIL("Unexpected message: 0x%04x -> 0x%04x", msg.ctx.addr,
+			     msg.ctx.recv_dst);
+		}
+	}
+
+	PASS();
+}
+
 #define TEST_CASE(role, name, description)                  \
 	{                                                   \
 		.test_id = "friendship_" #role "_" #name,   \
@@ -969,6 +1142,7 @@ static const struct bst_test_instance test_connect[] = {
 	TEST_CASE(friend, overflow,         "Friend: message queue overflow"),
 	TEST_CASE(friend, group,            "Friend: send to group addrs"),
 	TEST_CASE(friend, no_est,           "Friend: do not establish friendship"),
+	TEST_CASE(friend, va_collision,     "Friend: send to virtual addrs with collision"),
 
 	TEST_CASE(lpn,    est,              "LPN: establish friendship"),
 	TEST_CASE(lpn,    msg_frnd,         "LPN: message exchange with friend"),
@@ -980,6 +1154,7 @@ static const struct bst_test_instance test_connect[] = {
 	TEST_CASE(lpn,    loopback,         "LPN: send to loopback addrs"),
 	TEST_CASE(lpn,    disable,          "LPN: disable LPN"),
 	TEST_CASE(lpn,    term_cb_check,    "LPN: no terminate cb trigger"),
+	TEST_CASE(lpn,    va_collision,     "LPN: receive on virtual addrs with collision"),
 
 	TEST_CASE(other,  msg,              "Other mesh device: message exchange"),
 	TEST_CASE(other,  group,            "Other mesh device: send to group addrs"),

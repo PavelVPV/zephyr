@@ -23,7 +23,7 @@
 #include "foundation.h"
 #include "lpn.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_lpn);
 
@@ -120,6 +120,7 @@ static int32_t poll_timeout(struct bt_mesh_lpn *lpn)
 {
 	/* If we're waiting for segment acks keep polling at high freq */
 	if (bt_mesh_tx_in_progress()) {
+		LOG_DBG("Keep polling");
 		return MIN(POLL_TIMEOUT_MAX(lpn), 1 * MSEC_PER_SEC);
 	}
 
@@ -573,6 +574,7 @@ static void friend_response_received(struct bt_mesh_lpn *lpn)
 	 * processing of the received response.
 	 */
 	int32_t timeout = poll_timeout(lpn);
+	LOG_ERR("Next timeout: %d", timeout);
 
 	k_work_reschedule(&lpn->timer, K_MSEC(timeout));
 }
@@ -668,6 +670,7 @@ int bt_mesh_lpn_friend_offer(struct bt_mesh_net_rx *rx,
 	lpn->recv_win = msg->recv_win;
 	lpn->queue_size = msg->queue_size;
 
+	LOG_ERR("%d", __LINE__);
 	err = send_friend_poll();
 	if (err) {
 		/* Will retry sending later */
@@ -914,6 +917,7 @@ static void lpn_timeout(struct k_work *work)
 			lpn->sent_req = 0U;
 
 			if (!req || req == TRANS_CTL_OP_FRIEND_POLL) {
+				LOG_ERR("%d", __LINE__);
 				send_friend_poll();
 			} else {
 				sub_update(req);
@@ -933,6 +937,7 @@ static void lpn_timeout(struct k_work *work)
 		lpn_set_state(BT_MESH_LPN_WAIT_UPDATE);
 		break;
 	case BT_MESH_LPN_WAIT_UPDATE:
+		LOG_ERR("%d", __LINE__);
 		update_timeout(lpn);
 		break;
 	default:
@@ -1026,6 +1031,7 @@ int bt_mesh_lpn_friend_sub_cfm(struct bt_mesh_net_rx *rx,
 	}
 
 	if (lpn->pending_poll) {
+		LOG_ERR("pending_poll!");
 		send_friend_poll();
 	}
 
@@ -1040,6 +1046,8 @@ int bt_mesh_lpn_friend_update(struct bt_mesh_net_rx *rx,
 	struct bt_mesh_subnet *sub = rx->sub;
 	uint32_t iv_index;
 	bool established = false;
+
+	LOG_ERR("%d", __LINE__);
 
 	if (buf->len < sizeof(*msg)) {
 		LOG_WRN("Too short Friend Update");

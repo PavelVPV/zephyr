@@ -22,7 +22,7 @@
 #include "foundation.h"
 #include "friend.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_FRIEND_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_FRIEND_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_friend);
 
@@ -60,9 +60,15 @@ struct friend_pdu_info {
 	uint32_t  iv_index;
 };
 
+BUILD_ASSERT(CONFIG_BT_MESH_LABEL_COUNT <= 0xFFFU, "Friend doesn't support more than 4096 labels.");
+
 struct friend_adv {
 	uint16_t app_idx;
-	bool     seg;
+	struct {
+		/* CONFIG_BT_MESH_LABEL_COUNT max value is 4096. */
+		uint16_t uuid_idx:15,
+			 seg:1;
+	};
 };
 
 NET_BUF_POOL_FIXED_DEFINE(friend_buf_pool, FRIEND_BUF_COUNT, BT_MESH_ADV_DATA_SIZE,
@@ -304,6 +310,7 @@ static void friend_sub_add(struct bt_mesh_friend *frnd, uint16_t addr)
 
 	if (empty_idx != INT_MAX) {
 		frnd->sub_list[empty_idx] = addr;
+		LOG_WRN("Addded %04x to subscription", addr);
 	} else {
 		LOG_WRN("No space in friend subscription list");
 	}
@@ -365,6 +372,7 @@ static int unseg_app_sdu_unpack(struct bt_mesh_friend *frnd,
 				struct unseg_app_sdu_meta *meta)
 {
 	uint16_t app_idx = FRIEND_ADV(buf)->app_idx;
+	uint16_t uuid_idx = FRIEND_ADV(buf)->uuid_idx;
 	struct bt_mesh_net_rx net = {
 		.ctx = {
 			.app_idx = app_idx,
@@ -386,18 +394,21 @@ static int unseg_app_sdu_unpack(struct bt_mesh_friend *frnd,
 	meta->crypto.dev_key = BT_MESH_IS_DEV_KEY(app_idx);
 	meta->crypto.seq_num = net.seq;
 	meta->crypto.aszmic = 0;
-	meta->crypto.ad = NULL;
+
+	if (BT_MESH_ADDR_IS_VIRTUAL(meta->crypto.dst)) {
+		meta->crypto.ad = bt_mesh_label_uuid_get_by_idx(uuid_idx);
+		LOG_WRN("Addr: %04x, uuid: %p", meta->crypto.dst, meta->crypto.ad);
+	}
 
 	return 0;
 }
 
 static int unseg_app_sdu_decrypt(struct bt_mesh_friend *frnd,
 				 struct net_buf *buf,
-				 struct unseg_app_sdu_meta *meta)
+				 const struct unseg_app_sdu_meta *meta)
 {
 	struct net_buf_simple in;
 	struct net_buf_simple out;
-	int err;
 
 	/* Direct the input buffer at the Upper Transport Access PDU, accounting for
 	 * the network header and the 1 byte lower transport header
@@ -410,19 +421,8 @@ static int unseg_app_sdu_decrypt(struct bt_mesh_friend *frnd,
 	net_buf_simple_clone(&in, &out);
 	out.len = 0; /* length will be set by decrypt */
 
-	do {
-		if (BT_MESH_ADDR_IS_VIRTUAL(meta->crypto.dst)) {
-			meta->crypto.ad = bt_mesh_va_label_get(meta->crypto.dst, meta->crypto.ad);
-			if (!meta->crypto.ad) {
-				return -ENOENT;
-			}
-		}
-
-		/* Decrypt in place, as we only need to test one key: */
-		err = bt_mesh_app_decrypt(meta->key, &meta->crypto, &in, &out);
-	} while (err && meta->crypto.ad != NULL);
-
-	return err;
+	/* Decrypt in place, as we only need to test one key: */
+	return bt_mesh_app_decrypt(meta->key, &meta->crypto, &in, &out);
 }
 
 static int unseg_app_sdu_encrypt(struct bt_mesh_friend *frnd,
@@ -468,6 +468,8 @@ static int unseg_app_sdu_prepare(struct bt_mesh_friend *frnd,
 		LOG_WRN("Decryption failed! %d", err);
 		return err;
 	}
+
+	LOG_ERR("Friend message re-encrypted!");
 
 	meta.crypto.seq_num = bt_mesh.seq;
 
@@ -1504,9 +1506,23 @@ static void friend_lpn_enqueue_tx(struct bt_mesh_friend *frnd,
 		FRIEND_ADV(buf)->app_idx = tx->ctx->app_idx;
 	}
 
+	if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
+		uint16_t uuid_idx;
+
+		uuid_idx = bt_mesh_label_uuid_idx_get(tx->ctx->label_uuid);
+		if (uuid_idx >= 0xfff) {
+			LOG_ERR("Index (%d) for Label UUID %p is too big", uuid_idx,
+				tx->ctx->label_uuid);
+			net_buf_unref(buf);
+			return;
+		}
+
+		FRIEND_ADV(buf)->uuid_idx = uuid_idx;
+	}
+
 	enqueue_friend_pdu(frnd, type, info.src, seg_count, buf);
 
-	LOG_DBG("Queued message for LPN 0x%04x", frnd->lpn);
+	LOG_DBG("Queued message for LPN 0x%04x, dst: %04x, uuid: %p", frnd->lpn, tx->ctx->addr, tx->ctx->label_uuid);
 }
 
 static bool friend_lpn_matches(struct bt_mesh_friend *frnd, uint16_t net_idx,

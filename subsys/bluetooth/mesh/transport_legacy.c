@@ -438,7 +438,8 @@ static void seg_tx_send_unacked(struct seg_tx *tx)
 
 end:
 	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) &&
-	    bt_mesh_lpn_established()) {
+	    bt_mesh_lpn_established() && !bt_mesh_has_addr(ctx.addr)) {
+		LOG_ERR("bt_mesh_lpn_poll in transport, dst:%d", ctx.addr);
 		bt_mesh_lpn_poll();
 	}
 
@@ -611,6 +612,7 @@ static int trans_encrypt(const struct bt_mesh_net_tx *tx, const uint8_t *key,
 		}
 
 		crypto.ad = tx->ctx->label_uuid;
+		LOG_ERR("Encrypting %04x using %p", tx->ctx->addr, tx->ctx->label_uuid);
 	}
 
 	return bt_mesh_app_encrypt(key, &crypto, msg);
@@ -1080,7 +1082,7 @@ static int send_ack(struct bt_mesh_subnet *sub, uint16_t src, uint16_t dst,
 
 	LOG_DBG("SeqZero 0x%04x Block 0x%08x OBO %u", seq_zero, block, obo);
 
-	if (bt_mesh_lpn_established()) {
+	if (bt_mesh_lpn_established() && !bt_mesh_has_addr(ctx.addr)) {
 		LOG_WRN("Not sending ack when LPN is enabled");
 		return 0;
 	}
@@ -1782,6 +1784,19 @@ const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid)
 	LOG_WRN("No matching Label UUID for 0x%04x", addr);
 
 	return NULL;
+}
+
+bool bt_mesh_va_has_collision(const struct bt_mesh_va *va)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(virtual_addrs); i++) {
+		if (va != &virtual_addrs[i] && virtual_addrs[i].ref && virtual_addrs[i].addr == va->addr) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 const uint16_t bt_mesh_va_addr_get(const uint8_t *uuid)
