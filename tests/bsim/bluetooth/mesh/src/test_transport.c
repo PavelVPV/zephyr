@@ -171,7 +171,7 @@ static void test_tx_va(void)
 	k_sleep(K_SECONDS(1));
 
 	for (int i = 0; i < ARRAY_SIZE(test_vector); i++) {
-		err = bt_mesh_test_send(va->addr, test_va_uuid, test_vector[i].len,
+		err = bt_mesh_test_send(va->addr, va->uuid, test_vector[i].len,
 					test_vector[i].flags, K_SECONDS(20));
 		ASSERT_OK_MSG(err, "Failed sending vector %d", i);
 	}
