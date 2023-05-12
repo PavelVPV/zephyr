@@ -1005,7 +1005,7 @@ uint16_t *bt_mesh_model_find_group(struct bt_mesh_model **mod, uint16_t addr)
 	return ctx.entry;
 }
 
-static const uint8_t **model_label_get(struct bt_mesh_model *mod, const uint8_t *label)
+static const uint8_t **model_uuid_get(struct bt_mesh_model *mod, const uint8_t *label)
 {
 	int i;
 
@@ -1018,21 +1018,21 @@ static const uint8_t **model_label_get(struct bt_mesh_model *mod, const uint8_t 
 	return NULL;
 }
 
-struct find_label_visitor_ctx {
+struct find_uuid_visitor_ctx {
 	const uint8_t **entry;
 	struct bt_mesh_model *mod;
-	const uint8_t *label;
+	const uint8_t *uuid;
 };
 
-static enum bt_mesh_walk find_label_mod_visitor(struct bt_mesh_model *mod, void *user_data)
+static enum bt_mesh_walk find_uuid_mod_visitor(struct bt_mesh_model *mod, void *user_data)
 {
-	struct find_label_visitor_ctx *ctx = user_data;
+	struct find_uuid_visitor_ctx *ctx = user_data;
 
 	if (mod->elem_idx != ctx->mod->elem_idx) {
 		return BT_MESH_WALK_CONTINUE;
 	}
 
-	ctx->entry = model_label_get(mod, ctx->label);
+	ctx->entry = model_uuid_get(mod, ctx->uuid);
 	if (ctx->entry) {
 		ctx->mod = mod;
 		return BT_MESH_WALK_STOP;
@@ -1041,15 +1041,15 @@ static enum bt_mesh_walk find_label_mod_visitor(struct bt_mesh_model *mod, void 
 	return BT_MESH_WALK_CONTINUE;
 }
 
-const uint8_t **bt_mesh_model_find_label(struct bt_mesh_model **mod, const uint8_t *label)
+const uint8_t **bt_mesh_model_find_uuid(struct bt_mesh_model **mod, const uint8_t *uuid)
 {
-	struct find_label_visitor_ctx ctx = {
+	struct find_uuid_visitor_ctx ctx = {
 		.mod = *mod,
 		.entry = NULL,
-		.label = label,
+		.uuid = uuid,
 	};
 
-	bt_mesh_model_extensions_walk(*mod, find_label_mod_visitor, &ctx);
+	bt_mesh_model_extensions_walk(*mod, find_uuid_mod_visitor, &ctx);
 
 	*mod = ctx.mod;
 	return ctx.entry;
@@ -1175,7 +1175,7 @@ static bool model_has_dst(struct bt_mesh_model *mod, uint16_t dst, const uint8_t
 	if (BT_MESH_ADDR_IS_UNICAST(dst)) {
 		return (dev_comp->elem[mod->elem_idx].addr == dst);
 	} else if (BT_MESH_ADDR_IS_VIRTUAL(dst)) {
-		return !!bt_mesh_model_find_label(&mod, uuid);
+		return !!bt_mesh_model_find_uuid(&mod, uuid);
 	} else if (BT_MESH_ADDR_IS_GROUP(dst) ||
 		  (BT_MESH_ADDR_IS_FIXED_GROUP(dst) &&  mod->elem_idx != 0)) {
 		return !!bt_mesh_model_find_group(&mod, dst);
@@ -1775,31 +1775,35 @@ static int mod_set(bool vnd, const char *name, size_t len_rd,
 	}
 
 	len = settings_name_next(name, &next);
-
 	if (!next) {
 		LOG_ERR("Insufficient number of arguments");
 		return -ENOENT;
 	}
 
-	if (!strncmp(next, "bind", 4)) {
-		return mod_set_bind(mod, len_rd, read_cb, cb_arg);
-	}
+	/* len contains length of mod id string represntation. Call settings_name_next() again
+	 * to get length of next.
+	 */
+	switch (settings_name_next(next, NULL)) {
+	case 4:
+		if (!strncmp(next, "bind", 4)) {
+			return mod_set_bind(mod, len_rd, read_cb, cb_arg);
+		} else if (!strncmp(next, "subv", 4)) {
+			return mod_set_sub_va(mod, len_rd, read_cb, cb_arg);
+		} if (!strncmp(next, "data", 4)) {
+			return mod_data_set(mod, next, len_rd, read_cb, cb_arg);
+		}
 
-	/* Should go before 'sub' */
-	if (!strncmp(next, "subv", 4)) {
-		return mod_set_sub_va(mod, len_rd, read_cb, cb_arg);
-	}
+		break;
+	case 3:
+		if (!strncmp(next, "sub", 3)) {
+			return mod_set_sub(mod, len_rd, read_cb, cb_arg);
+		} else if (!strncmp(next, "pub", 3)) {
+			return mod_set_pub(mod, len_rd, read_cb, cb_arg);
+		}
 
-	if (!strncmp(next, "sub", 3)) {
-		return mod_set_sub(mod, len_rd, read_cb, cb_arg);
-	}
-
-	if (!strncmp(next, "pub", 3)) {
-		return mod_set_pub(mod, len_rd, read_cb, cb_arg);
-	}
-
-	if (!strncmp(next, "data", 4)) {
-		return mod_data_set(mod, next, len_rd, read_cb, cb_arg);
+		break;
+	default:
+		break;
 	}
 
 	LOG_WRN("Unknown module key %s", next);

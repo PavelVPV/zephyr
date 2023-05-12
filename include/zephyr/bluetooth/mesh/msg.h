@@ -86,7 +86,7 @@ struct bt_mesh_msg_ctx {
 	/** Destination address of a received message. Not used for sending. */
 	uint16_t recv_dst;
 
-	/** Virtual address UUID, or NULL if this is not a virtual address. */
+	/** Pointer to Label UUID, or NULL if this is not a virtual address. */
 	const uint8_t *uuid;
 
 	/** RSSI of received packet. Not used for sending. */
@@ -105,7 +105,7 @@ struct bt_mesh_msg_ctx {
 /**
  * @brief Helper for bt_mesh_msg_ctx structure initialization.
  *
- * @note If @c dst is a Virtual Address, Label UUID should initalized separately.
+ * @note If @c dst is a Virtual Address, Label UUID shall initalized separately.
  *
  * @param net_key_idx NetKey Index of the subnet to send the message on. Only used if
  * @c app_key_idx points to devkey.

@@ -512,7 +512,7 @@ struct bt_mesh_model_pub {
 	struct bt_mesh_model *mod;
 
 	uint16_t addr;          /**< Publish Address. */
-	const uint8_t *uuid;
+	const uint8_t *uuid;    /**< Pointer to Label UUID if Publish Address is Virtual Address. */
 	uint16_t key:12,        /**< Publish AppKey Index. */
 		 cred:1,        /**< Friendship Credentials Flag. */
 		 send_rel:1,    /**< Force reliable sending (segment acks) */

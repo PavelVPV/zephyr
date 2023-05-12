@@ -1453,14 +1453,14 @@ static int mod_sub_va_add(struct bt_mesh_model *model,
 
 	sub_addr = va->addr;
 
-	if (bt_mesh_model_find_label(&mod, va->uuid)) {
+	if (bt_mesh_model_find_uuid(&mod, va->uuid)) {
 		/* Tried to add existing subscription */
 		status = STATUS_SUCCESS;
 		bt_mesh_va_del(uuid, NULL);
 		goto send_status;
 	}
 
-	label_entry = bt_mesh_model_find_label(&mod, NULL);
+	label_entry = bt_mesh_model_find_uuid(&mod, NULL);
 	group_entry = bt_mesh_model_find_group(&mod, BT_MESH_ADDR_UNASSIGNED);
 	if (!group_entry || !label_entry) {
 		status = STATUS_INSUFF_RESOURCES;
@@ -1550,7 +1550,7 @@ static int mod_sub_va_del(struct bt_mesh_model *model,
 		bt_mesh_lpn_group_del(&sub_addr, 1);
 	}
 
-	label_match = bt_mesh_model_find_label(&mod, va->uuid);
+	label_match = bt_mesh_model_find_uuid(&mod, va->uuid);
 	if (label_match) {
 		group_match = bt_mesh_model_find_group(&mod, sub_addr);
 		if (group_match) {
