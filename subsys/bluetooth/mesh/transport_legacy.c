@@ -133,8 +133,6 @@ K_MEM_SLAB_DEFINE(segs, BT_MESH_APP_SEG_SDU_MAX, CONFIG_BT_MESH_SEG_BUFS, 4);
 
 static struct bt_mesh_va virtual_addrs[CONFIG_BT_MESH_LABEL_COUNT];
 
-static const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid);
-
 static int send_unseg(struct bt_mesh_net_tx *tx, struct net_buf_simple *sdu,
 		      const struct bt_mesh_send_cb *cb, void *cb_data,
 		      const uint8_t *ctl_op)
@@ -726,7 +724,7 @@ static int sdu_try_decrypt(struct bt_mesh_net_rx *rx, const uint8_t key[16],
 
 	do {
 		if (BT_MESH_ADDR_IS_VIRTUAL(rx->ctx.recv_dst)) {
-			ctx->crypto.ad = bt_mesh_va_label_get(rx->ctx.recv_dst, ctx->crypto.ad);
+			ctx->crypto.ad = bt_mesh_va_uuid_get(rx->ctx.recv_dst, ctx->crypto.ad);
 
 			if (!ctx->crypto.ad) {
 				return -ENOENT;
@@ -1752,7 +1750,7 @@ uint8_t bt_mesh_va_del(const uint8_t *uuid)
 
 // FIXME: to be removed
 /* Iterate over Label UUIDs that have the same virtual address. */
-static const uint8_t *bt_mesh_va_label_get(uint16_t addr, const uint8_t *uuid)
+const uint8_t *bt_mesh_va_uuid_get(uint16_t addr, const uint8_t *uuid)
 {
 	int i;
 

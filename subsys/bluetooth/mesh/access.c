@@ -1643,7 +1643,25 @@ static int mod_set_sub(struct bt_mesh_model *mod, size_t len_rd,
 
 	LOG_DBG("Decoded %zu subscribed group addresses for model", len / sizeof(mod->groups[0]));
 
-	// FIXME: Convert va addrs stored in group to uuids.
+	/* If uuids[0] is NULL, then either the model is not subscribed to virtual addresses or
+	 * uuids are not yet recovered.
+	 */
+	if (CONFIG_BT_MESH_LABEL_COUNT && mod->uuids[0] == NULL) {
+		int i, j = 0;
+
+		for (i = 0; i < mod->groups_cnt && j < CONFIG_BT_MESH_LABEL_COUNT; i++) {
+			if (BT_MESH_ADDR_IS_VIRTUAL(mod->groups[i])) {
+				/* Recover from implementation where uuid was not stored for
+				 * virtual address. It is safe to pick first matched label because
+				 * previously the stack wasn't able to store virtual addresses with
+				 * collisions.
+				 */
+				mod->uuids[j] = bt_mesh_va_uuid_get(mod->groups[i], NULL);
+				j++;
+			}
+		}
+	}
+
 	return 0;
 }
 
@@ -1719,11 +1737,22 @@ static int mod_set_pub(struct bt_mesh_model *mod, size_t len_rd,
 			return err;
 		}
 
-		pub.uuidx = (uint16_t)(-1);
+		/* Recover from implementation where uuid was not stored for virtual address. It
+		 * is safe to pick first matched label because previously the stack wasn't able
+		 * to store virtual addresses with collisions.
+		 */
+		if (BT_MESH_ADDR_IS_VIRTUAL(pub.base.addr)) {
+			mod->pub->uuid = bt_mesh_va_uuid_get(pub.base.addr, NULL);
+		}
+
+		goto pub_base_set;
 	}
 
-	// FIXME: Convert va addrs stored in group to uuids.
+	if (BT_MESH_ADDR_IS_VIRTUAL(pub.base.addr)) {
+		mod->pub->uuid = bt_mesh_va_get_uuid_by_idx(pub.uuidx);
+	}
 
+pub_base_set:
 	mod->pub->addr = pub.base.addr;
 	mod->pub->key = pub.base.key;
 	mod->pub->cred = pub.base.cred;
@@ -1732,13 +1761,6 @@ static int mod_set_pub(struct bt_mesh_model *mod, size_t len_rd,
 	mod->pub->retransmit = pub.base.retransmit;
 	mod->pub->period_div = pub.base.period_div;
 	mod->pub->count = 0U;
-
-	if (pub.uuidx != (uint16_t)(-1)) {
-		//FIXME: This won't work
-		mod->pub->uuid = bt_mesh_va_get_uuid_by_idx(pub.uuidx);
-	} else {
-		mod->pub->uuid = NULL;
-	}
 
 	LOG_DBG("Restored model publication, dst 0x%04x app_idx 0x%03x", pub.base.addr,
 		pub.base.key);
