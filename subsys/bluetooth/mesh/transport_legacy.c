@@ -1748,7 +1748,6 @@ uint8_t bt_mesh_va_del(const uint8_t *uuid)
 	return STATUS_SUCCESS;
 }
 
-// FIXME: to be removed
 /* Iterate over Label UUIDs that have the same virtual address. */
 const uint8_t *bt_mesh_va_uuid_get(uint16_t addr, const uint8_t *uuid)
 {
@@ -1757,7 +1756,8 @@ const uint8_t *bt_mesh_va_uuid_get(uint16_t addr, const uint8_t *uuid)
 	LOG_DBG("addr 0x%04x", addr);
 
 	for (i = 0; i < ARRAY_SIZE(virtual_addrs); i++) {
-		if (virtual_addrs[i].ref && virtual_addrs[i].addr == addr) {
+		if (virtual_addrs[i].ref &&
+		    (virtual_addrs[i].addr == addr || addr == BT_MESH_ADDR_UNASSIGNED)) {
 			if (!uuid) {
 				LOG_DBG("Found Label UUID for 0x%04x: %s", addr,
 					bt_hex(virtual_addrs[i].uuid, 16));
