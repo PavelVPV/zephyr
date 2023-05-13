@@ -311,7 +311,7 @@ static void friend_sub_add(struct bt_mesh_friend *frnd, uint16_t addr)
 
 	if (empty_idx != INT_MAX) {
 		frnd->sub_list[empty_idx] = addr;
-		LOG_WRN("Addded %04x to subscription", addr);
+		LOG_DBG("%04x added %04x to subscription list", frnd->lpn, addr);
 	} else {
 		LOG_WRN("No space in friend subscription list");
 	}
@@ -323,7 +323,7 @@ static void friend_sub_rem(struct bt_mesh_friend *frnd, uint16_t addr)
 
 	for (i = 0; i < ARRAY_SIZE(frnd->sub_list); i++) {
 		if (frnd->sub_list[i] == addr) {
-			LOG_ERR("Removing %04x from sub_list", addr);
+			LOG_DBG("%04x removed %04x from subscription list", frnd->lpn, addr);
 			frnd->sub_list[i] = BT_MESH_ADDR_UNASSIGNED;
 			return;
 		}
@@ -403,8 +403,6 @@ static int unseg_app_sdu_unpack(struct bt_mesh_friend *frnd,
 		meta->crypto.ad = NULL;
 	}
 
-	LOG_WRN("Addr: %04x, uuid: %p", meta->crypto.dst, meta->crypto.ad);
-
 	return 0;
 }
 
@@ -473,8 +471,6 @@ static int unseg_app_sdu_prepare(struct bt_mesh_friend *frnd,
 		LOG_WRN("Decryption failed! %d", err);
 		return err;
 	}
-
-	LOG_ERR("Friend message re-encrypted!");
 
 	meta.crypto.seq_num = bt_mesh.seq;
 
@@ -1516,13 +1512,9 @@ static void friend_lpn_enqueue_tx(struct bt_mesh_friend *frnd,
 
 		uuid_idx = bt_mesh_va_get_idx_by_uuid(tx->ctx->uuid);
 		if (uuid_idx >= 0xfff) {
-			LOG_ERR("Index (%d) for Label UUID %p is too big", uuid_idx,
-				tx->ctx->uuid);
 			net_buf_unref(buf);
 			return;
 		}
-
-		LOG_WRN("encr: %d %p", uuid_idx, tx->ctx->uuid);
 
 		FRIEND_ADV(buf)->uuid_idx = uuid_idx;
 	}

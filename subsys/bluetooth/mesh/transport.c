@@ -638,7 +638,6 @@ static int trans_encrypt(const struct bt_mesh_net_tx *tx, const uint8_t *key,
 
 	if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
 		crypto.ad = tx->ctx->uuid;
-		LOG_ERR("Encrypting %04x using %p", tx->ctx->addr, tx->ctx->uuid);
 	}
 
 	return bt_mesh_app_encrypt(key, &crypto, msg);

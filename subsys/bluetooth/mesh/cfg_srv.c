@@ -1458,8 +1458,6 @@ static int mod_sub_va_add(struct bt_mesh_model *model,
 	*group_entry = va->addr;
 	*label_entry = va->uuid;
 
-	LOG_ERR("Add Addr: %d, %p, col:%d", va->addr, va->uuid, bt_mesh_va_collision_check(va->addr));
-
 	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 1 &&
 	    !bt_mesh_va_collision_check(va->addr)) {
 		bt_mesh_lpn_group_add(va->addr);
@@ -1528,7 +1526,6 @@ static int mod_sub_va_del(struct bt_mesh_model *model,
 		goto send_status;
 	}
 
-	LOG_ERR("Del Addr: %d, %p, col:%d", va->addr, va->uuid, bt_mesh_va_collision_check(va->addr));
 	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 1 &&
 	    !bt_mesh_va_collision_check(va->addr)) {
 		bt_mesh_lpn_group_del(&va->addr, 1);
@@ -1624,7 +1621,6 @@ static int mod_sub_va_overwrite(struct bt_mesh_model *model,
 		bt_mesh_model_sub_store(mod);
 	}
 
-	LOG_ERR("Over Addr: %d, %p, col:%d", va->addr, va->uuid, bt_mesh_va_collision_check(va->addr));
 	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 1 &&
 	    !bt_mesh_va_collision_check(va->addr)) {
 		bt_mesh_lpn_group_add(va->addr);
