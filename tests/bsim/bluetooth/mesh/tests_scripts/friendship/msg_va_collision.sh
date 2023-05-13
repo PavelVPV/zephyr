@@ -10,6 +10,6 @@ RunTest mesh_friendship_msg_va_collision \
 	friendship_friend_va_collision
 
 conf=prj_mesh1d1_conf
-RunTest mesh_friendship_msg_group_1d1 \
+RunTest mesh_friendship_msg_va_collision_1d1 \
 	friendship_lpn_va_collision \
 	friendship_friend_va_collision
