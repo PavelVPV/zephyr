@@ -845,7 +845,8 @@ static int mod_pub_va_set(struct bt_mesh_model *model,
 {
 	const struct bt_mesh_va *va;
 	uint8_t retransmit, status, pub_ttl, pub_period, cred_flag;
-	uint16_t elem_addr, pub_addr, pub_app_idx;
+	uint16_t elem_addr, pub_app_idx;
+	uint16_t pub_addr = 0U;
 	struct bt_mesh_model *mod;
 	struct bt_mesh_elem *elem;
 	const uint8_t *uuid;
@@ -887,14 +888,12 @@ static int mod_pub_va_set(struct bt_mesh_model *model,
 	if (!elem) {
 		mod = NULL;
 		vnd = (buf->len == 4U);
-		pub_addr = 0U;
 		status = STATUS_INVALID_ADDRESS;
 		goto send_status;
 	}
 
 	mod = get_model(elem, buf, &vnd);
 	if (!mod) {
-		pub_addr = 0U;
 		status = STATUS_INVALID_MODEL;
 		goto send_status;
 	}
@@ -1383,7 +1382,7 @@ static int mod_sub_va_add(struct bt_mesh_model *model,
 			  struct net_buf_simple *buf)
 {
 	const struct bt_mesh_va *va;
-	uint16_t elem_addr, sub_addr;
+	uint16_t elem_addr, sub_addr = BT_MESH_ADDR_UNASSIGNED;
 	struct bt_mesh_model *mod;
 	struct bt_mesh_elem *elem;
 	const uint8_t *uuid;
@@ -1413,14 +1412,12 @@ static int mod_sub_va_add(struct bt_mesh_model *model,
 	if (!elem) {
 		mod = NULL;
 		vnd = (buf->len == 4U);
-		sub_addr = BT_MESH_ADDR_UNASSIGNED;
 		status = STATUS_INVALID_ADDRESS;
 		goto send_status;
 	}
 
 	mod = get_model(elem, buf, &vnd);
 	if (!mod) {
-		sub_addr = BT_MESH_ADDR_UNASSIGNED;
 		status = STATUS_INVALID_MODEL;
 		goto send_status;
 	}
@@ -1485,7 +1482,7 @@ static int mod_sub_va_del(struct bt_mesh_model *model,
 			  struct net_buf_simple *buf)
 {
 	const struct bt_mesh_va *va;
-	uint16_t elem_addr, sub_addr;
+	uint16_t elem_addr, sub_addr = BT_MESH_ADDR_UNASSIGNED;
 	struct bt_mesh_model *mod;
 	struct bt_mesh_elem *elem;
 	const uint8_t *uuid;
@@ -1515,14 +1512,12 @@ static int mod_sub_va_del(struct bt_mesh_model *model,
 	if (!elem) {
 		mod = NULL;
 		vnd = (buf->len == 4U);
-		sub_addr = BT_MESH_ADDR_UNASSIGNED;
 		status = STATUS_INVALID_ADDRESS;
 		goto send_status;
 	}
 
 	mod = get_model(elem, buf, &vnd);
 	if (!mod) {
-		sub_addr = BT_MESH_ADDR_UNASSIGNED;
 		status = STATUS_INVALID_MODEL;
 		goto send_status;
 	}

@@ -133,7 +133,7 @@ const uint8_t *bt_mesh_va_uuid_get(uint16_t addr, const uint8_t *uuid, uint16_t 
 bool bt_mesh_va_collision_check(uint16_t addr)
 {
 	size_t count = 0;
-	const uint8_t *uuid;
+	const uint8_t *uuid = NULL;
 
 	do {
 		uuid = bt_mesh_va_uuid_get(addr, uuid, NULL);
