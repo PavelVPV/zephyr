@@ -114,7 +114,6 @@ uint8_t bt_mesh_va_add(const uint8_t uuid[16], const struct bt_mesh_va **entry);
 uint8_t bt_mesh_va_del(const uint8_t *uuid);
 const struct bt_mesh_va *bt_mesh_va_get(const uint8_t *uuid);
 const uint8_t *bt_mesh_va_uuid_get(uint16_t addr, const uint8_t *uuid);
-bool bt_mesh_va_has_collision(const struct bt_mesh_va *va);
 
 const uint8_t *bt_mesh_va_get_uuid_by_idx(uint16_t idx);
 uint16_t bt_mesh_va_get_idx_by_uuid(const uint8_t *uuid);

@@ -1773,19 +1773,6 @@ const uint8_t *bt_mesh_va_uuid_get(uint16_t addr, const uint8_t *uuid)
 	return NULL;
 }
 
-bool bt_mesh_va_has_collision(const struct bt_mesh_va *va)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(virtual_addrs); i++) {
-		if (va != &virtual_addrs[i] && virtual_addrs[i].ref && virtual_addrs[i].addr == va->addr) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
 const struct bt_mesh_va *bt_mesh_va_get(const uint8_t *uuid)
 {
 	int i;

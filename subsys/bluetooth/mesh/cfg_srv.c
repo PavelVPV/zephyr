@@ -1377,6 +1377,18 @@ send_list:
 	return 0;
 }
 
+static bool va_collision_check(uint16_t addr)
+{
+	size_t count = 0;
+	const uint8_t *uuid;
+
+	do {
+		uuid = bt_mesh_va_uuid_get(addr, uuid);
+	} while (uuid && ++count);
+
+	return count > 1;
+}
+
 static int mod_sub_va_add(struct bt_mesh_model *model,
 			  struct bt_mesh_msg_ctx *ctx,
 			  struct net_buf_simple *buf)
@@ -1460,10 +1472,10 @@ static int mod_sub_va_add(struct bt_mesh_model *model,
 	*group_entry = va->addr;
 	*label_entry = va->uuid;
 
-	LOG_ERR("Add Addr: %d, %p, col:%d", va->addr, va->uuid, bt_mesh_va_has_collision(va));
+	LOG_ERR("Add Addr: %d, %p, col:%d", va->addr, va->uuid, va_collision_check(va->addr));
 
 	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 1 &&
-	    !bt_mesh_va_has_collision(va)) {
+	    !va_collision_check(va->addr)) {
 		bt_mesh_lpn_group_add(va->addr);
 	}
 
@@ -1532,9 +1544,9 @@ static int mod_sub_va_del(struct bt_mesh_model *model,
 		goto send_status;
 	}
 
-	LOG_ERR("Del Addr: %d, %p, col:%d", va->addr, va->uuid, bt_mesh_va_has_collision(va));
+	LOG_ERR("Del Addr: %d, %p, col:%d", va->addr, va->uuid, va_collision_check(va->addr));
 	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 1 &&
-	    !bt_mesh_va_has_collision(va)) {
+	    !va_collision_check(va->addr)) {
 		bt_mesh_lpn_group_del(&va->addr, 1);
 	}
 
@@ -1628,9 +1640,9 @@ static int mod_sub_va_overwrite(struct bt_mesh_model *model,
 		bt_mesh_model_sub_store(mod);
 	}
 
-	LOG_ERR("Over Addr: %d, %p, col:%d", va->addr, va->uuid, bt_mesh_va_has_collision(va));
+	LOG_ERR("Over Addr: %d, %p, col:%d", va->addr, va->uuid, va_collision_check(va->addr));
 	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) && va->ref == 1 &&
-	    !bt_mesh_va_has_collision(va)) {
+	    !va_collision_check(va->addr)) {
 		bt_mesh_lpn_group_add(va->addr);
 	}
 
