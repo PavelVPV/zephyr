@@ -1657,7 +1657,7 @@ static int mod_set_sub(struct bt_mesh_model *mod, size_t len_rd,
 				 * previously the stack wasn't able to store virtual addresses with
 				 * collisions.
 				 */
-				mod->uuids[j] = bt_mesh_va_uuid_get(mod->groups[i], NULL);
+				mod->uuids[j] = bt_mesh_va_uuid_get(mod->groups[i], NULL, NULL);
 				j++;
 			}
 		}
@@ -1743,7 +1743,7 @@ static int mod_set_pub(struct bt_mesh_model *mod, size_t len_rd,
 		 * to store virtual addresses with collisions.
 		 */
 		if (BT_MESH_ADDR_IS_VIRTUAL(pub.base.addr)) {
-			mod->pub->uuid = bt_mesh_va_uuid_get(pub.base.addr, NULL);
+			mod->pub->uuid = bt_mesh_va_uuid_get(pub.base.addr, NULL, NULL);
 		}
 
 		goto pub_base_set;

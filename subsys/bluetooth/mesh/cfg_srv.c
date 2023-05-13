@@ -1384,7 +1384,7 @@ static bool va_collision_check(uint16_t addr)
 	const uint8_t *uuid;
 
 	do {
-		uuid = bt_mesh_va_uuid_get(addr, uuid);
+		uuid = bt_mesh_va_uuid_get(addr, uuid, NULL);
 	} while (uuid && ++count);
 
 	return count > 1;

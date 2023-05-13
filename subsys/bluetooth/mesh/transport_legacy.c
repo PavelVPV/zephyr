@@ -716,7 +716,8 @@ static int sdu_try_decrypt(struct bt_mesh_net_rx *rx, const uint8_t key[16],
 
 	do {
 		if (BT_MESH_ADDR_IS_VIRTUAL(rx->ctx.recv_dst)) {
-			ctx->crypto.ad = bt_mesh_va_uuid_get(rx->ctx.recv_dst, ctx->crypto.ad);
+			ctx->crypto.ad = bt_mesh_va_uuid_get(rx->ctx.recv_dst, ctx->crypto.ad,
+							     NULL);
 
 			if (!ctx->crypto.ad) {
 				return -ENOENT;
