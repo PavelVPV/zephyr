@@ -710,11 +710,13 @@ static int sdu_try_decrypt(struct bt_mesh_net_rx *rx, const uint8_t key[16],
 	struct decrypt_ctx *ctx = cb_data;
 	int err;
 
-	if (ctx->seg) {
-		seg_rx_assemble(ctx->seg, ctx->buf, ctx->crypto.aszmic);
-	}
+	ctx->crypto.ad = NULL;
 
 	do {
+		if (ctx->seg) {
+			seg_rx_assemble(ctx->seg, ctx->buf, ctx->crypto.aszmic);
+		}
+
 		if (BT_MESH_ADDR_IS_VIRTUAL(rx->ctx.recv_dst)) {
 			ctx->crypto.ad = bt_mesh_va_uuid_get(rx->ctx.recv_dst, ctx->crypto.ad,
 							     NULL);

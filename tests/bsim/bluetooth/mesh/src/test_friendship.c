@@ -39,6 +39,14 @@ static const struct bt_mesh_test_cfg other_cfg = {
 };
 static struct bt_mesh_test_cfg lpn_cfg;
 
+static uint8_t test_va_col_uuid[][16] = {
+	{ 0xe3, 0x94, 0xe7, 0xc1, 0xc5, 0x14, 0x72, 0x11,
+	  0x68, 0x36, 0x19, 0x30, 0x99, 0x34, 0x53, 0x62 },
+	{ 0x5e, 0x49, 0x5a, 0xd9, 0x44, 0xdf, 0xae, 0xc0,
+	  0x62, 0xd8, 0x0d, 0xed, 0x16, 0x82, 0xd1, 0x7d },
+};
+static uint16_t test_va_col_addr = 0x809D;
+
 static void test_common_init(const struct bt_mesh_test_cfg *cfg)
 {
 	bt_mesh_test_friendship_init(CONFIG_BT_MESH_FRIEND_LPN_COUNT);
@@ -358,15 +366,8 @@ static void test_friend_no_est(void)
 	PASS();
 }
 
-static uint8_t test_va_col_uuid[][16] = {
-	{ 0xe3, 0x94, 0xe7, 0xc1, 0xc5, 0x14, 0x72, 0x11,
-	  0x68, 0x36, 0x19, 0x30, 0x99, 0x34, 0x53, 0x62 },
-	{ 0x5e, 0x49, 0x5a, 0xd9, 0x44, 0xdf, 0xae, 0xc0,
-	  0x62, 0xd8, 0x0d, 0xed, 0x16, 0x82, 0xd1, 0x7d },
-};
-static uint16_t test_va_col_addr = 0x809D;
-
-/** TBA */
+/** Send messages to 2 virtual addresses with collision and check that LPN correctly polls them.
+ */
 static void test_friend_va_collision(void)
 {
 	const struct bt_mesh_va *va[2];
@@ -401,7 +402,6 @@ static void test_friend_va_collision(void)
 	LOG_INF("Let LPN unsubscribe from the first address.");
 
 	/* Manual poll by LPN test case after removing the first Label UUID from subscription. */
-	// FIXME: Should here be one more pull for Friend Update with mp == 0?
 	friend_wait_for_polls(1);
 
 	LOG_INF("Step 2: Sending msgs to LPN.");
@@ -421,7 +421,6 @@ static void test_friend_va_collision(void)
 	/* Manual poll by LPN test case after removing the second Label UUID from subscription.
 	 * After this step, the virtual address shall be removed from the subscription list.
 	 */
-	// FIXME: Should here be one more pull for Friend Update with mp == 0?
 	friend_wait_for_polls(1);
 
 	LOG_INF("Step 3: Sending msgs to LPN.");
@@ -1036,6 +1035,9 @@ static void test_lpn_term_cb_check(void)
 	PASS();
 }
 
+/** Test that LPN sends only one Subscription List Add and only one Subscription List Remove message
+ * to Friend when LPN is subscribed to 2 virtual addresses with collision.
+ */
 static void test_lpn_va_collision(void)
 {
 	struct bt_mesh_test_msg msg;

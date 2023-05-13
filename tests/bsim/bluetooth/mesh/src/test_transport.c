@@ -57,6 +57,18 @@ static const struct bt_mesh_test_cfg rx_cfg = {
 
 static int expected_send_err;
 
+static uint8_t test_va_col_uuid[][16] = {
+	{
+		0xe3, 0x94, 0xe7, 0xc1, 0xc5, 0x14, 0x72, 0x11,
+		0x68, 0x36, 0x19, 0x30, 0x99, 0x34, 0x53, 0x62
+	},
+	{
+		0x5e, 0x49, 0x5a, 0xd9, 0x44, 0xdf, 0xae, 0xc0,
+		0x62, 0xd8, 0x0d, 0xed, 0x16, 0x82, 0xd1, 0x7d
+	},
+};
+static const uint16_t test_va_col_addr = 0x809D;
+
 static void test_tx_init(void)
 {
 	bt_mesh_test_cfg_set(&tx_cfg, WAIT_TIME);
@@ -180,14 +192,8 @@ static void test_tx_va(void)
 	PASS();
 }
 
-static uint8_t test_va_col_uuid[][16] = {
-	{ 0xe3, 0x94, 0xe7, 0xc1, 0xc5, 0x14, 0x72, 0x11,
-	  0x68, 0x36, 0x19, 0x30, 0x99, 0x34, 0x53, 0x62 },
-	{ 0x5e, 0x49, 0x5a, 0xd9, 0x44, 0xdf, 0xae, 0xc0,
-	  0x62, 0xd8, 0x0d, 0xed, 0x16, 0x82, 0xd1, 0x7d },
-};
-static uint16_t test_va_col_addr = 0x809D;
-
+/** Test sending the test vector using virtual addresses with collision.
+ */
 static void test_tx_va_collision(void)
 {
 	const struct bt_mesh_va *va[ARRAY_SIZE(test_va_col_uuid)];
@@ -204,10 +210,14 @@ static void test_tx_va_collision(void)
 	/* Wait for the receiver to subscribe on address. */
 	k_sleep(K_SECONDS(1));
 
-	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
-		err = bt_mesh_test_send(test_va_col_addr, va[i]->uuid, test_vector[0].len,
-					test_vector[0].flags, K_SECONDS(20));
-		ASSERT_OK_MSG(err, "Failed sending vector %d", i);
+	for (int i = 0; i < ARRAY_SIZE(test_vector); i++) {
+		for (int j = 0; j < ARRAY_SIZE(test_va_col_uuid); j++) {
+			LOG_INF("Sending msg #%d to %s addr", i, (j == 0 ? "first" : "second"));
+
+			err = bt_mesh_test_send(test_va_col_addr, va[j]->uuid, test_vector[i].len,
+						test_vector[i].flags, K_SECONDS(20));
+			ASSERT_OK_MSG(err, "Failed sending vector %d", i);
+		}
 	}
 
 	PASS();
@@ -491,6 +501,8 @@ static void test_rx_va(void)
 	PASS();
 }
 
+/** @brief Receive the test vector using virtual addresses with collision.
+ */
 static void test_rx_va_collision(void)
 {
 	uint16_t virtual_addr;
@@ -506,12 +518,14 @@ static void test_rx_va_collision(void)
 		ASSERT_EQUAL(test_va_col_addr, virtual_addr);
 	}
 
-	printk("here\n");
+	for (int i = 0; i < ARRAY_SIZE(test_vector); i++) {
+		for (int j = 0; j < ARRAY_SIZE(test_va_col_uuid); j++) {
+			LOG_INF("Recv msg #%d from %s addr", i, (j == 0 ? "first" : "second"));
 
-	for (int i = 0; i < ARRAY_SIZE(test_va_col_uuid); i++) {
-		err = bt_mesh_test_recv(test_vector[0].len, test_va_col_addr, test_va_col_uuid[i],
-					K_SECONDS(20));
-		ASSERT_OK_MSG(err, "Failed receiving vector %d", i);
+			err = bt_mesh_test_recv(test_vector[i].len, test_va_col_addr,
+						test_va_col_uuid[j], K_SECONDS(20));
+			ASSERT_OK_MSG(err, "Failed receiving vector %d", i);
+		}
 	}
 
 	PASS();
@@ -584,51 +598,6 @@ static void test_rx_seg_ivu(void)
 	PASS();
 }
 
-static void test_rx_va_collision_find(void)
-{
-	bt_mesh_test_setup();
-	bt_mesh_test_cfg_set(&tx_cfg, 7000);
-
-//	uint8_t uuid1[16] = { 0xca, 0xcd, 0x13, 0xbd, 0x54, 0xfe, 0x43, 0xed,
-//			      0x12, 0x3d, 0xa3, 0xe3, 0xb9, 0x03, 0x70, 0xaa };
-//	uint16_t addr1 = 0xb6f0;
-	uint8_t uuid1[16] = { 0xdf, 0xca, 0xa3, 0x54, 0x23, 0xfa, 0x33, 0xed,
-				       0x1a, 0xbe, 0xa0, 0xaa, 0xbd, 0xfa, 0x0f, 0xaf };
-	uint16_t addr1 = 0x8700;
-	uint8_t uuid2[16];
-	uint16_t addr2;
-	int err;
-
-#if 0
-	err = bt_rand(uuid1, 16);
-	if (err) {
-		FAIL("Unable to generate uuid 1: %d", err);
-	}
-
-	err = bt_mesh_virtual_addr(uuid1, &addr1);
-	if (err) {
-		FAIL("Unable to generated addr 1: %d", err);
-	}
-#endif
-	LOG_WRN("Generated first UUID: %s, addr: %04X", bt_hex(uuid1, 16), addr1);
-
-	do {
-		err = bt_rand(uuid2, 16);
-		if (err) {
-			FAIL("Unable to generate uuid 2: %d", err);
-		}
-
-		err = bt_mesh_virtual_addr(uuid2, &addr2);
-		if (err) {
-			FAIL("Unable to generated addr 2: %d", err);
-		}
-	} while (addr1 != addr2);
-
-	LOG_WRN("Found collision! UUID: %s, addr: %04X", bt_hex(uuid2, 16), addr2);
-
-	PASS();
-}
-
 #define TEST_CASE(role, name, description)                                     \
 	{                                                                      \
 		.test_id = "transport_" #role "_" #name,                       \
@@ -660,7 +629,6 @@ static const struct bst_test_instance test_connect[] = {
 	TEST_CASE(rx, seg_concurrent, "Transport: receive concurrent segmented"),
 	TEST_CASE(rx, seg_ivu,        "Transport: receive segmented during IV update"),
 
-	TEST_CASE(rx, va_collision_find,        "Transport: receive segmented during IV update"),
 	BSTEST_END_MARKER
 };
 

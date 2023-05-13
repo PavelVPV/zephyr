@@ -4,7 +4,8 @@
 
 source $(dirname "${BASH_SOURCE[0]}")/../../_mesh_test.sh
 
-#RunTest mesh_transport_va transport_rx_va_collision_find
+# Test transmission to virtual addresses with collision
 RunTest mesh_transport_va_collision transport_tx_va_collision transport_rx_va_collision
 
-conf=prj_mesh1d1_conf
+#conf=prj_mesh1d1_conf
+#RunTest mesh_transport_va_collision_1d1 transport_tx_va_collision transport_rx_va_collision
