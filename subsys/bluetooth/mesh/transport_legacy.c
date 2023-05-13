@@ -736,7 +736,6 @@ static int sdu_try_decrypt(struct bt_mesh_net_rx *rx, const uint8_t key[16],
 	}
 
 	return err;
-
 }
 
 static int sdu_recv(struct bt_mesh_net_rx *rx, uint8_t hdr, uint8_t aszmic,
