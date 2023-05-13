@@ -15,6 +15,7 @@ uint8_t bt_mesh_va_add(const uint8_t uuid[16], const struct bt_mesh_va **entry);
 uint8_t bt_mesh_va_del(const uint8_t *uuid);
 /* Finds va entry by user's UUID */
 const struct bt_mesh_va *bt_mesh_va_get(const uint8_t *uuid);
+bool bt_mesh_va_collision_check(uint16_t addr);
 
 /* Needed for storing va as indexes in persistent storage. */
 const uint8_t *bt_mesh_va_get_uuid_by_idx(uint16_t idx);

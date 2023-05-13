@@ -134,6 +134,18 @@ const uint8_t *bt_mesh_va_uuid_get(uint16_t addr, const uint8_t *uuid, uint16_t 
 	return NULL;
 }
 
+bool bt_mesh_va_collision_check(uint16_t addr)
+{
+	size_t count = 0;
+	const uint8_t *uuid;
+
+	do {
+		uuid = bt_mesh_va_uuid_get(addr, uuid, NULL);
+	} while (uuid && ++count);
+
+	return count > 1;
+}
+
 const struct bt_mesh_va *bt_mesh_va_get(const uint8_t *uuid)
 {
 	int i;
