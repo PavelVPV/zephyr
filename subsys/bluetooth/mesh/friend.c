@@ -21,6 +21,7 @@
 #include "access.h"
 #include "foundation.h"
 #include "friend.h"
+#include "va.h"
 
 #define LOG_LEVEL 4//CONFIG_BT_MESH_FRIEND_LOG_LEVEL
 #include <zephyr/logging/log.h>

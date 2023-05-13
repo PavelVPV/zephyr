@@ -35,6 +35,7 @@
 #include "friend.h"
 #include "settings.h"
 #include "cfg.h"
+#include "va.h"
 
 #define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
 #include <zephyr/logging/log.h>

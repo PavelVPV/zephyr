@@ -27,6 +27,7 @@
 #include "foundation.h"
 #include "op_agg.h"
 #include "settings.h"
+#include "va.h"
 
 #define LOG_LEVEL CONFIG_BT_MESH_ACCESS_LOG_LEVEL
 #include <zephyr/logging/log.h>

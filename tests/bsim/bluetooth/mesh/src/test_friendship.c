@@ -6,6 +6,7 @@
 #include "mesh_test.h"
 #include "mesh/net.h"
 #include "mesh/transport.h"
+#include "mesh/va.h"
 #include <zephyr/sys/byteorder.h>
 #include "argparse.h"
 

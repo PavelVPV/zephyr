@@ -17,6 +17,8 @@ zephyr_library_sources_ifdef(CONFIG_BT_MESH
     msg.c
     cfg_srv.c
     health_srv.c
+    #FIXME: Check if possible to compile out this file if BT_MESH_LABEL_COUNT == 0
+    va.c
 )
 
 if (CONFIG_BT_MESH_V1d1)
