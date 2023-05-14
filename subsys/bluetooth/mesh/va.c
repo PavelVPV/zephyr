@@ -105,6 +105,10 @@ const uint8_t *bt_mesh_va_uuid_get(uint16_t addr, const uint8_t *uuid, uint16_t 
 {
 	int i = 0;
 
+	if (CONFIG_BT_MESH_LABEL_COUNT == 0) {
+		return NULL;
+	}
+
 	if (uuid != NULL) {
 		struct bt_mesh_va *va;
 
@@ -179,7 +183,13 @@ const uint8_t *bt_mesh_va_get_uuid_by_idx(uint16_t idx)
 
 int bt_mesh_va_get_idx_by_uuid(const uint8_t *uuid, uint16_t *uuidx)
 {
-	struct bt_mesh_va *va = CONTAINER_OF(uuid, struct bt_mesh_va, uuid);
+	struct bt_mesh_va *va;
+
+	if (CONFIG_BT_MESH_LABEL_COUNT == 0) {
+		return -ENOENT;
+	}
+
+	va = CONTAINER_OF(uuid, struct bt_mesh_va, uuid);
 
 	if (!PART_OF_ARRAY(virtual_addrs, va) || va->ref == 0) {
 		return -ENOENT;
