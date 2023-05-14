@@ -1520,7 +1520,7 @@ static int mod_sub_va_del(struct bt_mesh_model *model,
 		goto send_status;
 	}
 
-	va = bt_mesh_va_get(uuid);
+	va = bt_mesh_va_find(uuid);
 	if (!va) {
 		status = STATUS_CANNOT_REMOVE;
 		goto send_status;

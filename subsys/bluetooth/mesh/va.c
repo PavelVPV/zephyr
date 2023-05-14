@@ -147,7 +147,7 @@ bool bt_mesh_va_collision_check(uint16_t addr)
 	return count > 1;
 }
 
-const struct bt_mesh_va *bt_mesh_va_get(const uint8_t *uuid)
+const struct bt_mesh_va *bt_mesh_va_find(const uint8_t *uuid)
 {
 	int i;
 
@@ -174,7 +174,7 @@ const uint8_t *bt_mesh_va_get_uuid_by_idx(uint16_t idx)
 	struct bt_mesh_va *va;
 
 	va = va_get_by_idx(idx);
-	return va ? va->uuid : NULL;
+	return (va && va->ref > 0) ? va->uuid : NULL;
 }
 
 int bt_mesh_va_get_idx_by_uuid(const uint8_t *uuid, uint16_t *uuidx)

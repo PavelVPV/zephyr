@@ -1505,22 +1505,20 @@ static void friend_lpn_enqueue_tx(struct bt_mesh_friend *frnd,
 		 * when encrypting in transport and network.
 		 */
 		FRIEND_ADV(buf)->app_idx = tx->ctx->app_idx;
-	}
 
-	if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
-		uint16_t uuidx;
-		int err;
+		/* When reencrypting a virtual address message, we need to know uuid as well. */
+		if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
+			uint16_t uuidx;
+			int err;
 
-		err = bt_mesh_va_get_idx_by_uuid(tx->ctx->uuid, &uuidx);
-		if (err) {
-			/* This can happen if the va was deleted on Friend before Friend sent
-			 * message to LPN.
-			 */
-			net_buf_unref(buf);
-			return;
+			err = bt_mesh_va_get_idx_by_uuid(tx->ctx->uuid, &uuidx);
+			if (err) {
+				net_buf_unref(buf);
+				return;
+			}
+
+			FRIEND_ADV(buf)->uuidx = uuidx;
 		}
-
-		FRIEND_ADV(buf)->uuidx = uuidx;
 	}
 
 	enqueue_friend_pdu(frnd, type, info.src, seg_count, buf);

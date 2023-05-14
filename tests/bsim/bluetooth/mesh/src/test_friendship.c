@@ -767,7 +767,7 @@ static void test_lpn_group(void)
 		FAIL("VA addr add failed with err %d status 0x%x", err, status);
 	}
 
-	va = bt_mesh_va_get(test_va_uuid);
+	va = bt_mesh_va_find(test_va_uuid);
 	ASSERT_TRUE(va != NULL);
 	ASSERT_EQUAL(vaddr, va->addr);
 
@@ -872,7 +872,7 @@ static void test_lpn_loopback(void)
 		FAIL("VA addr add failed with err %d status 0x%x", err, status);
 	}
 
-	va = bt_mesh_va_get(test_va_uuid);
+	va = bt_mesh_va_find(test_va_uuid);
 	ASSERT_TRUE(va != NULL);
 	ASSERT_EQUAL(vaddr, va->addr);
 
@@ -1058,7 +1058,7 @@ static void test_lpn_va_collision(void)
 
 		ASSERT_EQUAL(test_va_col_addr, vaddr);
 
-		va[i] = bt_mesh_va_get(test_va_col_uuid[i]);
+		va[i] = bt_mesh_va_find(test_va_col_uuid[i]);
 		ASSERT_TRUE(va[i] != NULL);
 		ASSERT_EQUAL(vaddr, va[i]->addr);
 	}
