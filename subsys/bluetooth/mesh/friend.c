@@ -67,7 +67,7 @@ struct friend_adv {
 	uint16_t app_idx;
 	struct {
 		/* CONFIG_BT_MESH_LABEL_COUNT max value is 4096. */
-		uint16_t uuid_idx:15,
+		uint16_t uuidx:15,
 			 seg:1;
 	};
 };
@@ -374,7 +374,7 @@ static int unseg_app_sdu_unpack(struct bt_mesh_friend *frnd,
 				struct unseg_app_sdu_meta *meta)
 {
 	uint16_t app_idx = FRIEND_ADV(buf)->app_idx;
-	uint16_t uuid_idx = FRIEND_ADV(buf)->uuid_idx;
+	uint16_t uuidx = FRIEND_ADV(buf)->uuidx;
 	struct bt_mesh_net_rx net = {
 		.ctx = {
 			.app_idx = app_idx,
@@ -398,7 +398,7 @@ static int unseg_app_sdu_unpack(struct bt_mesh_friend *frnd,
 	meta->crypto.aszmic = 0;
 
 	if (BT_MESH_ADDR_IS_VIRTUAL(meta->crypto.dst)) {
-		meta->crypto.ad = bt_mesh_va_get_uuid_by_idx(uuid_idx);
+		meta->crypto.ad = bt_mesh_va_get_uuid_by_idx(uuidx);
 	} else {
 		meta->crypto.ad = NULL;
 	}
@@ -1508,15 +1508,19 @@ static void friend_lpn_enqueue_tx(struct bt_mesh_friend *frnd,
 	}
 
 	if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
-		uint16_t uuid_idx;
+		uint16_t uuidx;
+		int err;
 
-		uuid_idx = bt_mesh_va_get_idx_by_uuid(tx->ctx->uuid);
-		if (uuid_idx >= 0xfff) {
+		err = bt_mesh_va_get_idx_by_uuid(tx->ctx->uuid, &uuidx);
+		if (err) {
+			/* This can happen if the va was deleted on Friend before Friend sent
+			 * message to LPN.
+			 */
 			net_buf_unref(buf);
 			return;
 		}
 
-		FRIEND_ADV(buf)->uuid_idx = uuid_idx;
+		FRIEND_ADV(buf)->uuidx = uuidx;
 	}
 
 	enqueue_friend_pdu(frnd, type, info.src, seg_count, buf);

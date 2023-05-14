@@ -21,7 +21,7 @@ bool bt_mesh_va_collision_check(uint16_t addr);
 
 /* Needed for storing va as indexes in persistent storage. */
 const uint8_t *bt_mesh_va_get_uuid_by_idx(uint16_t idx);
-uint16_t bt_mesh_va_get_idx_by_uuid(const uint8_t *uuid);
+int bt_mesh_va_get_idx_by_uuid(const uint8_t *uuid, uint16_t *uuidx);
 
 void bt_mesh_va_pending_store(void);
 void bt_mesh_va_clear(void);

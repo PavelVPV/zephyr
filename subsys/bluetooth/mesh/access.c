@@ -1952,7 +1952,10 @@ static void store_pending_mod_sub_va(struct bt_mesh_model *mod, bool vnd)
 
 	for (i = 0, count = 0; i < CONFIG_BT_MESH_LABEL_COUNT; i++) {
 		if (mod->uuids[i] != NULL) {
-			uuidxs[count++] = bt_mesh_va_get_idx_by_uuid(mod->uuids[i]);
+			err = bt_mesh_va_get_idx_by_uuid(mod->uuids[i], &uuidxs[count]);
+			if (!err) {
+				count++;
+			}
 		}
 	}
 
@@ -1991,7 +1994,7 @@ static void store_pending_mod_pub(struct bt_mesh_model *mod, bool vnd)
 		pub.base.cred = mod->pub->cred;
 
 		if (BT_MESH_ADDR_IS_VIRTUAL(mod->pub->addr)) {
-			pub.uuidx = bt_mesh_va_get_idx_by_uuid(mod->pub->uuid);
+			(void)bt_mesh_va_get_idx_by_uuid(mod->pub->uuid, &pub.uuidx);
 		}
 
 		err = settings_save_one(path, &pub,
