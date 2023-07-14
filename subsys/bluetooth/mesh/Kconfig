@@ -10,6 +10,9 @@ menuconfig BT_MESH
 	  This option enables Bluetooth mesh support. The specific
 	  features that are available may depend on other features
 	  that have been enabled in the stack, such as GATT support.
+	  When Bluetooth host is not enabled, this options enables
+	  default configurations needed for the mesh stack in
+	  Bluetooth controller.
 
 if BT_MESH
 
@@ -37,7 +40,7 @@ config BT_MESH_GATT_CLIENT
 config BT_MESH_GATT_SERVER
 	bool
 	select BT_MESH_GATT
-	select BT_GATT_DYNAMIC_DB
+	select BT_GATT_DYNAMIC_DB if BT_HCI_HOST
 
 config BT_MESH_PB_GATT_COMMON
 	bool
@@ -68,7 +71,7 @@ menuconfig BT_MESH_ADV_LEGACY
 	  retransmissions than requested because of limitations of HCI
 	  interface API.
 
-if BT_MESH_ADV_LEGACY
+if BT_MESH_ADV_LEGACY && BT_HCI_HOST
 
 config BT_MESH_ADV_STACK_SIZE
 	int "Mesh advertiser thread stack size"
@@ -101,7 +104,7 @@ menuconfig BT_MESH_ADV_EXT
 	  Extended advertising is faster and uses less memory than legacy
 	  advertising, but isn't supported by all controllers.
 
-if BT_MESH_ADV_EXT
+if BT_MESH_ADV_EXT && BT_HCI_HOST
 
 config BT_MESH_RELAY_ADV_SETS
 	int "Maximum of simultaneous relay message support"
@@ -152,6 +155,8 @@ endif # BT_MESH_ADV_EXT
 
 endchoice
 
+if BT_HCI_HOST
+
 config BT_MESH_ADV_BUF_COUNT
 	int "Number of advertising buffers for local messages"
 	default 6
@@ -169,9 +174,13 @@ config BT_MESH_DEBUG_USE_ID_ADDR
 	  traces), however it should never be enabled for a production
 	  build as it compromises the privacy of the device.
 
+endif # BT_HCI_HOST
+
 endmenu # Advertiser
 
 menu "Provisioning"
+
+if BT_HCI_HOST
 
 menuconfig BT_MESH_PB_ADV
 	bool "PB-ADV support"
@@ -201,6 +210,8 @@ config BT_MESH_PB_ADV_RETRANS_TIMEOUT
 
 endif # BT_MESH_PB_ADV
 
+endif # BT_HCI_HOST
+
 if BT_CONN
 
 config BT_MESH_PB_GATT
@@ -215,7 +226,7 @@ config BT_MESH_PB_GATT
 
 config BT_MESH_PB_GATT_USE_DEVICE_NAME
 	bool "Include Bluetooth device name in scan response"
-	depends on BT_MESH_PB_GATT
+	depends on BT_MESH_PB_GATT && BT_HCI_HOST
 	default y
 	help
 	  This option includes GAP device name in scan response when
@@ -237,10 +248,13 @@ endif # BT_CONN
 
 config BT_MESH_PROV_DEVICE
 	bool "Provisioning device role support"
+	depends on BT_HCI_HOST
 	depends on BT_MESH_PB_ADV || BT_MESH_PB_GATT
 	default y
 	help
 	  Enable this option to allow the device to be provisioned into a mesh network.
+
+if BT_HCI_HOST
 
 config BT_MESH_PROV_OOB_PUBLIC_KEY
 	bool "OOB Public key support"
@@ -287,7 +301,11 @@ config BT_MESH_CDB_APP_KEY_COUNT
 
 endif # BT_MESH_CDB
 
+endif # BT_HCI_HOST
+
 endmenu # Provisioning
+
+if BT_HCI_HOST
 
 menu "Network layer"
 
@@ -636,6 +654,8 @@ endif # BT_MESH_HEALTH_CLI
 
 endmenu # Models
 
+endif # BT_HCI_HOST
+
 menu "Proxy"
 	visible if BT_CONN
 
@@ -648,7 +668,7 @@ menuconfig BT_MESH_GATT_PROXY
 	  i.e. the ability to act as a proxy between a Mesh GATT Client
 	  and a Mesh network.
 
-if BT_MESH_GATT_PROXY
+if BT_MESH_GATT_PROXY && BT_HCI_HOST
 
 config BT_MESH_GATT_PROXY_ENABLED
 	bool "GATT Proxy enabled"
@@ -686,7 +706,7 @@ config BT_MESH_PROXY_FILTER_SIZE
 	  enough so that proxy client can communicate with several devices through
 	  this proxy server node using the default accept list filter type.
 
-endif # BT_MESH_GATT_PROXY
+endif # BT_MESH_GATT_PROXY && BT_HCI_HOST
 
 config BT_MESH_PROXY_CLIENT
 	bool "Proxy client support"
@@ -699,6 +719,8 @@ config BT_MESH_PROXY_CLIENT
 	  and a Mesh network.
 
 endmenu # Proxy
+
+if BT_HCI_HOST
 
 choice BT_MESH_CRYPTO_LIB
 	prompt "Crypto library:"
@@ -1741,4 +1763,5 @@ config BT_MESH_STATISTIC
 	  frames. This helps to estimate the quality of the communication and
 	  the sufficiency of configured advertiser instances.
 
+endif # BT_HCI_HOST
 endif # BT_MESH
