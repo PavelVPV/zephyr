@@ -10,6 +10,9 @@ menuconfig BT_MESH
 	  This option enables Bluetooth mesh support. The specific
 	  features that are available may depend on other features
 	  that have been enabled in the stack, such as GATT support.
+	  When Bluetooth host is not enabled, this options enables
+	  default configurations needed for the mesh stack in
+	  Bluetooth controller.
 
 if BT_MESH
 
@@ -31,11 +34,14 @@ config BT_MESH_PROXY_MSG_LEN
 	depends on BT_MESH_GATT
 
 config BT_MESH_GATT_CLIENT
-	bool
+	select BT_MESH_GATT
+
+config BT_MESH_GATT_SERVER
 	select BT_MESH_GATT
 
 config BT_MESH_GATT_SERVER
 	bool
+	depends on BT_HCI_HOST
 	select BT_MESH_GATT
 	select BT_GATT_DYNAMIC_DB
 
@@ -49,6 +55,23 @@ config BT_MESH_PROV
 ###################################################################################################
 # Visible options
 ###################################################################################################
+
+# These options are visible only when controller is enabled without host.
+if !BT_HCI_HOST && BT_CTLR
+
+config BT_MESH_GATT_CLIENT
+	bool "Mesh requires GATT Client"
+	select BT_MESH_GATT
+	depends on BT_CENTRAL
+
+config BT_MESH_GATT_SERVER
+	bool "Mesh requires GATT Server"
+	select BT_MESH_GATT
+
+endif # !BT_HCI_HOST && BT_CTLR
+#
+# Show mesh options only when host is enabled.
+if BT_HCI_HOST
 
 menu "Advertiser"
 
@@ -1741,4 +1764,5 @@ config BT_MESH_STATISTIC
 	  frames. This helps to estimate the quality of the communication and
 	  the sufficiency of configured advertiser instances.
 
+endif # BT_HCI_HOST
 endif # BT_MESH
