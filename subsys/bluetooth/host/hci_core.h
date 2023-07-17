@@ -130,6 +130,9 @@ enum {
 	 */
 	BT_PER_ADV_CTE_ENABLED,
 
+	/* Generate new NRPA when advertiser set starts. */
+	BT_ADV_CONNECTABLE_USE_NRPA,
+
 	BT_ADV_NUM_FLAGS,
 };
 

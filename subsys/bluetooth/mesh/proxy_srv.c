@@ -32,7 +32,7 @@
 #include "proxy_msg.h"
 #include "crypto.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROXY_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_PROXY_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_gatt);
 
@@ -40,7 +40,8 @@ LOG_MODULE_REGISTER(bt_mesh_gatt);
  *
  * Defined in the Bluetooth Mesh Specification v1.1, Section 7.2.2.2.4.
  */
-#define PROXY_RANDOM_UPDATE_INTERVAL (10 * 60 * MSEC_PER_SEC)
+//#define PROXY_RANDOM_UPDATE_INTERVAL (10 * 60 * MSEC_PER_SEC)
+#define PROXY_RANDOM_UPDATE_INTERVAL (10 * MSEC_PER_SEC)
 
 #if defined(CONFIG_BT_MESH_PROXY_USE_DEVICE_NAME)
 #define ADV_OPT_USE_NAME BT_LE_ADV_OPT_USE_NAME
@@ -48,10 +49,13 @@ LOG_MODULE_REGISTER(bt_mesh_gatt);
 #define ADV_OPT_USE_NAME 0
 #endif
 
-#define ADV_OPT_PROXY                                                           \
-	(BT_LE_ADV_OPT_CONNECTABLE | BT_LE_ADV_OPT_SCANNABLE |                 \
-	 BT_LE_ADV_OPT_ONE_TIME | ADV_OPT_USE_IDENTITY |                       \
-	 ADV_OPT_USE_NAME)
+#define ADV_OPT_PROXY                                                                              \
+	(BT_LE_ADV_OPT_CONNECTABLE | BT_LE_ADV_OPT_SCANNABLE |                                     \
+	 BT_LE_ADV_OPT_ONE_TIME | ADV_OPT_USE_IDENTITY | ADV_OPT_USE_NAME)
+
+#define ADV_OPT_PRIVATE_PROXY                                                                      \
+	(BT_LE_ADV_OPT_CONNECTABLE | BT_LE_ADV_OPT_SCANNABLE | BT_LE_ADV_OPT_CONNECTABLE_USE_NRPA |\
+	 BT_LE_ADV_OPT_ONE_TIME | ADV_OPT_USE_IDENTITY | ADV_OPT_USE_NAME)
 
 static void proxy_send_beacons(struct k_work *work);
 static int proxy_send(struct bt_conn *conn,
@@ -496,12 +500,14 @@ static int enc_id_adv(struct bt_mesh_subnet *sub, uint8_t type,
 {
 	struct bt_le_adv_param slow_adv_param = {
 		.id = BT_ID_DEFAULT,
-		.options = ADV_OPT_PROXY,
+		.options = (type == BT_MESH_ID_TYPE_PRIV_NET || type == BT_MESH_ID_TYPE_PRIV_NODE) ?
+			ADV_OPT_PRIVATE_PROXY : ADV_OPT_PROXY,
 		ADV_SLOW_INT,
 	};
 	struct bt_le_adv_param fast_adv_param = {
 		.id = BT_ID_DEFAULT,
-		.options = ADV_OPT_PROXY,
+		.options = (type == BT_MESH_ID_TYPE_PRIV_NET || type == BT_MESH_ID_TYPE_PRIV_NODE) ?
+			ADV_OPT_PRIVATE_PROXY : ADV_OPT_PROXY,
 		ADV_FAST_INT,
 	};
 	int err;

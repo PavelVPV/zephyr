@@ -685,6 +685,18 @@ enum {
 	 * @note Requires @ref BT_LE_ADV_OPT_USE_NAME
 	 */
 	BT_LE_ADV_OPT_FORCE_NAME_IN_AD = BIT(18),
+
+	/**
+	 * @brief Use the Non-Resolvable Private Address when advertise as
+	 * connectable.
+	 *
+	 * When this option is enabled, the advertiser will use freshly
+	 * generated Non-Resolvable Private Address on every advertising
+	 * start.
+	 *
+	 * @note Has no effect if @kconfig{CONFIG_BT_PRIVACY} is enabled.
+	 */
+	BT_LE_ADV_OPT_CONNECTABLE_USE_NRPA = BIT(19),
 };
 
 /** LE Advertising Parameters. */
