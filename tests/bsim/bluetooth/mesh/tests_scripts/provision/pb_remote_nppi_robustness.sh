@@ -18,3 +18,9 @@ RunTest mesh_prov_pb_remote_nppi_robustness \
 	prov_provisioner_pb_remote_client_nppi_robustness \
 	prov_device_pb_remote_server_unproved \
 	prov_device_pb_remote_server_nppi_robustness
+
+conf=prj_psa_conf
+RunTest mesh_prov_pb_remote_nppi_robustness_psa \
+	prov_provisioner_pb_remote_client_nppi_robustness \
+	prov_device_pb_remote_server_unproved \
+	prov_device_pb_remote_server_nppi_robustness

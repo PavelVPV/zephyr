@@ -17,3 +17,10 @@ RunTest mesh_prov_pb_remote_parallel \
 	prov_device_pb_remote_server_unproved \
 	prov_device_pb_adv_no_oob \
 	prov_device_pb_adv_no_oob
+
+conf=prj_psa_conf
+RunTest mesh_prov_pb_remote_parallel_psa \
+	prov_provisioner_pb_remote_client_parallel \
+	prov_device_pb_remote_server_unproved \
+	prov_device_pb_adv_no_oob \
+	prov_device_pb_adv_no_oob

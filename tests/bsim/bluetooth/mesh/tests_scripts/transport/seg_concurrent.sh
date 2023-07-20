@@ -8,3 +8,6 @@ RunTest mesh_transport_seg_concurrent transport_tx_seg_concurrent transport_rx_s
 
 conf=prj_mesh1d1_conf
 RunTest mesh_transport_seg_concurrent_1d1 transport_tx_seg_concurrent transport_rx_seg_concurrent
+
+conf=prj_psa_conf
+RunTest mesh_transport_seg_concurrent_psa transport_tx_seg_concurrent transport_rx_seg_concurrent

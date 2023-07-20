@@ -8,3 +8,6 @@ RunTest mesh_transport_va transport_tx_va transport_rx_va
 
 conf=prj_mesh1d1_conf
 RunTest mesh_transport_va_1d1 transport_tx_va transport_rx_va
+
+conf=prj_psa_conf
+RunTest mesh_transport_va_psa transport_tx_va transport_rx_va

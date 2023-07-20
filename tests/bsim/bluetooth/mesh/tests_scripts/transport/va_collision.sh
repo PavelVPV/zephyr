@@ -9,3 +9,6 @@ RunTest mesh_transport_va_collision transport_tx_va_collision transport_rx_va_co
 
 conf=prj_mesh1d1_conf
 RunTest mesh_transport_va_collision_1d1 transport_tx_va_collision transport_rx_va_collision
+
+conf=prj_psa_conf
+RunTest mesh_transport_va_collision_psa transport_tx_va_collision transport_rx_va_collision

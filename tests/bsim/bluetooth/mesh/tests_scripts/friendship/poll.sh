@@ -13,3 +13,8 @@ conf=prj_mesh1d1_conf
 RunTest mesh_friendship_poll_1d1 \
 	friendship_friend_est \
 	friendship_lpn_poll
+
+conf=prj_psa_conf
+RunTest mesh_friendship_poll_psa \
+	friendship_friend_est \
+	friendship_lpn_poll

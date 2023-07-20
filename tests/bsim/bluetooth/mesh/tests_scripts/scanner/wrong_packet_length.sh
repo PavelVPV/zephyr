@@ -12,3 +12,8 @@ conf=prj_mesh1d1_conf
 RunTest mesh_scanner_wrong_packet_length_1d1 \
 	scanner_tx_wrong_packet_length \
 	scanner_rx_invalid_packet
+
+conf=prj_psa_conf
+RunTest mesh_scanner_wrong_packet_length_psa \
+	scanner_tx_wrong_packet_length \
+	scanner_rx_invalid_packet

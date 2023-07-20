@@ -22,3 +22,12 @@ RunTest mesh_friendship_est_multi_1d1 \
 	friendship_lpn_est \
 	friendship_lpn_est \
 	friendship_lpn_est
+
+conf=prj_psa_conf
+RunTest mesh_friendship_est_multi_psa \
+	friendship_friend_est_multi \
+	friendship_lpn_est \
+	friendship_lpn_est \
+	friendship_lpn_est \
+	friendship_lpn_est \
+	friendship_lpn_est

@@ -8,3 +8,6 @@ RunTest mesh_transport_loopback_group transport_tx_loopback_group transport_rx_g
 
 conf=prj_mesh1d1_conf
 RunTest mesh_transport_loopback_group_1d1 transport_tx_loopback_group transport_rx_group
+
+conf=prj_psa_conf
+RunTest mesh_transport_loopback_group_psa transport_tx_loopback_group transport_rx_group

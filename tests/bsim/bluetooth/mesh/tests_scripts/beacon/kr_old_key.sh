@@ -12,3 +12,8 @@ conf=prj_mesh1d1_conf
 RunTest mesh_beacon_kr_old_key_1d1 \
 	beacon_tx_kr_old_key \
 	beacon_rx_kr_old_key
+
+conf=prj_psa_conf
+RunTest mesh_beacon_kr_old_key_psa \
+	beacon_tx_kr_old_key \
+	beacon_rx_kr_old_key

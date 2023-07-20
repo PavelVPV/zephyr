@@ -37,6 +37,7 @@ if(CONFIG_SETTINGS)
 if(CONFIG_BT_MESH_USES_MBEDTLS_PSA)
  target_sources(app PRIVATE
   src/distribute_keyid.c
+  src/psa_its_emul.c
  )
 endif()
 
@@ -82,3 +83,9 @@ zephyr_include_directories(
   ${BSIM_COMPONENTS_PATH}/libUtilv1/src/
   ${BSIM_COMPONENTS_PATH}/libPhyComv1/src/
 )
+
+if(CONFIG_BT_MESH_USES_MBEDTLS_PSA)
+  zephyr_ld_options(
+    ${LINKERFLAGPREFIX},--allow-multiple-definition
+    )
+endif()

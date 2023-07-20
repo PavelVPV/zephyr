@@ -15,3 +15,9 @@ RunTest mesh_heartbeat_sub_cb_api_unicast_1d1 \
 	heartbeat_publish_unicast \
 	heartbeat_publish_unicast \
 	heartbeat_subscribe_unicast
+
+conf=prj_psa_conf
+RunTest mesh_heartbeat_sub_cb_api_unicast_psa \
+	heartbeat_publish_unicast \
+	heartbeat_publish_unicast \
+	heartbeat_subscribe_unicast

@@ -9,3 +9,6 @@ RunTest mesh_ivi_update ivi_ivu_normal
 
 conf=prj_mesh1d1_conf
 RunTest mesh_ivi_update_1d1 ivi_ivu_normal
+
+conf=prj_psa_conf
+RunTest mesh_ivi_update_psa ivi_ivu_normal

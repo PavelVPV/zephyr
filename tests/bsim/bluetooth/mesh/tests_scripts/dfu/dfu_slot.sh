@@ -20,3 +20,13 @@ RunTest dfu_slot dfu_dist_dfu_slot_create_recover
 RunTest dfu_slot dfu_dist_dfu_slot_delete_all
 
 RunTest dfu_slot dfu_dist_dfu_slot_check_delete_all
+
+conf=prj_psa_conf
+overlay=overlay_pst_conf
+RunTest dfu_slot_psa dfu_dist_dfu_slot_create
+
+RunTest dfu_slot_psa dfu_dist_dfu_slot_create_recover
+
+RunTest dfu_slot_psa dfu_dist_dfu_slot_delete_all
+
+RunTest dfu_slot_psa dfu_dist_dfu_slot_check_delete_all
