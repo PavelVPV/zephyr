@@ -28,12 +28,12 @@ app=tests/bsim/bluetooth/mesh \
   conf_file=prj_mesh1d1.conf conf_overlay=overlay_gatt.conf compile
 app=tests/bsim/bluetooth/mesh \
   conf_file=prj_mesh1d1.conf conf_overlay=overlay_low_lat.conf compile
-app=tests/bsim/bluetooth/mesh conf_file=prj_psa.conf compile
+app=tests/bsim/bluetooth/mesh conf_file=prj_mesh1d1.conf conf_overlay=overlay_psa.conf compile
 app=tests/bsim/bluetooth/mesh \
-  conf_file=prj_psa.conf conf_overlay=overlay_pst.conf compile
+  conf_file=prj_mesh1d1.conf conf_overlay="overlay_pst.conf;overlay_psa.conf" compile
 app=tests/bsim/bluetooth/mesh \
-  conf_file=prj_psa.conf conf_overlay=overlay_gatt.conf compile
+  conf_file=prj_mesh1d1.conf conf_overlay="overlay_gatt.conf;overlay_psa.conf" compile
 app=tests/bsim/bluetooth/mesh \
-  conf_file=prj_psa.conf conf_overlay=overlay_low_lat.conf compile
+  conf_file=prj_mesh1d1.conf conf_overlay="overlay_low_lat.conf;overlay_psa.conf" compile
 
 wait_for_background_jobs
