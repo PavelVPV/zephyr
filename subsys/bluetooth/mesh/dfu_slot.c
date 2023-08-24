@@ -34,8 +34,10 @@ static ATOMIC_DEFINE(valid_slots, CONFIG_BT_MESH_DFU_SLOT_CNT);
 static sys_slist_t list;
 static struct slot {
 	sys_snode_t n;
+	uint32_t index;
 	struct bt_mesh_dfu_slot slot;
 } slots[CONFIG_BT_MESH_DFU_SLOT_CNT];
+static uint32_t slot_index;
 
 static char *slot_entry_encode(uint16_t idx, char buf[SLOT_ENTRY_BUFLEN],
 			       const char *property)
@@ -115,6 +117,19 @@ static int valid_slots_store(void)
 				 valid_slots, sizeof(valid_slots));
 }
 
+static void slot_defrag(void)
+{
+	struct slot *s;
+	uint32_t idx = 0;
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&list, s, n) {
+		s->index = idx++;
+		slot_store(s);
+	}
+
+	slot_index = idx;
+}
+
 const struct bt_mesh_dfu_slot *
 bt_mesh_dfu_slot_add(size_t size, const uint8_t *fwid,
 		     size_t fwid_len, const uint8_t *metadata,
@@ -147,6 +162,11 @@ bt_mesh_dfu_slot_add(size_t size, const uint8_t *fwid,
 		return NULL;
 	}
 
+	if (slot_index == UINT32_MAX) {
+		slot_defrag();
+	}
+
+	slot->index = slot_index++;
 	slot->slot.fwid_len = fwid_len;
 	slot->slot.metadata_len = metadata_len;
 	slot->slot.uri_len = uri_len;
@@ -164,7 +184,7 @@ bt_mesh_dfu_slot_add(size_t size, const uint8_t *fwid,
 
 	sys_slist_append(&list, &slot->n);
 
-	LOG_DBG("Added slot #%u: %s", slot - &slots[0],
+	LOG_DBG("Added slot #%u(%u): %s", slot - &slots[0], slot->index,
 		bt_hex(slot->slot.fwid, slot->slot.fwid_len));
 	return &slot->slot;
 }
@@ -180,8 +200,6 @@ int bt_mesh_dfu_slot_valid_set(const struct bt_mesh_dfu_slot *slot, bool valid)
 	}
 
 	idx = slot_idx(slot);
-
-	LOG_DBG("%u: %u", idx, valid);
 
 	if (valid) {
 		prev = atomic_test_and_set_bit(valid_slots, idx);
@@ -222,7 +240,7 @@ int bt_mesh_dfu_slot_del(const struct bt_mesh_dfu_slot *slot)
 		return -ENOENT;
 	}
 
-	LOG_DBG("%u", s - &slots[0]);
+	LOG_DBG("%u(%u)", s - &slots[0], s->index);
 
 	slot_erase(s);
 	slot_invalidate(s);
@@ -339,7 +357,25 @@ static int slot_data_load(const char *key, size_t len_rd,
 
 	if (!strncmp(prop, PROP_HEADER, len)) {
 		if (read_cb(cb_arg, &slots[idx], HEADER_SIZE) > 0) {
-			sys_slist_append(&list, &slots[idx].n);
+			struct slot *s, *prev = NULL;
+
+			SYS_SLIST_FOR_EACH_CONTAINER(&list, s, n) {
+				if (s->index > slots[idx].index) {
+					break;
+				}
+
+				prev = s;
+			}
+
+			if (prev == NULL) {
+				sys_slist_prepend(&list, &slots[idx].n);
+			} else {
+				sys_slist_insert(&list, &prev->n, &slots[idx].n);
+			}
+
+			if (slots[idx].index >= slot_index) {
+				slot_index = slots[idx].index + 1;
+			}
 		}
 
 		return 0;
