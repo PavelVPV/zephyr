@@ -1880,7 +1880,7 @@ static int vnd_mod_set(const char *name, size_t len_rd,
 
 BT_MESH_SETTINGS_DEFINE(vnd_mod, "v", vnd_mod_set);
 
-static int comp_set(const char *name, size_t len_rd, settings_read_cb read_cb,
+static int comp_p0_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 		    void *cb_arg)
 {
 	/* Only need to know that the entry exists. Will load the contents on
@@ -1892,7 +1892,16 @@ static int comp_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 
 	return 0;
 }
-BT_MESH_SETTINGS_DEFINE(comp, "cmp", comp_set);
+BT_MESH_SETTINGS_DEFINE(comp, "cmp", comp_p0_set);
+
+static int comp_p1_set(const char *name, size_t len_rd, settings_read_cb read_cb,
+		    void *cb_arg)
+{
+	/* Identical behavior as for page 0 */
+	comp_p0_set(name, len_rd, read_cb, cb_arg);
+	return 0;
+}
+BT_MESH_SETTINGS_DEFINE(comp1, "cmp1", comp_p1_set);
 
 static void encode_mod_path(struct bt_mesh_model *mod, bool vnd,
 			    const char *key, char *path, size_t path_len)
@@ -2086,17 +2095,33 @@ int bt_mesh_comp_store(void)
 
 	err = bt_mesh_comp_data_get_page_0(&buf, 0);
 	if (err) {
-		LOG_ERR("Failed to read composition data: %d", err);
+		LOG_ERR("Failed to read composition data P1: %d", err);
 		return err;
 	}
 
 	err = settings_save_one("bt/mesh/cmp", buf.data, buf.len);
 	if (err) {
-		LOG_ERR("Failed to store composition data: %d", err);
+		LOG_ERR("Failed to store composition data P0: %d", err);
 	} else {
-		LOG_DBG("Stored composition data");
+		LOG_DBG("Stored composition data P0");
 	}
 
+	if (IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_1)) {
+		net_buf_simple_reset(&buf);
+		err = bt_mesh_comp_data_get_page_1(&buf);
+
+		if (err) {
+			LOG_ERR("Failed to read composition data P1: %d", err);
+			return err;
+		}
+
+		err = settings_save_one("bt/mesh/cmp1", buf.data, buf.len);
+		if (err) {
+			LOG_ERR("Failed to store composition data P1: %d", err);
+		} else {
+			LOG_DBG("Stored composition data P1");
+		}
+	}
 	return err;
 }
 
@@ -2111,13 +2136,20 @@ int bt_mesh_comp_change_prepare(void)
 
 static void comp_data_clear(void)
 {
-	int err;
+	int err_p0, err_p1;
 
-	err = settings_delete("bt/mesh/cmp");
-	if (err) {
-		LOG_ERR("Failed to clear composition data: %d", err);
-	} else {
-		LOG_DBG("Cleared composition data page 128");
+	err_p0 = settings_delete("bt/mesh/cmp");
+	if (err_p0) {
+		LOG_ERR("Failed to clear composition data P0: %d", err_p0);
+	}
+
+	err_p1 = settings_delete("bt/mesh/cmp1");
+	if (err_p1) {
+		LOG_ERR("Failed to clear composition data P1: %d", err_p1);
+	}
+
+	if (!err_p0 && !err_p1) {
+		LOG_DBG("Cleared composition data");
 	}
 
 	atomic_clear_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY);
@@ -2140,7 +2172,7 @@ static int read_comp_cb(const char *key, size_t len, settings_read_cb read_cb,
 	return -EALREADY;
 }
 
-int bt_mesh_comp_read(struct net_buf_simple *buf)
+int bt_mesh_comp_read(struct net_buf_simple *buf, uint8_t page)
 {
 	size_t original_len = buf->len;
 	int err;
@@ -2149,7 +2181,19 @@ int bt_mesh_comp_read(struct net_buf_simple *buf)
 		return -ENOTSUP;
 	}
 
-	err = settings_load_subtree_direct("bt/mesh/cmp", read_comp_cb, buf);
+	switch (page) {
+	case 0:
+		err = settings_load_subtree_direct("bt/mesh/cmp", read_comp_cb, buf);
+		break;
+	case 1:
+		err = settings_load_subtree_direct("bt/mesh/cmp1", read_comp_cb, buf);
+		break;
+
+	default:
+		err = -EINVAL;
+		break;
+	}
+
 	if (err) {
 		LOG_ERR("Failed reading composition data: %d", err);
 		return err;
