@@ -1743,6 +1743,22 @@ struct bt_mesh_comp_p1_ext_item {
 	};
 };
 
+struct bt_mesh_comp_p2_elem {
+	uint16_t id;
+	struct {
+		/** Major version*/
+		uint8_t x;
+		/** Minor version*/
+		uint8_t y;
+		/** Z version*/
+		uint8_t z;
+	} version;
+	uint8_t elem_offset_cnt;
+	struct net_buf_simple *_elem_buf;
+	uint16_t additional_data_len;
+	struct net_buf_simple *_data_buf;
+};
+
 /** @brief Pull a Composition Data Page 1 Element from a composition data page 1
  *         instance.
  *
@@ -1785,6 +1801,21 @@ struct bt_mesh_comp_p1_model_item *bt_mesh_comp_p1_item_pull(
  */
 struct bt_mesh_comp_p1_ext_item *bt_mesh_comp_p1_pull_ext_item(
 	struct bt_mesh_comp_p1_model_item *item, struct bt_mesh_comp_p1_ext_item *ext_item);
+
+/** @brief Pull a Composition Data Page 2 Record from a composition data page 2
+ *         instance.
+ *
+ *  Each call to this function will pull out a new element from the composition
+ *  data page, until all elements have been pulled.
+ *
+ *  @param buf Composition data page 2 buffer
+ *  @param elem Element to fill.
+ *
+ *  @return A pointer to @c elem on success, or NULL if no more elements could
+ *          be pulled.
+ */
+struct bt_mesh_comp_p2_elem *bt_mesh_comp_p2_record_pull(struct net_buf_simple *buf,
+							 struct bt_mesh_comp_p2_elem *elem);
 
 /** @brief Unpack a list of key index entries from a buffer.
  *

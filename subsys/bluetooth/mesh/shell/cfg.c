@@ -98,7 +98,7 @@ static int cmd_get_comp(const struct shell *sh, size_t argc, char *argv[])
 		return 0;
 	}
 
-	if (page != 0 && page != 1 && page != 128 && page != 129) {
+	if (page != 0 && page != 1 && page != 2 && page != 128 && page != 129 && page != 130) {
 		shell_print(sh, "Got page %d. No parser available.",
 			    page);
 		return 0;
@@ -251,6 +251,39 @@ static int cmd_get_comp(const struct shell *sh, size_t argc, char *argv[])
 				}
 			}
 			mod_idx++;
+		}
+	}
+
+	if (page == 2 || page == 130) {
+		/* size of 32 is chosen arbitrary, as sufficient for testing purposes */
+		NET_BUF_SIMPLE_DEFINE(p2_elem_offset_buf, 32);
+		NET_BUF_SIMPLE_DEFINE(p2_data_buf, 32);
+		struct bt_mesh_comp_p2_elem p2_elem = {._elem_buf = &p2_elem_offset_buf,
+						       ._data_buf = &p2_data_buf};
+
+		if (!buf.len) {
+			shell_error(sh, "Composition data empty");
+			return 0;
+		}
+		shell_print(sh, "Got Composition Data for 0x%04x, page: %d:",
+			    bt_mesh_shell_target_ctx.dst, page);
+
+		while (bt_mesh_comp_p2_record_pull(&buf, &p2_elem)) {
+
+			shell_print(sh, "\tNLC profile id: %d ", p2_elem.id);
+			shell_print(sh, "\t\tVersion: %d.%d.%d ", p2_elem.version.x,
+				    p2_elem.version.y, p2_elem.version.z);
+			shell_print(sh, "\t\tElement offsets:");
+
+			for (int i = 0; i < p2_elem.elem_offset_cnt; i++) {
+				shell_print(sh, "\t\t\t%d ",
+					    net_buf_simple_pull_u8(p2_elem._elem_buf));
+			}
+
+			if (p2_elem.additional_data_len) {
+				shell_print(sh, "\t\t%d bytes of additional data is available",
+					    p2_elem.additional_data_len);
+			}
 		}
 	}
 
