@@ -1118,6 +1118,24 @@ bool bt_mesh_model_is_extended(struct bt_mesh_model *model);
  */
 int bt_mesh_comp_change_prepare(void);
 
+/** @typedef bt_mesh_comp2_cb_t
+ *  @brief Composition data page 2 callback.
+ *
+ *  @param buf Composition data page 2 buffer to fill.
+ *
+ *  @return 0 on success or negative return code.
+ */
+typedef int (*bt_mesh_comp2_cb_t)(struct net_buf_simple *buf);
+
+/** @brief Register a callback providing composition data page 2 of the device.
+ *
+ *  Register a callback that provides Network Lighting Control (NLC)
+ *  information for composition data page 2 of the device.
+ *
+ *  @param cb Callback structure.
+ */
+void bt_mesh_comp_data_page_2_cb_reg(bt_mesh_comp2_cb_t cb);
+
 /** @brief Indicate that the metadata will change on next bootup.
  *
  *  Tell the config server that the models metadata is expected to change on

@@ -55,6 +55,7 @@ struct comp_foreach_model_arg {
 static const struct bt_mesh_comp *dev_comp;
 static uint16_t dev_primary_addr;
 static void (*msg_cb)(uint32_t opcode, struct bt_mesh_msg_ctx *ctx, struct net_buf_simple *buf);
+static bt_mesh_comp2_cb_t comp_page2_cb;
 
 /* Structure containing information about model extension */
 struct mod_relation {
@@ -590,6 +591,24 @@ int bt_mesh_comp_data_get_page_1(struct net_buf_simple *buf)
 		}
 	}
 	return 0;
+}
+
+int bt_mesh_comp_data_get_page_2(struct net_buf_simple *buf)
+{
+	int err;
+
+	if (comp_page2_cb) {
+		err = comp_page2_cb(buf);
+	} else {
+		err = -ENODEV;
+	}
+
+	return err;
+}
+
+void bt_mesh_comp_data_page_2_cb_reg(bt_mesh_comp2_cb_t cb)
+{
+	comp_page2_cb = cb;
 }
 
 int32_t bt_mesh_model_pub_period_get(struct bt_mesh_model *mod)
@@ -1903,6 +1922,15 @@ static int comp_p1_set(const char *name, size_t len_rd, settings_read_cb read_cb
 }
 BT_MESH_SETTINGS_DEFINE(comp1, "cmp1", comp_p1_set);
 
+static int comp_p2_set(const char *name, size_t len_rd, settings_read_cb read_cb,
+		    void *cb_arg)
+{
+	/* Identical behavior as for page 0 */
+	comp_p0_set(name, len_rd, read_cb, cb_arg);
+	return 0;
+}
+BT_MESH_SETTINGS_DEFINE(comp2, "cmp2", comp_p2_set);
+
 static void encode_mod_path(struct bt_mesh_model *mod, bool vnd,
 			    const char *key, char *path, size_t path_len)
 {
@@ -2122,6 +2150,24 @@ int bt_mesh_comp_store(void)
 			LOG_DBG("Stored composition data P1");
 		}
 	}
+
+	if (IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_2)) {
+		net_buf_simple_reset(&buf);
+		err = bt_mesh_comp_data_get_page_2(&buf);
+
+		if (err) {
+			LOG_ERR("Failed to read composition data P2: %d", err);
+			return err;
+		}
+
+		err = settings_save_one("bt/mesh/cmp2", buf.data, buf.len);
+		if (err) {
+			LOG_ERR("Failed to store composition data P2: %d", err);
+		} else {
+			LOG_DBG("Stored composition data P2");
+		}
+	}
+
 	return err;
 }
 
@@ -2136,7 +2182,7 @@ int bt_mesh_comp_change_prepare(void)
 
 static void comp_data_clear(void)
 {
-	int err_p0, err_p1;
+	int err_p0, err_p1, err_p2;
 
 	err_p0 = settings_delete("bt/mesh/cmp");
 	if (err_p0) {
@@ -2148,7 +2194,12 @@ static void comp_data_clear(void)
 		LOG_ERR("Failed to clear composition data P1: %d", err_p1);
 	}
 
-	if (!err_p0 && !err_p1) {
+	err_p2 = settings_delete("bt/mesh/cmp2");
+	if (err_p2) {
+		LOG_ERR("Failed to clear composition data P2: %d", err_p2);
+	}
+
+	if (!err_p0 && !err_p1 && !err_p2) {
 		LOG_DBG("Cleared composition data");
 	}
 
@@ -2187,6 +2238,10 @@ int bt_mesh_comp_read(struct net_buf_simple *buf, uint8_t page)
 		break;
 	case 1:
 		err = settings_load_subtree_direct("bt/mesh/cmp1", read_comp_cb, buf);
+		break;
+
+	case 2:
+		err = settings_load_subtree_direct("bt/mesh/cmp2", read_comp_cb, buf);
 		break;
 
 	default:
