@@ -105,6 +105,19 @@ static struct mod_relation mod_rel_list[MOD_REL_LIST_SIZE];
 
 #define RELATION_TYPE_EXT 0xFF
 
+static const struct {
+	uint8_t *path;
+	uint8_t page;
+} comp_data_pages[] = {
+	{ "bt/mesh/cmp", 0, },
+#if IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_1)
+	{ "bt/mesh/cmp1", 1, },
+#endif
+#if IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_2)
+	{ "bt/mesh/cmp2", 2, },
+#endif
+};
+
 void bt_mesh_model_foreach(void (*func)(struct bt_mesh_model *mod,
 					struct bt_mesh_elem *elem,
 					bool vnd, bool primary,
@@ -2116,59 +2129,43 @@ void bt_mesh_model_pub_store(struct bt_mesh_model *mod)
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_MOD_PENDING);
 }
 
+int bt_mesh_comp_data_get_page(struct net_buf_simple *buf, size_t page, size_t offset)
+{
+	if (page == 0 || page == 128) {
+		return bt_mesh_comp_data_get_page_0(buf, offset);
+	} else if (page == 1 || page == 129) {
+		return bt_mesh_comp_data_get_page_1(buf);
+	} else if (page == 2 || page == 130) {
+		return bt_mesh_comp_data_get_page_2(buf);
+	}
+
+	return -EINVAL;
+}
+
 int bt_mesh_comp_store(void)
 {
 	NET_BUF_SIMPLE_DEFINE(buf, BT_MESH_TX_SDU_MAX);
 	int err;
 
-	err = bt_mesh_comp_data_get_page_0(&buf, 0);
-	if (err) {
-		LOG_ERR("Failed to read composition data P1: %d", err);
-		return err;
-	}
-
-	err = settings_save_one("bt/mesh/cmp", buf.data, buf.len);
-	if (err) {
-		LOG_ERR("Failed to store composition data P0: %d", err);
-	} else {
-		LOG_DBG("Stored composition data P0");
-	}
-
-	if (IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_1)) {
+	for (int i = 0; i < ARRAY_SIZE(comp_data_pages); i++) {
 		net_buf_simple_reset(&buf);
-		err = bt_mesh_comp_data_get_page_1(&buf);
 
+		err = bt_mesh_comp_data_get_page(&buf, comp_data_pages[i].page, 0);
 		if (err) {
-			LOG_ERR("Failed to read composition data P1: %d", err);
+			LOG_ERR("Failed to read CDP%d: %d", comp_data_pages[i].page, err);
 			return err;
 		}
 
-		err = settings_save_one("bt/mesh/cmp1", buf.data, buf.len);
+		err = settings_save_one(comp_data_pages[i].path, buf.data, buf.len);
 		if (err) {
-			LOG_ERR("Failed to store composition data P1: %d", err);
-		} else {
-			LOG_DBG("Stored composition data P1");
-		}
-	}
-
-	if (IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_2)) {
-		net_buf_simple_reset(&buf);
-		err = bt_mesh_comp_data_get_page_2(&buf);
-
-		if (err) {
-			LOG_ERR("Failed to read composition data P2: %d", err);
+			LOG_ERR("Failed to store CDP%d: %d", comp_data_pages[i].page, err);
 			return err;
 		}
 
-		err = settings_save_one("bt/mesh/cmp2", buf.data, buf.len);
-		if (err) {
-			LOG_ERR("Failed to store composition data P2: %d", err);
-		} else {
-			LOG_DBG("Stored composition data P2");
-		}
+		LOG_DBG("Stored CDP%d", comp_data_pages[i].page);
 	}
 
-	return err;
+	return 0;
 }
 
 int bt_mesh_comp_change_prepare(void)
@@ -2182,25 +2179,13 @@ int bt_mesh_comp_change_prepare(void)
 
 static void comp_data_clear(void)
 {
-	int err_p0, err_p1, err_p2;
+	int err;
 
-	err_p0 = settings_delete("bt/mesh/cmp");
-	if (err_p0) {
-		LOG_ERR("Failed to clear composition data P0: %d", err_p0);
-	}
-
-	err_p1 = settings_delete("bt/mesh/cmp1");
-	if (err_p1) {
-		LOG_ERR("Failed to clear composition data P1: %d", err_p1);
-	}
-
-	err_p2 = settings_delete("bt/mesh/cmp2");
-	if (err_p2) {
-		LOG_ERR("Failed to clear composition data P2: %d", err_p2);
-	}
-
-	if (!err_p0 && !err_p1 && !err_p2) {
-		LOG_DBG("Cleared composition data");
+	for (int i = 0; i < ARRAY_SIZE(comp_data_pages); i++) {
+		err = settings_delete(comp_data_pages[i].path);
+		if (err) {
+			LOG_ERR("Failed to clear composition data %d: %d", comp_data_pages[i].page, err);
+		}
 	}
 
 	atomic_clear_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY);
@@ -2226,28 +2211,24 @@ static int read_comp_cb(const char *key, size_t len, settings_read_cb read_cb,
 int bt_mesh_comp_read(struct net_buf_simple *buf, uint8_t page)
 {
 	size_t original_len = buf->len;
+	int i;
 	int err;
 
 	if (!IS_ENABLED(CONFIG_BT_SETTINGS)) {
 		return -ENOTSUP;
 	}
 
-	switch (page) {
-	case 0:
-		err = settings_load_subtree_direct("bt/mesh/cmp", read_comp_cb, buf);
-		break;
-	case 1:
-		err = settings_load_subtree_direct("bt/mesh/cmp1", read_comp_cb, buf);
-		break;
-
-	case 2:
-		err = settings_load_subtree_direct("bt/mesh/cmp2", read_comp_cb, buf);
-		break;
-
-	default:
-		err = -EINVAL;
-		break;
+	for (i = 0; i < ARRAY_SIZE(comp_data_pages); i++) {
+		if (comp_data_pages[i].page == page) {
+			break;
+		}
 	}
+
+	if (i == ARRAY_SIZE(comp_data_pages)) {
+		return -ENOENT;
+	}
+
+	err = settings_load_subtree_direct(comp_data_pages[i].path, read_comp_cb, buf);
 
 	if (err) {
 		LOG_ERR("Failed reading composition data: %d", err);

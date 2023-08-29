@@ -86,99 +86,17 @@ static int dev_comp_data_get(struct bt_mesh_model *model,
 
 	net_buf_simple_add_u8(&sdu, page);
 
-	switch (page) {
-	case 0:
-		if (atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY)) {
-			sdu.size -= BT_MESH_MIC_SHORT;
-			err = bt_mesh_comp_read(&sdu, 0);
-			if (err) {
-				LOG_ERR("Unable to get stored composition data");
-				return err;
-			}
+	if (atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) && page < 128) {
+		buf->size -= BT_MESH_MIC_SHORT;
+		err = bt_mesh_comp_read(buf, page);
+		buf->size += BT_MESH_MIC_SHORT;
+	} else {
+		err = bt_mesh_comp_data_get_page(&sdu, page, 0);
+	}
 
-			sdu.size += BT_MESH_MIC_SHORT;
-		} else {
-			err = bt_mesh_comp_data_get_page_0(&sdu, 0);
-			if (err < 0) {
-				LOG_ERR("Unable to get composition page 0");
-				return err;
-			}
-		}
-		break;
-
-	case 128:
-		err = bt_mesh_comp_data_get_page_0(&sdu, 0);
-		if (err < 0) {
-			LOG_ERR("Unable to get composition page 0");
-			return err;
-		}
-		break;
-
-#if IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_1)
-	case 1:
-		if (atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY)) {
-			sdu.size -= BT_MESH_MIC_SHORT;
-			err = bt_mesh_comp_read(&sdu, 1);
-			if (err) {
-				LOG_ERR("Unable to get stored composition data");
-				return err;
-			}
-
-			sdu.size += BT_MESH_MIC_SHORT;
-		} else {
-			err = bt_mesh_comp_data_get_page_1(&sdu);
-		}
-		if (err < 0) {
-			LOG_ERR("Unable to get composition page 1");
-			return err;
-		}
-		break;
-
-
-	case 129:
-		err = bt_mesh_comp_data_get_page_1(&sdu);
-		if (err < 0) {
-			LOG_ERR("Unable to get composition page 1");
-			return err;
-		}
-		break;
-#endif
-
-#if IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_2)
-	case 2:
-		if (atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY)) {
-			sdu.size -= BT_MESH_MIC_SHORT;
-			err = bt_mesh_comp_read(&sdu, 2);
-			if (err) {
-				LOG_ERR("Unable to get stored composition data");
-				return err;
-			}
-
-			sdu.size += BT_MESH_MIC_SHORT;
-		} else {
-			err = bt_mesh_comp_data_get_page_2(&sdu);
-		}
-
-		if (err < 0) {
-			LOG_ERR("Unable to get composition page 2");
-			return err;
-		}
-		break;
-
-
-	case 130:
-		err = bt_mesh_comp_data_get_page_2(&sdu);
-		if (err < 0) {
-			LOG_ERR("Unable to get composition page 2");
-			return err;
-		}
-		break;
-#endif
-
-	default:
-		/*Should never happen*/
-		err = -EINVAL;
-		break;
+	if (err) {
+		LOG_ERR("Unable to get composition data: %d", err);
+		return err;
 	}
 
 	if (bt_mesh_model_send(model, ctx, &sdu, NULL, NULL)) {
