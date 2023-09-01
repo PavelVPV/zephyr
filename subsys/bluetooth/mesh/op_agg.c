@@ -59,18 +59,18 @@ int bt_mesh_op_agg_send(struct bt_mesh_model *model,
 	/* Model responded so mark this message as acknowledged */
 	agg_ctx.ack = true;
 
-	if (IS_ENABLED(CONFIG_BT_MESH_OP_AGG_CLI)) {
-		/* Store source address so that Opcodes Aggregator Client can
-		 * match response with source model
-		 */
-		uint16_t src = bt_mesh_model_elem(model)->addr;
+#if defined(CONFIG_BT_MESH_OP_AGG_CLI)
+	/* Store source address so that Opcodes Aggregator Client can
+	 * match response with source model
+	 */
+	uint16_t src = bt_mesh_model_elem(model)->addr;
 
-		if (net_buf_simple_tailroom(&srcs) < 2) {
-			return -ENOMEM;
-		}
-
-		net_buf_simple_add_le16(&srcs, src);
+	if (net_buf_simple_tailroom(&srcs) < 2) {
+		return -ENOMEM;
 	}
+
+	net_buf_simple_add_le16(&srcs, src);
+#endif /* defined(CONFIG_BT_MESH_OP_AGG_CLI) */
 
 	err = bt_mesh_op_agg_encode_msg(msg);
 	if (err) {
