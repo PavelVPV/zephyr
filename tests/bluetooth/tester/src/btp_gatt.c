@@ -282,6 +282,8 @@ static int register_service(void)
 		svc_attr_count = 0U;
 	}
 
+	LOG_ERR("register_service: %d", err);
+
 	return err;
 }
 

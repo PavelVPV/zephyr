@@ -1519,7 +1519,7 @@ int bt_mesh_model_send(struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx,
 	}
 
 	if (!bt_mesh_model_has_key(model, ctx->app_idx)) {
-		LOG_ERR("Model not bound to AppKey 0x%04x", ctx->app_idx);
+		LOG_ERR("Model 0x%04x/%p not bound to AppKey 0x%04x", model->id, model, ctx->app_idx);
 		return -EINVAL;
 	}
 

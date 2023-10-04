@@ -101,13 +101,17 @@ static uint8_t register_service(const void *cmd, uint16_t cmd_len,
 	const struct btp_core_register_service_cmd *cp = cmd;
 	uint8_t status;
 
+	LOG_WRN("id: %d", cp->id);
+
 	/* invalid service */
 	if ((cp->id == BTP_SERVICE_ID_CORE) || (cp->id > BTP_SERVICE_ID_MAX)) {
+		LOG_WRN("%s:%d", __FILE__, __LINE__);
 		return BTP_STATUS_FAILED;
 	}
 
 	/* already registered */
 	if (atomic_test_bit(registered_services, cp->id)) {
+		LOG_WRN("%s:%d", __FILE__, __LINE__);
 		return BTP_STATUS_FAILED;
 	}
 
@@ -194,6 +198,7 @@ static uint8_t register_service(const void *cmd, uint16_t cmd_len,
 		atomic_set_bit(registered_services, cp->id);
 	}
 
+	LOG_WRN("%s:%d:%d", __FILE__, __LINE__, status);
 	return status;
 }
 

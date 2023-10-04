@@ -21,7 +21,7 @@
 #include "net.h"
 #include "mesh.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_MODEL_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_rpr_srv);
 
@@ -160,6 +160,7 @@ static void scan_status_send(struct bt_mesh_msg_ctx *ctx,
 	net_buf_simple_add_u8(&rsp, srv.scan.max_devs);
 	net_buf_simple_add_u8(&rsp, timeout);
 
+	LOG_WRN("srv.mod[%d]: %p", __LINE__, srv.mod);
 	bt_mesh_model_send(srv.mod, ctx, &rsp, NULL, NULL);
 }
 
@@ -171,6 +172,7 @@ static void link_status_send(struct bt_mesh_msg_ctx *ctx,
 	net_buf_simple_add_u8(&buf, status);
 	net_buf_simple_add_u8(&buf, srv.link.state);
 
+	LOG_WRN("srv.mod[%d]: %p", __LINE__, srv.mod);
 	bt_mesh_model_send(srv.mod, ctx, &buf, NULL, NULL);
 }
 
@@ -189,6 +191,7 @@ static void link_report_send(void)
 
 	LOG_DBG("%u %u", srv.link.status, srv.link.state);
 
+	LOG_WRN("srv.mod[%d]: %p", __LINE__, srv.mod);
 	bt_mesh_model_send(srv.mod, &ctx, &buf, NULL, NULL);
 }
 
@@ -244,6 +247,7 @@ static void scan_report_send(void)
 
 		atomic_set_bit(srv.flags, SCAN_REPORT_PENDING);
 
+		LOG_WRN("srv.mod[%d]: %p", __LINE__, srv.mod);
 		err = bt_mesh_model_send(srv.mod, &ctx, &buf, &report_cb, NULL);
 		if (err) {
 			atomic_clear_bit(srv.flags, SCAN_REPORT_PENDING);
@@ -284,6 +288,7 @@ static void scan_ext_report_send(void)
 
 	srv.scan.dev->flags &= ~BT_MESH_RPR_UNPROV_EXT_ADV_RXD;
 send:
+	LOG_WRN("srv.mod[%d]: %p", __LINE__, srv.mod);
 	err = bt_mesh_model_send(srv.mod, &ctx, &buf, NULL, NULL);
 	if (!err) {
 		srv.scan.dev->flags |= BT_MESH_RPR_UNPROV_REPORTED;
@@ -381,6 +386,7 @@ static void outbound_pdu_report_send(void)
 
 	LOG_DBG("%u", srv.link.tx_pdu);
 
+	LOG_WRN("srv.mod[%d]: %p", __LINE__, srv.mod);
 	bt_mesh_model_send(srv.mod, &ctx, &buf, NULL, NULL);
 }
 
@@ -406,6 +412,7 @@ static int inbound_pdu_send(struct net_buf_simple *buf,
 	net_buf_simple_add_u8(&msg, srv.link.rx_pdu);
 	net_buf_simple_add_mem(&msg, buf->data, buf->len);
 
+	LOG_WRN("srv.mod[%d]: %p", __LINE__, srv.mod);
 	return bt_mesh_model_send(srv.mod, &ctx, &msg, cb, NULL);
 }
 
@@ -544,6 +551,7 @@ static int handle_scan_caps_get(struct bt_mesh_model *mod, struct bt_mesh_msg_ct
 	net_buf_simple_add_u8(&rsp, CONFIG_BT_MESH_RPR_SRV_SCANNED_ITEMS_MAX);
 	net_buf_simple_add_u8(&rsp, true);
 
+	LOG_WRN("srv.mod[%d]: %p", __LINE__, srv.mod);
 	bt_mesh_model_send(srv.mod, ctx, &rsp, NULL, NULL);
 
 	return 0;
@@ -693,6 +701,7 @@ static int handle_extended_scan_start(struct bt_mesh_model *mod, struct bt_mesh_
 			}
 		}
 
+		LOG_WRN("mod[%d]: %p", __LINE__, mod);
 		bt_mesh_model_send(mod, ctx, &rsp, NULL, NULL);
 		return 0;
 	}
@@ -779,6 +788,7 @@ rsp:
 	bt_mesh_model_msg_init(&rsp, RPR_OP_EXTENDED_SCAN_REPORT);
 	net_buf_simple_add_u8(&rsp, status);
 	net_buf_simple_add_mem(&rsp, uuid, 16);
+	LOG_WRN("mod[%d]: %p", __LINE__, mod);
 	bt_mesh_model_send(mod, ctx, &rsp, NULL, NULL);
 
 	return 0;
@@ -1312,6 +1322,7 @@ static int rpr_srv_init(struct bt_mesh_model *mod)
 	}
 
 	srv.mod = mod;
+	LOG_WRN("mod id: 0x%04x", mod->id);
 
 	net_buf_simple_init(srv.scan.adv_data, 0);
 
@@ -1337,7 +1348,8 @@ static void rpr_srv_reset(struct bt_mesh_model *mod)
 	atomic_clear(srv.flags);
 	srv.link.dev = NULL;
 	srv.scan.dev = NULL;
-	srv.mod = NULL;
+//	srv.mod = NULL;
+	LOG_WRN("rpr_srv_reset");
 }
 
 const struct bt_mesh_model_cb _bt_mesh_rpr_srv_cb = {

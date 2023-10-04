@@ -101,12 +101,15 @@ static void cmd_handler(void *p1, void *p2, void *p3)
 		btp = find_btp_handler(cmd->hdr.service, cmd->hdr.opcode);
 		if (btp) {
 			if (btp->index != cmd->hdr.index) {
+				LOG_ERR("%s:%d", __FILE__, __LINE__);
 				status = BTP_STATUS_FAILED;
 			} else if ((btp->expect_len >= 0) && (btp->expect_len != len)) {
+				LOG_ERR("%s:%d", __FILE__, __LINE__);
 				status = BTP_STATUS_FAILED;
 			} else {
 				status = btp->func(cmd->hdr.data, len,
 						   cmd->rsp, &rsp_len);
+				LOG_ERR("%s:%d:%d:%p", __FILE__, __LINE__, status, btp->func);
 			}
 
 			__ASSERT_NO_MSG((rsp_len + sizeof(struct btp_hdr)) <= BTP_MTU);
@@ -277,10 +280,16 @@ static void tester_send_with_index(uint8_t service, uint8_t opcode, uint8_t inde
 {
 	struct btp_hdr msg;
 
+	LOG_ERR("%d/%d/%d/%d", service, opcode, index, len);
+
 	msg.service = service;
 	msg.opcode = opcode;
 	msg.index = index;
 	msg.len = sys_cpu_to_le16(len);
+
+//	if (service == 0 && opcode == 0 && index == 255 && len == 1) {
+//		while(1);
+//	}
 
 	uart_send((uint8_t *)&msg, sizeof(msg));
 	if (data && len) {
@@ -299,6 +308,7 @@ static void tester_rsp_with_index(uint8_t service, uint8_t opcode, uint8_t index
 	}
 
 	s.code = status;
+	LOG_ERR("rsp_with_index: %d/%d/%d/%d", service, opcode, index, status);
 	tester_send_with_index(service, BTP_STATUS, index, (uint8_t *) &s, sizeof(s));
 }
 

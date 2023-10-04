@@ -1662,6 +1662,7 @@ int bt_gatt_service_register(struct bt_gatt_service *svc)
 	/* Do no allow to register mandatory services twice */
 	if (!bt_uuid_cmp(svc->attrs[0].uuid, BT_UUID_GAP) ||
 	    !bt_uuid_cmp(svc->attrs[0].uuid, BT_UUID_GATT)) {
+		LOG_ERR("%d", __LINE__);
 		return -EALREADY;
 	}
 
@@ -1670,12 +1671,14 @@ int bt_gatt_service_register(struct bt_gatt_service *svc)
 	err = gatt_register(svc);
 	if (err < 0) {
 		k_sched_unlock();
+		LOG_ERR("%d", __LINE__);
 		return err;
 	}
 
 	/* Don't submit any work until the stack is initialized */
 	if (!atomic_test_bit(gatt_flags, GATT_INITIALIZED)) {
 		k_sched_unlock();
+		LOG_ERR("%d", __LINE__);
 		return 0;
 	}
 
