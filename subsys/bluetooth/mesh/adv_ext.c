@@ -256,7 +256,7 @@ static void send_pending_adv(struct k_work *work)
 		 */
 		int64_t duration = k_uptime_delta(&adv->timestamp);
 
-		LOG_DBG("Advertising stopped after %u ms for %s", (uint32_t)duration,
+		LOG_ERR("Advertising stopped after %u ms for %s", (uint32_t)duration,
 		       adv->buf ? adv_tag_to_str[BT_MESH_ADV(adv->buf)->tag] :
 				  adv_tag_to_str[BT_MESH_ADV_TAG_PROXY]);
 
