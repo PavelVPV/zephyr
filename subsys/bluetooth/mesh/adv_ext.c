@@ -67,6 +67,7 @@ struct bt_mesh_ext_adv {
 
 static void send_pending_adv(struct k_work *work);
 static bool schedule_send(struct bt_mesh_ext_adv *ext_adv);
+static bool schedule_send2(struct bt_mesh_ext_adv *ext_adv);
 
 static struct bt_mesh_ext_adv advs[] = {
 	[0] = {
@@ -263,9 +264,9 @@ static void send_pending_adv(struct k_work *work)
 			ext_adv->adv = NULL;
 		}
 
-		(void)schedule_send(ext_adv);
-
-		return;
+		if (!schedule_send(ext_adv)) {
+			return;
+		}
 	}
 
 	atomic_clear_bit(ext_adv->flags, ADV_FLAG_SCHEDULED);
@@ -304,7 +305,7 @@ static void send_pending_adv(struct k_work *work)
 	}
 
 	if (atomic_test_and_clear_bit(ext_adv->flags, ADV_FLAG_SCHEDULE_PENDING)) {
-		schedule_send(ext_adv);
+		schedule_send2(ext_adv);
 	}
 }
 
@@ -325,19 +326,30 @@ static bool schedule_send(struct bt_mesh_ext_adv *ext_adv)
 	}
 
 	atomic_clear_bit(ext_adv->flags, ADV_FLAG_SCHEDULE_PENDING);
-	k_work_submit(&ext_adv->work);
 
 	return true;
 }
 
+static bool schedule_send2(struct bt_mesh_ext_adv *ext_adv)
+{
+	bool res;
+
+	res = schedule_send(ext_adv);
+	if (res) {
+		k_work_submit(&ext_adv->work);
+	}
+
+	return res;
+}
+
 void bt_mesh_adv_gatt_update(void)
 {
-	(void)schedule_send(gatt_adv_get());
+	(void)schedule_send2(gatt_adv_get());
 }
 
 void bt_mesh_adv_local_ready(void)
 {
-	(void)schedule_send(advs);
+	(void)schedule_send2(advs);
 }
 
 void bt_mesh_adv_relay_ready(void)
@@ -345,23 +357,23 @@ void bt_mesh_adv_relay_ready(void)
 	struct bt_mesh_ext_adv *ext_adv = relay_adv_get();
 
 	for (int i = 0; i < CONFIG_BT_MESH_RELAY_ADV_SETS; i++) {
-		if (schedule_send(&ext_adv[i])) {
+		if (schedule_send2(&ext_adv[i])) {
 			return;
 		}
 	}
 
 	/* Attempt to use the main adv set for the sending of relay messages. */
 	if (IS_ENABLED(CONFIG_BT_MESH_ADV_EXT_RELAY_USING_MAIN_ADV_SET)) {
-		(void)schedule_send(advs);
+		(void)schedule_send2(advs);
 	}
 }
 
 void bt_mesh_adv_friend_ready(void)
 {
 	if (IS_ENABLED(CONFIG_BT_MESH_ADV_EXT_FRIEND_SEPARATE)) {
-		schedule_send(&advs[1 + CONFIG_BT_MESH_RELAY_ADV_SETS]);
+		schedule_send2(&advs[1 + CONFIG_BT_MESH_RELAY_ADV_SETS]);
 	} else {
-		schedule_send(&advs[0]);
+		schedule_send2(&advs[0]);
 	}
 }
 
@@ -451,7 +463,7 @@ static void connected(struct bt_le_ext_adv *instance,
 
 	if (atomic_test_and_clear_bit(ext_adv->flags, ADV_FLAG_PROXY_START)) {
 		atomic_clear_bit(ext_adv->flags, ADV_FLAG_ACTIVE);
-		(void)schedule_send(ext_adv);
+		(void)schedule_send2(ext_adv);
 	}
 }
 #endif /* CONFIG_BT_MESH_GATT_SERVER */
