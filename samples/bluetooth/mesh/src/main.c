@@ -16,6 +16,8 @@
 #include <zephyr/sys/byteorder.h>
 
 #include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/mesh.h>
 
 #include "board.h"
@@ -374,6 +376,23 @@ static void button_pressed(struct k_work *work)
 	printk("Provisioned and configured!\n");
 }
 
+static const struct bt_uuid_128 smp_bt_svc_uuid = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0x8d53dc1d, 0x1db7, 0x4cd3, 0x868b, 0x8a527460aa84));
+
+static const struct bt_uuid_128 smp_bt_svc_uuid2 = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0x8d53dc1d, 0x1db7, 0x4cd3, 0x868b, 0x8a527460aa85));
+
+static struct bt_gatt_attr svc1_attrs[] = {
+	BT_GATT_PRIMARY_SERVICE(&smp_bt_svc_uuid),
+};
+
+static struct bt_gatt_attr svc2_attrs[] = {
+	BT_GATT_PRIMARY_SERVICE(&smp_bt_svc_uuid2),
+};
+
+static struct bt_gatt_service smp_bt_svc1 = BT_GATT_SERVICE(svc1_attrs);
+static struct bt_gatt_service smp_bt_svc2 = BT_GATT_SERVICE(svc2_attrs);
+
 static void bt_ready(int err)
 {
 	if (err) {
@@ -397,6 +416,28 @@ static void bt_ready(int err)
 	bt_mesh_prov_enable(BT_MESH_PROV_ADV | BT_MESH_PROV_GATT);
 
 	printk("Mesh initialized\n");
+
+	err = bt_gatt_service_register(&smp_bt_svc1);
+	printk("%d: %d\n", __LINE__, err);
+	err = bt_gatt_service_unregister(&smp_bt_svc1);
+	printk("%d: %d\n", __LINE__, err);
+
+	err = bt_gatt_service_register(&smp_bt_svc2);
+	printk("%d: %d\n", __LINE__, err);
+	//err = bt_gatt_service_unregister(&smp_bt_svc2);
+	//printk("%d: %d\n", __LINE__, err);
+
+	err = bt_gatt_service_register(&smp_bt_svc1);
+	printk("%d: %d\n", __LINE__, err);
+
+
+
+
+	err = bt_gatt_service_unregister(&smp_bt_svc1);
+	printk("%d: %d\n", __LINE__, err);
+
+	err = bt_gatt_service_unregister(&smp_bt_svc2);
+	printk("%d: %d\n", __LINE__, err);
 }
 
 int main(void)
