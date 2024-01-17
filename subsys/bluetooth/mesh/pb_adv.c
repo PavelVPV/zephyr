@@ -207,6 +207,7 @@ static void delayable_unacked_schedule(struct bt_mesh_adv *adv, const struct bt_
 
 static void delayable_acked_schedule(void)
 {
+	LOG_WRN("Sending acked");
 	link.tx.last_tx_idx = 0;
 	delayable_schedule();
 }
@@ -237,6 +238,11 @@ static void delayable_work_handler(struct k_work *work)
 	}
 
 	// Send Trans Start, Trans Cont and Link Open
+	if (link.tx.adv[0] == NULL) {
+		LOG_WRN("nothing to send");
+		return;
+	}
+
 	for (i = link.tx.last_tx_idx; i < ARRAY_SIZE(link.tx.adv); i++) {
 		struct bt_mesh_adv *adv = link.tx.adv[i];
 
@@ -252,13 +258,17 @@ static void delayable_work_handler(struct k_work *work)
 
 		bt_mesh_adv_send(adv, NULL, NULL);
 		LOG_WRN("link.tx.adv[%d] sent", i);
+		break;
 
 		// No NULLing link.tx.adv[] as they are needed for retransmission.
 	}
 
+	link.tx.last_tx_idx = i + 1;
+
 	if (i == ARRAY_SIZE(link.tx.adv) || link.tx.adv[i] == NULL) {
 		// Sent all buffers with delay, now can run retransmit timer
 		k_work_reschedule(&link.tx.retransmit, RETRANSMIT_TIMEOUT);
+		return;
 	}
 
 reschedule:
@@ -280,6 +290,8 @@ static void free_segments(void)
 {
 	int i;
 
+	LOG_WRN("free_segments");
+
 	for (i = 0; i < ARRAY_SIZE(link.tx.adv); i++) {
 		struct bt_mesh_adv *adv = link.tx.adv[i];
 
@@ -288,6 +300,7 @@ static void free_segments(void)
 		}
 
 		link.tx.adv[i] = NULL;
+		LOG_WRN("freeing seg %d", i);
 
 		/* Terminate active adv */
 		if (adv->ctx.busy == 0U) {
