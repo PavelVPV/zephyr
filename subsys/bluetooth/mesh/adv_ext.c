@@ -22,7 +22,7 @@
 #include "proxy.h"
 #include "solicitation.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_ADV_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_ADV_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_adv_ext);
 
@@ -258,7 +258,9 @@ static void send_pending_adv(struct k_work *work)
 		atomic_clear_bit(ext_adv->flags, ADV_FLAG_PROXY);
 		atomic_clear_bit(ext_adv->flags, ADV_FLAG_PROXY_START);
 
+		LOG_WRN("send_pending_adv: adv: %p", ext_adv->adv);
 		if (ext_adv->adv) {
+			bt_mesh_adv_send_end(0, &ext_adv->adv->ctx);
 			bt_mesh_adv_unref(ext_adv->adv);
 			ext_adv->adv = NULL;
 		}

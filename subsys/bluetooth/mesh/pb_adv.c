@@ -17,7 +17,7 @@
 
 #include "common/bt_str.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROV_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_PROV_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_pb_adv);
 
@@ -68,6 +68,7 @@ enum {
 	ADV_ACK_PENDING,    	/* An acknowledgment is being sent */
 	ADV_PROVISIONER,    	/* The link was opened as provisioner */
 	ADV_LINK_ACK_SENDING,
+	ADV_LINK_SENDING,
 
 	ADV_NUM_FLAGS,
 };
@@ -153,6 +154,11 @@ static void tx_schedule(void)
 {
 	uint16_t random_delay;
 
+	if (atomic_test_bit(link.flags, ADV_LINK_SENDING)) {
+		LOG_WRN("waiting previos adv to be sent");
+		return;
+	}
+
 	(void)bt_rand(&random_delay, sizeof(random_delay));
 	random_delay = 20 + (random_delay % 30);
 
@@ -190,6 +196,50 @@ static void send_reliable(void)
 	tx_schedule();
 }
 
+static void delayed_buf_sent(int err, void *user_data)
+{
+	bool unacked = (bool)user_data;
+	struct unacked_adv_ctx *unacked_adv = &link.tx.unacked[link.tx.last_unacked];
+
+	LOG_WRN("%s: err: %d, unacked: %d", __func__, err, unacked);
+
+	if (unacked && unacked_adv != NULL) {
+		if (unacked_adv->cb && unacked_adv->cb->end) {
+			unacked_adv->cb->end(err, unacked_adv->cb_data);
+		}
+
+		memset(unacked_adv, 0, sizeof(struct unacked_adv_ctx));
+	}
+
+	atomic_clear_bit(link.flags, ADV_LINK_SENDING);
+	tx_schedule();
+}
+
+static void delayed_buf_start(uint16_t duration, int err, void *user_data)
+{
+	bool unacked = (bool)user_data;
+	struct unacked_adv_ctx *unacked_adv = &link.tx.unacked[link.tx.last_unacked];
+
+	LOG_WRN("%s: err: %d, unacked: %d", __func__, err, unacked);
+
+	if (unacked && unacked_adv != NULL && unacked_adv->cb && unacked_adv->cb->start) {
+		unacked_adv->cb->start(duration, err, unacked_adv->cb_data);
+	}
+
+	if (err) {
+		if (unacked && unacked_adv != NULL) {
+			memset(unacked_adv, 0, sizeof(struct unacked_adv_ctx));
+		}
+
+		delayed_buf_sent(err, user_data);
+	}
+}
+
+static const struct bt_mesh_send_cb delayed_buf_sent_cb = {
+	.start = delayed_buf_start,
+	.end = delayed_buf_sent,
+};
+
 static void tx_work_handler(struct k_work *work)
 {
 	int i;
@@ -203,20 +253,22 @@ static void tx_work_handler(struct k_work *work)
 			continue;
 		}
 
-		bt_mesh_adv_send(unacked->adv, unacked->cb, unacked->cb_data);
+		bt_mesh_adv_send(unacked->adv, &delayed_buf_sent_cb, (void *)true);
 		bt_mesh_adv_unref(unacked->adv);
+		atomic_set_bit(link.flags, ADV_LINK_SENDING);
 
 		LOG_WRN("unacked_adv_ctx sent, cb: %p", unacked->cb);
 
-		memset(unacked, 0, sizeof(struct unacked_adv_ctx));
+//		memset(unacked, 0, sizeof(struct unacked_adv_ctx));
 		link.tx.last_unacked = idx;
 
-		goto reschedule;
+		return;
+		//goto reschedule;
 	}
 
 	// Send Trans Start, Trans Cont and Link Open
-	if (link.tx.adv[0] == NULL) {
-		LOG_WRN("nothing to send");
+	if (link.tx.adv[0] == NULL || link.tx.next >= ARRAY_SIZE(link.tx.adv)) {
+		LOG_WRN("nothing to send: %p", link.tx.adv[0]);
 		return;
 	}
 
@@ -233,23 +285,22 @@ static void tx_work_handler(struct k_work *work)
 
 		LOG_DBG("%u bytes: %s", adv->b.len, bt_hex(adv->b.data, adv->b.len));
 
-		bt_mesh_adv_send(adv, NULL, NULL);
+		bt_mesh_adv_send(adv, &delayed_buf_sent_cb, (void *)false);
+		atomic_set_bit(link.flags, ADV_LINK_SENDING);
 		LOG_WRN("link.tx.adv[%d] sent", i);
 		break;
-
-		// No NULLing link.tx.adv[] as they are needed for retransmission.
 	}
 
 	link.tx.next = i + 1;
 
-	if (i == ARRAY_SIZE(link.tx.adv) || link.tx.adv[i] == NULL) {
+	if (link.tx.next == ARRAY_SIZE(link.tx.adv) || link.tx.adv[link.tx.next] == NULL) {
 		// Sent all buffers with delay, now can run retransmit timer
 		k_work_reschedule(&link.tx.retransmit, RETRANSMIT_TIMEOUT);
-		return;
+//		return;
 	}
 
-reschedule:
-	tx_schedule();
+//reschedule:
+//	tx_schedule();
 }
 
 static void buf_sent(int err, void *user_data)
@@ -310,6 +361,7 @@ static void free_segments(void)
 			/* Mark as canceled */
 			adv->ctx.busy = 0U;
 		}
+		atomic_clear_bit(link.flags, ADV_LINK_SENDING);
 
 		bt_mesh_adv_unref(adv);
 	}
@@ -495,6 +547,7 @@ static void gen_prov_cont(struct prov_rx *rx, struct net_buf_simple *buf)
 			gen_prov_ack_send(rx->xact_id);
 		}
 
+		LOG_ERR("ack_pending cont");
 		return;
 	}
 
@@ -581,6 +634,8 @@ static void gen_prov_start(struct prov_rx *rx, struct net_buf_simple *buf)
 				LOG_DBG("Resending ack");
 				gen_prov_ack_send(rx->xact_id);
 			}
+
+			LOG_ERR("ack_pending");
 
 			return;
 		}

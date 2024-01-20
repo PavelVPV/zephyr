@@ -76,11 +76,14 @@ void bt_mesh_adv_send_start(uint16_t duration, int err, struct bt_mesh_adv_ctx *
 	}
 }
 
-static void bt_mesh_adv_send_end(int err, struct bt_mesh_adv_ctx const *ctx)
+void bt_mesh_adv_send_end(int err, struct bt_mesh_adv_ctx *ctx)
 {
+	LOG_WRN("send_end: started: %d cb: %p end: %p", ctx->started,ctx->cb,(ctx->cb ? ctx->cb->end : NULL));
 	if (ctx->started && ctx->cb && ctx->cb->end) {
 		ctx->cb->end(err, ctx->cb_data);
 	}
+
+	ctx->started = 0;
 }
 
 static struct bt_mesh_adv *adv_create_from_pool(struct k_mem_slab *buf_pool,
@@ -136,7 +139,7 @@ void bt_mesh_adv_unref(struct bt_mesh_adv *adv)
 	}
 
 	struct k_mem_slab *slab = &local_adv_pool;
-	struct bt_mesh_adv_ctx ctx = adv->ctx;
+//	struct bt_mesh_adv_ctx ctx = adv->ctx;
 
 #if defined(CONFIG_BT_MESH_RELAY)
 	if (adv->ctx.tag == BT_MESH_ADV_TAG_RELAY) {
@@ -151,7 +154,7 @@ void bt_mesh_adv_unref(struct bt_mesh_adv *adv)
 #endif
 
 	k_mem_slab_free(slab, (void *)adv);
-	bt_mesh_adv_send_end(0, &ctx);
+//	bt_mesh_adv_send_end(0, &ctx);
 }
 
 struct bt_mesh_adv *bt_mesh_adv_create(enum bt_mesh_adv_type type,
