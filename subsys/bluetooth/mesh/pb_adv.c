@@ -120,6 +120,8 @@ struct pb_adv {
 			const struct bt_mesh_send_cb *cb;
 			void *cb_data;
 		} unacked[2];
+
+		int last;
 	} tx;
 
 	/* Protocol timeout */
@@ -149,15 +151,13 @@ static K_WORK_DELAYABLE_DEFINE(tx_work, tx_work_handler);
 static void tx_schedule(void)
 {
 	uint16_t random_delay;
-	k_timeout_t delay;
 
 	(void)bt_rand(&random_delay, sizeof(random_delay));
 	random_delay = 20 + (random_delay % 30);
-	delay = K_MSEC(random_delay);
 
 	LOG_WRN("delay %u", random_delay);
 
-	k_work_schedule(&tx_work, delay);
+	k_work_schedule(&tx_work, K_MSEC(random_delay));
 }
 
 static void send_unacked(struct bt_mesh_adv *adv, const struct bt_mesh_send_cb *cb, void *cb_data)
@@ -191,25 +191,25 @@ static void send_reliable(void)
 
 static void tx_work_handler(struct k_work *work)
 {
-	static int prev_dpdu_idx;
+	static int last_unacked;
 	int i;
 
 	// Send Link Ack, Link Close and Transport Ack first.
 	for (i = 0; i < ARRAY_SIZE(link.tx.unacked); i++) {
-		int idx = (i + prev_dpdu_idx) % 2;
-		struct unacked_adv_ctx *dpdu = &link.tx.unacked[idx];
+		int idx = (i + last_unacked) % 2;
+		struct unacked_adv_ctx *unacked = &link.tx.unacked[idx];
 
-		if (!dpdu->adv) {
+		if (!unacked->adv) {
 			continue;
 		}
 
-		bt_mesh_adv_send(dpdu->adv, dpdu->cb, dpdu->cb_data);
-		bt_mesh_adv_unref(dpdu->adv);
+		bt_mesh_adv_send(unacked->adv, unacked->cb, unacked->cb_data);
+		bt_mesh_adv_unref(unacked->adv);
 
-		LOG_WRN("unacked_adv_ctx sent, cb: %p", dpdu->cb);
+		LOG_WRN("unacked_adv_ctx sent, cb: %p", unacked->cb);
 
-		memset(dpdu, 0, sizeof(struct unacked_adv_ctx));
-		prev_dpdu_idx = idx;
+		memset(unacked, 0, sizeof(struct unacked_adv_ctx));
+		last_unacked = idx;
 
 		goto reschedule;
 	}
