@@ -121,7 +121,8 @@ struct pb_adv {
 			void *cb_data;
 		} unacked[2];
 
-		int last;
+		/* Last sent unacked[] buffer */
+		int last_unacked;
 	} tx;
 
 	/* Protocol timeout */
@@ -191,12 +192,11 @@ static void send_reliable(void)
 
 static void tx_work_handler(struct k_work *work)
 {
-	static int last_unacked;
 	int i;
 
 	// Send Link Ack, Link Close and Transport Ack first.
 	for (i = 0; i < ARRAY_SIZE(link.tx.unacked); i++) {
-		int idx = (i + last_unacked) % 2;
+		int idx = (i + link.tx.last_unacked) % 2;
 		struct unacked_adv_ctx *unacked = &link.tx.unacked[idx];
 
 		if (!unacked->adv) {
@@ -209,7 +209,7 @@ static void tx_work_handler(struct k_work *work)
 		LOG_WRN("unacked_adv_ctx sent, cb: %p", unacked->cb);
 
 		memset(unacked, 0, sizeof(struct unacked_adv_ctx));
-		last_unacked = idx;
+		link.tx.last_unacked = idx;
 
 		goto reschedule;
 	}
