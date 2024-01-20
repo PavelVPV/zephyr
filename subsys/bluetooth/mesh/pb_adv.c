@@ -103,7 +103,9 @@ struct pb_adv {
 
 		/* Pending outgoing adv(s) */
 		struct bt_mesh_adv *adv[3];
-		int last_tx_idx;
+
+		/* Index of the next adv to be sent */
+		int next;
 
 		prov_bearer_send_complete_t cb;
 
@@ -112,12 +114,12 @@ struct pb_adv {
 		/* Retransmit timer */
 		struct k_work_delayable retransmit;
 
-		/* Delayed unacked adv buffers */
-		struct delayed_pdu {
+		/* Unacked adv buffers */
+		struct unacked_adv_ctx {
 			struct bt_mesh_adv *adv;
 			const struct bt_mesh_send_cb *cb;
 			void *cb_data;
-		} delayed[2];
+		} unacked[2];
 	} tx;
 
 	/* Protocol timeout */
@@ -140,6 +142,115 @@ static void link_ack(struct prov_rx *rx, struct net_buf_simple *buf);
 static void link_close(struct prov_rx *rx, struct net_buf_simple *buf);
 static void prov_link_close(enum prov_bearer_link_status status);
 static void close_link(enum prov_bearer_link_status status);
+
+static void tx_work_handler(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(tx_work, tx_work_handler);
+
+static void tx_schedule(void)
+{
+	uint16_t random_delay;
+	k_timeout_t delay;
+
+	(void)bt_rand(&random_delay, sizeof(random_delay));
+	random_delay = 20 + (random_delay % 30);
+	delay = K_MSEC(random_delay);
+
+	LOG_WRN("delay %u", random_delay);
+
+	k_work_schedule(&tx_work, delay);
+}
+
+static void send_unacked(struct bt_mesh_adv *adv, const struct bt_mesh_send_cb *cb, void *cb_data)
+{
+	for (int i = 0; i < ARRAY_SIZE(link.tx.unacked); i++) {
+		if (link.tx.unacked[i].adv != NULL) {
+			LOG_WRN("delayed_adv[i] busy: %p", link.tx.unacked[i].adv);
+			continue;
+		}
+
+		LOG_WRN("Sending delayed_adv[%d]: %p", i, adv);
+
+		link.tx.unacked[i].adv = adv;
+		link.tx.unacked[i].cb = cb;
+		link.tx.unacked[i].cb_data = cb_data;
+
+		tx_schedule();
+
+		return;
+	}
+
+	__ASSERT(false, "No memory for extra adv");
+}
+
+static void send_reliable(void)
+{
+	LOG_WRN("Sending acked");
+	link.tx.next = 0;
+	tx_schedule();
+}
+
+static void tx_work_handler(struct k_work *work)
+{
+	static int prev_dpdu_idx;
+	int i;
+
+	// Send Link Ack, Link Close and Transport Ack first.
+	for (i = 0; i < ARRAY_SIZE(link.tx.unacked); i++) {
+		int idx = (i + prev_dpdu_idx) % 2;
+		struct unacked_adv_ctx *dpdu = &link.tx.unacked[idx];
+
+		if (!dpdu->adv) {
+			continue;
+		}
+
+		bt_mesh_adv_send(dpdu->adv, dpdu->cb, dpdu->cb_data);
+		bt_mesh_adv_unref(dpdu->adv);
+
+		LOG_WRN("unacked_adv_ctx sent, cb: %p", dpdu->cb);
+
+		memset(dpdu, 0, sizeof(struct unacked_adv_ctx));
+		prev_dpdu_idx = idx;
+
+		goto reschedule;
+	}
+
+	// Send Trans Start, Trans Cont and Link Open
+	if (link.tx.adv[0] == NULL) {
+		LOG_WRN("nothing to send");
+		return;
+	}
+
+	for (i = link.tx.next; i < ARRAY_SIZE(link.tx.adv); i++) {
+		struct bt_mesh_adv *adv = link.tx.adv[i];
+
+		if (!adv) {
+			break;
+		}
+
+		if (adv->ctx.busy) {
+			continue;
+		}
+
+		LOG_DBG("%u bytes: %s", adv->b.len, bt_hex(adv->b.data, adv->b.len));
+
+		bt_mesh_adv_send(adv, NULL, NULL);
+		LOG_WRN("link.tx.adv[%d] sent", i);
+		break;
+
+		// No NULLing link.tx.adv[] as they are needed for retransmission.
+	}
+
+	link.tx.next = i + 1;
+
+	if (i == ARRAY_SIZE(link.tx.adv) || link.tx.adv[i] == NULL) {
+		// Sent all buffers with delay, now can run retransmit timer
+		k_work_reschedule(&link.tx.retransmit, RETRANSMIT_TIMEOUT);
+		return;
+	}
+
+reschedule:
+	tx_schedule();
+}
 
 static void buf_sent(int err, void *user_data)
 {
@@ -164,116 +275,6 @@ static struct bt_mesh_send_cb buf_sent_cb = {
 	.start = buf_start,
 	.end = buf_sent,
 };
-
-static void delayable_work_handler(struct k_work *work);
-static K_WORK_DELAYABLE_DEFINE(delayable_work, delayable_work_handler);
-
-static void delayable_schedule(void)
-{
-	uint16_t random_delay;
-	k_timeout_t delay;
-
-	(void)bt_rand(&random_delay, sizeof(random_delay));
-	random_delay = 20 + (random_delay % 30);
-	delay = K_MSEC(random_delay);
-
-	LOG_WRN("delay %u", random_delay);
-
-	k_work_schedule(&delayable_work, delay);
-}
-
-static void delayable_unacked_schedule(struct bt_mesh_adv *adv, const struct bt_mesh_send_cb *cb,
-				       void *cb_data)
-{
-	for (int i = 0; i < ARRAY_SIZE(link.tx.delayed); i++) {
-		if (link.tx.delayed[i].adv != NULL) {
-			LOG_WRN("delayed_adv[i] busy: %p", link.tx.delayed[i].adv);
-			continue;
-		}
-
-		LOG_WRN("Sending delayed_adv[%d]: %p", i, adv);
-
-		link.tx.delayed[i].adv = adv;
-		link.tx.delayed[i].cb = cb;
-		link.tx.delayed[i].cb_data = cb_data;
-
-		delayable_schedule();
-
-		return;
-	}
-
-	__ASSERT(false, "No memory for extra adv");
-}
-
-static void delayable_acked_schedule(void)
-{
-	LOG_WRN("Sending acked");
-	link.tx.last_tx_idx = 0;
-	delayable_schedule();
-}
-
-static void delayable_work_handler(struct k_work *work)
-{
-	static int prev_dpdu_idx;
-	int i;
-
-	// Send Link Ack, Link Close and Transport Ack first.
-	for (i = 0; i < ARRAY_SIZE(link.tx.delayed); i++) {
-		int idx = (i + prev_dpdu_idx) % 2;
-		struct delayed_pdu *dpdu = &link.tx.delayed[idx];
-
-		if (!dpdu->adv) {
-			continue;
-		}
-
-		bt_mesh_adv_send(dpdu->adv, dpdu->cb, dpdu->cb_data);
-		bt_mesh_adv_unref(dpdu->adv);
-
-		LOG_WRN("delayed_pdu sent, cb: %p", dpdu->cb);
-
-		memset(dpdu, 0, sizeof(struct delayed_pdu));
-		prev_dpdu_idx = idx;
-
-		goto reschedule;
-	}
-
-	// Send Trans Start, Trans Cont and Link Open
-	if (link.tx.adv[0] == NULL) {
-		LOG_WRN("nothing to send");
-		return;
-	}
-
-	for (i = link.tx.last_tx_idx; i < ARRAY_SIZE(link.tx.adv); i++) {
-		struct bt_mesh_adv *adv = link.tx.adv[i];
-
-		if (!adv) {
-			break;
-		}
-
-		if (adv->ctx.busy) {
-			continue;
-		}
-
-		LOG_DBG("%u bytes: %s", adv->b.len, bt_hex(adv->b.data, adv->b.len));
-
-		bt_mesh_adv_send(adv, NULL, NULL);
-		LOG_WRN("link.tx.adv[%d] sent", i);
-		break;
-
-		// No NULLing link.tx.adv[] as they are needed for retransmission.
-	}
-
-	link.tx.last_tx_idx = i + 1;
-
-	if (i == ARRAY_SIZE(link.tx.adv) || link.tx.adv[i] == NULL) {
-		// Sent all buffers with delay, now can run retransmit timer
-		k_work_reschedule(&link.tx.retransmit, RETRANSMIT_TIMEOUT);
-		return;
-	}
-
-reschedule:
-	delayable_schedule();
-}
 
 static uint8_t last_seg(uint16_t len)
 {
@@ -478,8 +479,8 @@ static void gen_prov_ack_send(uint8_t xact_id)
 	net_buf_simple_add_u8(&adv->b, xact_id);
 	net_buf_simple_add_u8(&adv->b, GPC_ACK);
 
-	LOG_WRN("Sending Trans Ack: %p, delayed_adv: %p", adv);
-	delayable_unacked_schedule(adv, complete, NULL);
+	LOG_WRN("Sending Trans Ack: %p", adv);
+	send_unacked(adv, complete, NULL);
 }
 
 static void gen_prov_cont(struct prov_rx *rx, struct net_buf_simple *buf)
@@ -730,7 +731,7 @@ static void prov_retransmit(struct k_work *work)
 		return;
 	}
 
-	delayable_acked_schedule();
+	send_reliable();
 }
 
 static struct bt_mesh_adv *ctl_adv_create(uint8_t op, const void *data, uint8_t data_len,
@@ -765,7 +766,7 @@ static int bearer_ctl_send(struct bt_mesh_adv *adv)
 
 	link.tx.start = k_uptime_get();
 	link.tx.adv[0] = adv;
-	delayable_acked_schedule();
+	send_reliable();
 
 	return 0;
 }
@@ -779,8 +780,8 @@ static int bearer_ctl_send_unacked(struct bt_mesh_adv *adv, void *user_data)
 	prov_clear_tx();
 	k_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
 
-	LOG_WRN("Sending Link Smth: %p, delayed_adv: %p", adv);
-	delayable_unacked_schedule(adv, &buf_sent_cb, user_data);
+	LOG_WRN("Sending Link Smth: %p", adv);
+	send_unacked(adv, &buf_sent_cb, user_data);
 
 	return 0;
 }
@@ -846,7 +847,7 @@ static int prov_send_adv(struct net_buf_simple *msg,
 		net_buf_simple_pull(msg, seg_len);
 	}
 
-	delayable_acked_schedule();
+	send_reliable();
 
 	return 0;
 }
