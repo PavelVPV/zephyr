@@ -280,9 +280,11 @@ static uint8_t last_seg(uint16_t len)
 static void free_segments(void)
 {
 	int i;
+	bool canceled = false;
 
 	for (i = 0; i < ARRAY_SIZE(link.tx.adv); i++) {
 		struct bt_mesh_adv *adv = link.tx.adv[i];
+		int err;
 
 		if (!adv) {
 			break;
@@ -292,16 +294,22 @@ static void free_segments(void)
 
 		/* Terminate active adv */
 		if (adv->ctx.busy == 0U) {
-			bt_mesh_adv_terminate(adv);
+			err = bt_mesh_adv_terminate(adv);
+			if (err == 0) {
+				canceled = true;
+			}
 		} else {
 			/* Mark as canceled */
 			adv->ctx.busy = 0U;
+			canceled = true;
 		}
 
+		bt_mesh_adv_unref(adv);
+	}
+
+	if (canceled) {
 		atomic_clear_bit(link.flags, ADV_SENDING);
 		tx_schedule();
-
-		bt_mesh_adv_unref(adv);
 	}
 }
 
@@ -477,7 +485,6 @@ static void gen_prov_cont(struct prov_rx *rx, struct net_buf_simple *buf)
 			gen_prov_ack_send(rx->xact_id);
 		}
 
-		LOG_ERR("ack_pending cont");
 		return;
 	}
 
@@ -564,8 +571,6 @@ static void gen_prov_start(struct prov_rx *rx, struct net_buf_simple *buf)
 				LOG_DBG("Resending ack");
 				gen_prov_ack_send(rx->xact_id);
 			}
-
-			LOG_ERR("ack_pending");
 
 			return;
 		}
@@ -871,11 +876,10 @@ static void link_open(struct prov_rx *rx, struct net_buf_simple *buf)
 		}
 
 		if (atomic_test_bit(link.flags, ADV_LINK_ACK_SENDING)) {
-			LOG_WRN("Still sending Link Ack");
+			LOG_DBG("Still sending Link Ack");
 			return;
 		}
 
-		LOG_WRN("Resending link ack");
 		/* Ignore errors, message will be attempted again if we keep receiving link open: */
 		atomic_set_bit(link.flags, ADV_LINK_ACK_SENDING);
 		(void)bearer_ctl_send_unacked(
