@@ -195,7 +195,7 @@ static void send_reliable(void)
 	tx_schedule();
 }
 
-static void delayed_buf_sent(int err, void *user_data)
+static void delayed_adv_send_end(int err, void *user_data)
 {
 	bool unacked = (bool)user_data;
 	struct unacked_adv_ctx *unacked_adv = &link.tx.unacked[link.tx.last_unacked];
@@ -212,16 +212,16 @@ static void delayed_buf_sent(int err, void *user_data)
 	tx_schedule();
 }
 
-static void delayed_buf_start(uint16_t duration, int err, void *user_data)
+static void delayed_adv_send_start(uint16_t duration, int err, void *user_data)
 {
 	if (err) {
-		delayed_buf_sent(err, user_data);
+		delayed_adv_send_end(err, user_data);
 	}
 }
 
 static const struct bt_mesh_send_cb delayed_adv_send_cb = {
-	.start = delayed_buf_start,
-	.end = delayed_buf_sent,
+	.start = delayed_adv_send_start,
+	.end = delayed_adv_send_end,
 };
 
 static void tx_work_handler(struct k_work *work)
