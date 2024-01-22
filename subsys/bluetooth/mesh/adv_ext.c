@@ -260,8 +260,11 @@ static void send_pending_adv(struct k_work *work)
 
 		LOG_WRN("send_pending_adv: adv: %p", ext_adv->adv);
 		if (ext_adv->adv) {
-			bt_mesh_adv_send_end(0, &ext_adv->adv->ctx);
+			struct bt_mesh_adv_ctx ctx = ext_adv->adv->ctx;
+
 			bt_mesh_adv_unref(ext_adv->adv);
+			bt_mesh_adv_send_end(0, &ctx);
+
 			ext_adv->adv = NULL;
 		}
 
