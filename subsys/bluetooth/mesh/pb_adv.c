@@ -172,7 +172,6 @@ static void send_unacked(struct bt_mesh_adv *adv, prov_bearer_send_complete_t cb
 {
 	for (int i = 0; i < ARRAY_SIZE(link.tx.unacked); i++) {
 		if (link.tx.unacked[i].adv != NULL) {
-			LOG_WRN("delayed_adv[i] busy: %p", link.tx.unacked[i].adv);
 			continue;
 		}
 
@@ -200,8 +199,6 @@ static void delayed_buf_sent(int err, void *user_data)
 {
 	bool unacked = (bool)user_data;
 	struct unacked_adv_ctx *unacked_adv = &link.tx.unacked[link.tx.last_unacked];
-
-	LOG_WRN("%s: err: %d, unacked: %d", __func__, err, unacked);
 
 	if (unacked && unacked_adv->adv != NULL) {
 		if (unacked_adv->cb) {
@@ -231,7 +228,7 @@ static void tx_work_handler(struct k_work *work)
 {
 	int i;
 
-	/* Send Link Ack, Link Close and Transport Ack first. */
+	/* Send Link Ack, Link Close and Gen Trans Ack first. */
 	for (i = 0; i < ARRAY_SIZE(link.tx.unacked); i++) {
 		int idx = (i + link.tx.last_unacked) % ARRAY_SIZE(link.tx.unacked);
 		struct unacked_adv_ctx *unacked = &link.tx.unacked[idx];
@@ -241,11 +238,8 @@ static void tx_work_handler(struct k_work *work)
 		}
 
 		atomic_set_bit(link.flags, ADV_SENDING);
-
 		bt_mesh_adv_send(unacked->adv, &delayed_adv_send_cb, (void *)true);
 		bt_mesh_adv_unref(unacked->adv);
-
-		LOG_WRN("unacked_adv_ctx sent, cb: %p", unacked->cb);
 
 		link.tx.last_unacked = idx;
 
@@ -269,11 +263,9 @@ static void tx_work_handler(struct k_work *work)
 			continue;
 		}
 
-		LOG_DBG("%u bytes: %s", adv->b.len, bt_hex(adv->b.data, adv->b.len));
-
-		bt_mesh_adv_send(adv, &delayed_adv_send_cb, (void *)false);
 		atomic_set_bit(link.flags, ADV_SENDING);
-		LOG_WRN("link.tx.adv[%d] sent", i);
+		bt_mesh_adv_send(adv, &delayed_adv_send_cb, (void *)false);
+
 		break;
 	}
 
@@ -281,6 +273,7 @@ static void tx_work_handler(struct k_work *work)
 
 	if (link.tx.next == ARRAY_SIZE(link.tx.adv) || link.tx.adv[link.tx.next] == NULL) {
 		/* All all ack-able PDUs are sent. Now we can run retransmit timer. */
+		LOG_DBG("Starting retransmit timer");
 		k_work_reschedule(&link.tx.retransmit, RETRANSMIT_TIMEOUT);
 	}
 }
