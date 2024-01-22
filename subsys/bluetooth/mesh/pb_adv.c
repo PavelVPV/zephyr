@@ -247,32 +247,20 @@ static void tx_work_handler(struct k_work *work)
 	}
 
 	/* Send Trans Start, Trans Cont and Link Open */
-	if (link.tx.adv[0] == NULL || link.tx.next >= ARRAY_SIZE(link.tx.adv)) {
+	if (link.tx.next >= ARRAY_SIZE(link.tx.adv) || link.tx.adv[link.tx.next] == NULL) {
 		LOG_DBG("All PDUs were sent");
 		return;
 	}
 
-	for (i = link.tx.next; i < ARRAY_SIZE(link.tx.adv); i++) {
-		struct bt_mesh_adv *adv = link.tx.adv[i];
+	struct bt_mesh_adv *adv = link.tx.adv[link.tx.next];
 
-		if (!adv) {
-			break;
-		}
+	atomic_set_bit(link.flags, ADV_SENDING);
+	bt_mesh_adv_send(adv, &delayed_adv_send_cb, (void *)false);
 
-		if (adv->ctx.busy) {
-			continue;
-		}
-
-		atomic_set_bit(link.flags, ADV_SENDING);
-		bt_mesh_adv_send(adv, &delayed_adv_send_cb, (void *)false);
-
-		break;
-	}
-
-	link.tx.next = i + 1;
+	link.tx.next++;
 
 	if (link.tx.next == ARRAY_SIZE(link.tx.adv) || link.tx.adv[link.tx.next] == NULL) {
-		/* All all ack-able PDUs are sent. Now we can run retransmit timer. */
+		/* All ack-able PDUs are sent. Now we can run the retransmit timer. */
 		LOG_DBG("Starting retransmit timer");
 		k_work_reschedule(&link.tx.retransmit, RETRANSMIT_TIMEOUT);
 	}
