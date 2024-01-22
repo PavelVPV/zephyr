@@ -17,7 +17,7 @@
 
 #include "common/bt_str.h"
 
-#define LOG_LEVEL 4//CONFIG_BT_MESH_PROV_LOG_LEVEL
+#define LOG_LEVEL CONFIG_BT_MESH_PROV_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_pb_adv);
 
@@ -67,8 +67,8 @@ enum {
 	ADV_LINK_INVALID,   	/* Error occurred during provisioning */
 	ADV_ACK_PENDING,    	/* An acknowledgment is being sent */
 	ADV_PROVISIONER,    	/* The link was opened as provisioner */
-	ADV_LINK_ACK_SENDING,
-	ADV_LINK_SENDING,
+	ADV_LINK_ACK_SENDING,	/* Link Ack tx was scheduled but not finished. */
+	ADV_SENDING,		/* Sending any PDU */
 
 	ADV_NUM_FLAGS,
 };
@@ -102,7 +102,7 @@ struct pb_adv {
 		/* Transaction timeout in seconds */
 		uint8_t timeout;
 
-		/* Pending outgoing adv(s) */
+		/* Pending outgoing adv(s) (Link Open, Gen Trans Start and Gen Trans Cont) */
 		struct bt_mesh_adv *adv[3];
 
 		/* Index of the next adv to be sent */
@@ -115,10 +115,10 @@ struct pb_adv {
 		/* Retransmit timer */
 		struct k_work_delayable retransmit;
 
-		/* Unacked adv buffers */
+		/* Unacked adv buffers (Link Ack, Link Close and Gen Trans Ack) */
 		struct unacked_adv_ctx {
 			struct bt_mesh_adv *adv;
-			const struct bt_mesh_send_cb *cb;
+			prov_bearer_send_complete_t cb;
 			void *cb_data;
 		} unacked[2];
 
@@ -154,28 +154,27 @@ static void tx_schedule(void)
 {
 	uint16_t random_delay;
 
-	if (atomic_test_bit(link.flags, ADV_LINK_SENDING)) {
-		LOG_WRN("waiting previos adv to be sent");
+	if (atomic_test_bit(link.flags, ADV_SENDING)) {
+		LOG_DBG("Another tx is in progress");
 		return;
 	}
 
 	(void)bt_rand(&random_delay, sizeof(random_delay));
 	random_delay = 20 + (random_delay % 30);
 
-	LOG_WRN("delay %u", random_delay);
+	LOG_DBG("Next PDU delayed by %ums", random_delay);
 
-	k_work_schedule(&tx_work, K_MSEC(random_delay));
+	(void)k_work_schedule(&tx_work, K_MSEC(random_delay));
 }
 
-static void send_unacked(struct bt_mesh_adv *adv, const struct bt_mesh_send_cb *cb, void *cb_data)
+static void send_unacked(struct bt_mesh_adv *adv, prov_bearer_send_complete_t cb,
+			 void *cb_data)
 {
 	for (int i = 0; i < ARRAY_SIZE(link.tx.unacked); i++) {
 		if (link.tx.unacked[i].adv != NULL) {
 			LOG_WRN("delayed_adv[i] busy: %p", link.tx.unacked[i].adv);
 			continue;
 		}
-
-		LOG_WRN("Sending delayed_adv[%d]: %p", i, adv);
 
 		link.tx.unacked[i].adv = adv;
 		link.tx.unacked[i].cb = cb;
@@ -191,8 +190,9 @@ static void send_unacked(struct bt_mesh_adv *adv, const struct bt_mesh_send_cb *
 
 static void send_reliable(void)
 {
-	LOG_WRN("Sending acked");
+	/* Dropping next tx adv index to start transmission from the first adv buffer. */
 	link.tx.next = 0;
+
 	tx_schedule();
 }
 
@@ -203,39 +203,26 @@ static void delayed_buf_sent(int err, void *user_data)
 
 	LOG_WRN("%s: err: %d, unacked: %d", __func__, err, unacked);
 
-	if (unacked && unacked_adv != NULL) {
-		if (unacked_adv->cb && unacked_adv->cb->end) {
-			unacked_adv->cb->end(err, unacked_adv->cb_data);
+	if (unacked && unacked_adv->adv != NULL) {
+		if (unacked_adv->cb) {
+			unacked_adv->cb(err, unacked_adv->cb_data);
 		}
 
-		memset(unacked_adv, 0, sizeof(struct unacked_adv_ctx));
+		unacked_adv->adv = NULL;
 	}
 
-	atomic_clear_bit(link.flags, ADV_LINK_SENDING);
+	atomic_clear_bit(link.flags, ADV_SENDING);
 	tx_schedule();
 }
 
 static void delayed_buf_start(uint16_t duration, int err, void *user_data)
 {
-	bool unacked = (bool)user_data;
-	struct unacked_adv_ctx *unacked_adv = &link.tx.unacked[link.tx.last_unacked];
-
-	LOG_WRN("%s: err: %d, unacked: %d", __func__, err, unacked);
-
-	if (unacked && unacked_adv != NULL && unacked_adv->cb && unacked_adv->cb->start) {
-		unacked_adv->cb->start(duration, err, unacked_adv->cb_data);
-	}
-
 	if (err) {
-		if (unacked && unacked_adv != NULL) {
-			memset(unacked_adv, 0, sizeof(struct unacked_adv_ctx));
-		}
-
 		delayed_buf_sent(err, user_data);
 	}
 }
 
-static const struct bt_mesh_send_cb delayed_buf_sent_cb = {
+static const struct bt_mesh_send_cb delayed_adv_send_cb = {
 	.start = delayed_buf_start,
 	.end = delayed_buf_sent,
 };
@@ -244,31 +231,30 @@ static void tx_work_handler(struct k_work *work)
 {
 	int i;
 
-	// Send Link Ack, Link Close and Transport Ack first.
+	/* Send Link Ack, Link Close and Transport Ack first. */
 	for (i = 0; i < ARRAY_SIZE(link.tx.unacked); i++) {
-		int idx = (i + link.tx.last_unacked) % 2;
+		int idx = (i + link.tx.last_unacked) % ARRAY_SIZE(link.tx.unacked);
 		struct unacked_adv_ctx *unacked = &link.tx.unacked[idx];
 
 		if (!unacked->adv) {
 			continue;
 		}
 
-		bt_mesh_adv_send(unacked->adv, &delayed_buf_sent_cb, (void *)true);
+		atomic_set_bit(link.flags, ADV_SENDING);
+
+		bt_mesh_adv_send(unacked->adv, &delayed_adv_send_cb, (void *)true);
 		bt_mesh_adv_unref(unacked->adv);
-		atomic_set_bit(link.flags, ADV_LINK_SENDING);
 
 		LOG_WRN("unacked_adv_ctx sent, cb: %p", unacked->cb);
 
-//		memset(unacked, 0, sizeof(struct unacked_adv_ctx));
 		link.tx.last_unacked = idx;
 
 		return;
-		//goto reschedule;
 	}
 
-	// Send Trans Start, Trans Cont and Link Open
+	/* Send Trans Start, Trans Cont and Link Open */
 	if (link.tx.adv[0] == NULL || link.tx.next >= ARRAY_SIZE(link.tx.adv)) {
-		LOG_WRN("nothing to send: %p", link.tx.adv[0]);
+		LOG_DBG("All PDUs were sent");
 		return;
 	}
 
@@ -285,8 +271,8 @@ static void tx_work_handler(struct k_work *work)
 
 		LOG_DBG("%u bytes: %s", adv->b.len, bt_hex(adv->b.data, adv->b.len));
 
-		bt_mesh_adv_send(adv, &delayed_buf_sent_cb, (void *)false);
-		atomic_set_bit(link.flags, ADV_LINK_SENDING);
+		bt_mesh_adv_send(adv, &delayed_adv_send_cb, (void *)false);
+		atomic_set_bit(link.flags, ADV_SENDING);
 		LOG_WRN("link.tx.adv[%d] sent", i);
 		break;
 	}
@@ -294,13 +280,9 @@ static void tx_work_handler(struct k_work *work)
 	link.tx.next = i + 1;
 
 	if (link.tx.next == ARRAY_SIZE(link.tx.adv) || link.tx.adv[link.tx.next] == NULL) {
-		// Sent all buffers with delay, now can run retransmit timer
+		/* All all ack-able PDUs are sent. Now we can run retransmit timer. */
 		k_work_reschedule(&link.tx.retransmit, RETRANSMIT_TIMEOUT);
-//		return;
 	}
-
-//reschedule:
-//	tx_schedule();
 }
 
 static void buf_sent(int err, void *user_data)
@@ -314,18 +296,6 @@ static void buf_sent(int err, void *user_data)
 		return;
 	}
 }
-
-static void buf_start(uint16_t duration, int err, void *user_data)
-{
-	if (err) {
-		buf_sent(err, user_data);
-	}
-}
-
-static struct bt_mesh_send_cb buf_sent_cb = {
-	.start = buf_start,
-	.end = buf_sent,
-};
 
 static uint8_t last_seg(uint16_t len)
 {
@@ -361,7 +331,7 @@ static void free_segments(void)
 			/* Mark as canceled */
 			adv->ctx.busy = 0U;
 		}
-		atomic_clear_bit(link.flags, ADV_LINK_SENDING);
+		atomic_clear_bit(link.flags, ADV_SENDING);
 
 		bt_mesh_adv_unref(adv);
 	}
@@ -445,7 +415,7 @@ static struct bt_mesh_adv *adv_create(uint8_t retransmits)
 	return adv;
 }
 
-static void ack_complete(uint16_t duration, int err, void *user_data)
+static void ack_complete(int err, void *user_data)
 {
 	LOG_DBG("xact 0x%x complete", (uint8_t)link.tx.pending_ack);
 	atomic_clear_bit(link.flags, ADV_ACK_PENDING);
@@ -500,10 +470,7 @@ static void protocol_timeout(struct k_work *work)
 
 static void gen_prov_ack_send(uint8_t xact_id)
 {
-	static const struct bt_mesh_send_cb cb = {
-		.start = ack_complete,
-	};
-	const struct bt_mesh_send_cb *complete;
+	prov_bearer_send_complete_t complete_cb;
 	struct bt_mesh_adv *adv;
 	bool pending = atomic_test_and_set_bit(link.flags, ADV_ACK_PENDING);
 
@@ -521,10 +488,10 @@ static void gen_prov_ack_send(uint8_t xact_id)
 	}
 
 	if (pending) {
-		complete = NULL;
+		complete_cb = NULL;
 	} else {
 		link.tx.pending_ack = xact_id;
-		complete = &cb;
+		complete_cb = ack_complete;
 	}
 
 	net_buf_simple_add_be32(&adv->b, link.id);
@@ -532,7 +499,7 @@ static void gen_prov_ack_send(uint8_t xact_id)
 	net_buf_simple_add_u8(&adv->b, GPC_ACK);
 
 	LOG_WRN("Sending Trans Ack: %p", adv);
-	send_unacked(adv, complete, NULL);
+	send_unacked(adv, complete_cb, NULL);
 }
 
 static void gen_prov_cont(struct prov_rx *rx, struct net_buf_simple *buf)
@@ -836,7 +803,7 @@ static int bearer_ctl_send_unacked(struct bt_mesh_adv *adv, void *user_data)
 	k_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
 
 	LOG_WRN("Sending Link Smth: %p", adv);
-	send_unacked(adv, &buf_sent_cb, user_data);
+	send_unacked(adv, &buf_sent, user_data);
 
 	return 0;
 }
