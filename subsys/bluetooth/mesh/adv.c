@@ -80,8 +80,6 @@ void bt_mesh_adv_send_end(int err, struct bt_mesh_adv_ctx *ctx)
 {
 	if (ctx->started && ctx->cb && ctx->cb->end) {
 		ctx->cb->end(err, ctx->cb_data);
-
-		ctx->started = 0;
 	}
 }
 

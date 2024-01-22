@@ -278,18 +278,6 @@ static void tx_work_handler(struct k_work *work)
 	}
 }
 
-static void buf_sent(int err, void *user_data)
-{
-	enum prov_bearer_link_status reason = (enum prov_bearer_link_status)(int)user_data;
-
-	atomic_test_and_clear_bit(link.flags, ADV_LINK_ACK_SENDING);
-
-	if (atomic_test_and_clear_bit(link.flags, ADV_LINK_CLOSING)) {
-		close_link(reason);
-		return;
-	}
-}
-
 static uint8_t last_seg(uint16_t len)
 {
 	if (len <= START_PAYLOAD_MAX) {
@@ -305,8 +293,6 @@ static void free_segments(void)
 {
 	int i;
 
-	LOG_WRN("free_segments");
-
 	for (i = 0; i < ARRAY_SIZE(link.tx.adv); i++) {
 		struct bt_mesh_adv *adv = link.tx.adv[i];
 
@@ -315,7 +301,6 @@ static void free_segments(void)
 		}
 
 		link.tx.adv[i] = NULL;
-		LOG_WRN("freeing seg %d", i);
 
 		/* Terminate active adv */
 		if (adv->ctx.busy == 0U) {
@@ -324,7 +309,9 @@ static void free_segments(void)
 			/* Mark as canceled */
 			adv->ctx.busy = 0U;
 		}
+
 		atomic_clear_bit(link.flags, ADV_SENDING);
+		tx_schedule();
 
 		bt_mesh_adv_unref(adv);
 	}
@@ -463,7 +450,6 @@ static void protocol_timeout(struct k_work *work)
 
 static void gen_prov_ack_send(uint8_t xact_id)
 {
-	prov_bearer_send_complete_t complete_cb;
 	struct bt_mesh_adv *adv;
 	bool pending = atomic_test_and_set_bit(link.flags, ADV_ACK_PENDING);
 
@@ -480,19 +466,15 @@ static void gen_prov_ack_send(uint8_t xact_id)
 		return;
 	}
 
-	if (pending) {
-		complete_cb = NULL;
-	} else {
+	if (!pending) {
 		link.tx.pending_ack = xact_id;
-		complete_cb = ack_complete;
 	}
 
 	net_buf_simple_add_be32(&adv->b, link.id);
 	net_buf_simple_add_u8(&adv->b, xact_id);
 	net_buf_simple_add_u8(&adv->b, GPC_ACK);
 
-	LOG_WRN("Sending Trans Ack: %p", adv);
-	send_unacked(adv, complete_cb, NULL);
+	send_unacked(adv, pending ? NULL : ack_complete, NULL);
 }
 
 static void gen_prov_cont(struct prov_rx *rx, struct net_buf_simple *buf)
@@ -786,6 +768,18 @@ static int bearer_ctl_send(struct bt_mesh_adv *adv)
 	return 0;
 }
 
+static void buf_sent(int err, void *user_data)
+{
+	enum prov_bearer_link_status reason = (enum prov_bearer_link_status)(int)user_data;
+
+	atomic_test_and_clear_bit(link.flags, ADV_LINK_ACK_SENDING);
+
+	if (atomic_test_and_clear_bit(link.flags, ADV_LINK_CLOSING)) {
+		close_link(reason);
+		return;
+	}
+}
+
 static int bearer_ctl_send_unacked(struct bt_mesh_adv *adv, void *user_data)
 {
 	if (!adv) {
@@ -795,7 +789,6 @@ static int bearer_ctl_send_unacked(struct bt_mesh_adv *adv, void *user_data)
 	prov_clear_tx();
 	k_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
 
-	LOG_WRN("Sending Link Smth: %p", adv);
 	send_unacked(adv, &buf_sent, user_data);
 
 	return 0;
@@ -912,7 +905,6 @@ static void link_open(struct prov_rx *rx, struct net_buf_simple *buf)
 	atomic_set_bit(link.flags, ADV_LINK_ACTIVE);
 	net_buf_simple_reset(link.rx.buf);
 
-	LOG_WRN("Sending first link ack");
 	atomic_set_bit(link.flags, ADV_LINK_ACK_SENDING);
 	err = bearer_ctl_send_unacked(
 		ctl_adv_create(LINK_ACK, NULL, 0, RETRANSMITS_ACK),
@@ -1059,7 +1051,6 @@ static void prov_link_close(enum prov_bearer_link_status status)
 	 */
 	link.tx.timeout = CLOSING_TIMEOUT;
 	/* Ignore errors, the link will time out eventually if this doesn't get sent */
-	LOG_WRN("Sending Link Close");
 	bearer_ctl_send_unacked(
 		ctl_adv_create(LINK_CLOSE, &status, 1, RETRANSMITS_LINK_CLOSE),
 		(void *)status);
