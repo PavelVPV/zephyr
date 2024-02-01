@@ -1463,6 +1463,8 @@ int nvs_delete(struct nvs_fs *fs, uint16_t id)
 	return nvs_write(fs, id, NULL, 0);
 }
 
+extern uint64_t ate_loops;
+
 ssize_t nvs_read_hist(struct nvs_fs *fs, uint16_t id, void *data, size_t len,
 		      uint16_t cnt)
 {
@@ -1501,6 +1503,7 @@ ssize_t nvs_read_hist(struct nvs_fs *fs, uint16_t id, void *data, size_t len,
 	rd_addr = wlk_addr;
 
 	while (cnt_his <= cnt) {
+		ate_loops++;
 		rd_addr = wlk_addr;
 		rc = nvs_prev_ate(fs, &wlk_addr, &wlk_ate);
 		if (rc) {

@@ -212,6 +212,8 @@ static int settings_nvs_load(struct settings_store *cs,
 	return ret;
 }
 
+#include <zephyr/sys/printk.h>
+
 static int settings_nvs_save(struct settings_store *cs, const char *name,
 			     const char *value, size_t val_len)
 {
@@ -220,6 +222,9 @@ static int settings_nvs_save(struct settings_store *cs, const char *name,
 	uint16_t name_id, write_name_id;
 	bool delete, write_name;
 	int rc = 0;
+
+	/*int64_t timestamp_loop = k_uptime_get();
+	uint32_t loops = 0;*/
 
 	if (!name) {
 		return -EINVAL;
@@ -251,7 +256,11 @@ static int settings_nvs_save(struct settings_store *cs, const char *name,
 	}
 #endif
 
+	/*printk("name id: %#2x,\n", name_id);
+	printk("ate_wra: %#4x, data_wra: %#4x\n", cf->cf_nvs.ate_wra, cf->cf_nvs.data_wra);*/
+
 	while (1) {
+		/*loops++;*/
 		name_id--;
 		if (name_id == NVS_NAMECNT_ID) {
 			break;
@@ -269,6 +278,9 @@ static int settings_nvs_save(struct settings_store *cs, const char *name,
 
 		rdname[rc] = '\0';
 
+		/*printk("rdname: %s\n", rdname);
+		printk("name: %s\n", name);*/
+
 		if (strcmp(name, rdname)) {
 			continue;
 		}
@@ -282,6 +294,10 @@ static int settings_nvs_save(struct settings_store *cs, const char *name,
 	}
 
 found:
+	/*int64_t delta_loop = k_uptime_delta(&timestamp_loop);
+	printk("nvs loop time: %u, loops: %u, ate_loops: %u\n", (uint32_t)delta_loop, loops, ate_loops);
+	printk("last id: %#2x, write id: %#2x\n", cf->last_name_id, write_name_id);*/
+
 	if (delete) {
 		if (name_id == NVS_NAMECNT_ID) {
 			return 0;

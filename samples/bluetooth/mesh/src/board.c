@@ -32,6 +32,18 @@
 #define BUTTON0 DT_INVALID_NODE
 #endif
 
+#if DT_NODE_EXISTS(DT_ALIAS(sw1))
+#define BUTTON1 DT_ALIAS(sw1)
+#elif DT_NODE_EXISTS(DT_ALIAS(button1))
+#define BUTTON1 DT_ALIAS(button1)
+#elif DT_NODE_EXISTS(DT_NODELABEL(sw1))
+#define BUTTON1 DT_NODELABEL(sw1)
+#elif DT_NODE_EXISTS(DT_NODELABEL(button1))
+#define BUTTON1 DT_NODELABEL(button1)
+#else
+#define BUTTON1 DT_INVALID_NODE
+#endif
+
 #if DT_NODE_EXISTS(LED0)
 #define LED0_DEV DT_PHANDLE(LED0, gpios)
 #define LED0_PIN DT_PHA(LED0, gpios, pin)
@@ -54,6 +66,21 @@ static void button_cb(const struct device *port, struct gpio_callback *cb,
 	k_work_submit(button_work);
 }
 #endif /* BUTTON0 */
+
+#if DT_NODE_EXISTS(BUTTON1)
+#define BUTTON1_DEV DT_PHANDLE(BUTTON1, gpios)
+#define BUTTON1_PIN DT_PHA(BUTTON1, gpios, pin)
+#define BUTTON1_FLAGS DT_PHA(BUTTON1, gpios, flags)
+
+static const struct device *const button1_dev = DEVICE_DT_GET(BUTTON1_DEV);
+static struct k_work *button1_work;
+
+static void button1_cb(const struct device *port, struct gpio_callback *cb,
+		      gpio_port_pins_t pins)
+{
+	k_work_submit(button1_work);
+}
+#endif /* BUTTON1 */
 
 static int led_init(void)
 {
@@ -106,11 +133,46 @@ static int button_init(struct k_work *button_pressed)
 	return 0;
 }
 
-int board_init(struct k_work *button_pressed)
+static int button1_init(struct k_work *button_pressed)
+{
+#if DT_NODE_EXISTS(BUTTON1)
+	int err;
+
+	err = gpio_pin_configure(button1_dev, BUTTON1_PIN,
+				 BUTTON1_FLAGS | GPIO_INPUT);
+	if (err) {
+		return err;
+	}
+
+	static struct gpio_callback gpio_cb;
+
+	err = gpio_pin_interrupt_configure(button1_dev, BUTTON1_PIN,
+					   GPIO_INT_EDGE_TO_ACTIVE);
+	if (err) {
+		return err;
+	}
+
+	button1_work = button_pressed;
+
+	gpio_init_callback(&gpio_cb, button1_cb, BIT(BUTTON1_PIN));
+	gpio_add_callback(button1_dev, &gpio_cb);
+#else
+	printk("WARNING: Buttons not supported on this board.\n");
+#endif
+
+	return 0;
+}
+
+int board_init(struct k_work *button_pressed, struct k_work *button1_pressed)
 {
 	int err;
 
 	err = led_init();
+	if (err) {
+		return err;
+	}
+
+	err = button1_init(button1_pressed);
 	if (err) {
 		return err;
 	}
