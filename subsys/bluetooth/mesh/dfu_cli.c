@@ -13,7 +13,7 @@
 #include <zephyr/random/random.h>
 #include <common/bt_str.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_DFU_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_DFU_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_dfu_cli);
 
@@ -249,6 +249,8 @@ static void blob_end(struct bt_mesh_blob_cli *b,
 		     const struct bt_mesh_blob_xfer *xfer, bool success)
 {
 	struct bt_mesh_dfu_cli *cli = DFU_CLI(b);
+
+	LOG_WRN("blob_end: succ: %d", success);
 
 	cli->req.img_cb = NULL;
 
@@ -525,6 +527,7 @@ static void refreshed(struct bt_mesh_blob_cli *b)
 	struct bt_mesh_dfu_cli *cli = DFU_CLI(b);
 
 	if (!targets_active(cli)) {
+		LOG_WRN("%s: no active targets", __func__);
 		dfu_failed(cli, BT_MESH_DFU_ERR_INTERNAL);
 		return;
 	}
@@ -634,6 +637,8 @@ static void confirmed(struct bt_mesh_blob_cli *b)
 
 	cli->req.img_cb = NULL;
 
+	LOG_WRN("confirmed");
+
 	TARGETS_FOR_EACH(cli, target) {
 		if (target->status != BT_MESH_DFU_SUCCESS) {
 			/* Target either failed at earlier stage or during confirmation. In any
@@ -691,6 +696,8 @@ static void cancelled(struct bt_mesh_blob_cli *b)
 {
 	struct bt_mesh_dfu_cli *cli = DFU_CLI(b);
 
+	LOG_WRN("cancelled");
+
 	cli->xfer.flags |= FLAG_CANCELLED;
 	dfu_failed(cli, BT_MESH_DFU_ERR_INTERNAL);
 }
@@ -711,6 +718,8 @@ static int handle_status(const struct bt_mesh_model *mod, struct bt_mesh_msg_ctx
 	byte = net_buf_simple_pull_u8(buf);
 	status = byte & BIT_MASK(3);
 	phase = byte >> 5;
+
+	LOG_WRN("handle_status: %d, %d", status, phase);
 
 	if (cli->req.type == REQ_STATUS && cli->req.addr == ctx->addr) {
 		if (cli->req.params) {
@@ -737,6 +746,7 @@ static int handle_status(const struct bt_mesh_model *mod, struct bt_mesh_msg_ctx
 		k_sem_give(&cli->req.sem);
 	}
 	if (cli->op != BT_MESH_DFU_OP_UPDATE_STATUS) {
+		LOG_WRN("cli->op: %d", cli->op);
 		return 0;
 	}
 

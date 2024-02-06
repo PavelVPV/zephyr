@@ -14,7 +14,7 @@
 #include "net.h"
 #include "transport.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_DFU_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_DFU_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_dfd_srv);
 

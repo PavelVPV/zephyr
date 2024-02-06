@@ -29,7 +29,7 @@
 #include "va.h"
 #include "delayable_msg.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_ACCESS_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_ACCESS_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_access);
 

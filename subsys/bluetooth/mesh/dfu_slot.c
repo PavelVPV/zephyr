@@ -12,7 +12,7 @@
 #include <zephyr/sys/util.h>
 #include <common/bt_str.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_DFU_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_DFU_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_dfu_slot);
 
