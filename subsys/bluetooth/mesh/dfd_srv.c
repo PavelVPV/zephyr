@@ -249,11 +249,14 @@ static void status_rsp(struct bt_mesh_dfd_srv *srv, struct bt_mesh_msg_ctx *ctx,
 	BT_MESH_MODEL_BUF_DEFINE(rsp, BT_MESH_DFD_OP_STATUS, 12);
 	bt_mesh_model_msg_init(&rsp, BT_MESH_DFD_OP_STATUS);
 
+	LOG_WRN("Sending Fw Dist Status: %d, p:%d, sl:%p", status, srv->phase, srv->dfu.xfer.slot);
+
 	net_buf_simple_add_u8(&rsp, status);
 	net_buf_simple_add_u8(&rsp, srv->phase);
 
 	if (srv->phase == BT_MESH_DFD_PHASE_IDLE || !srv->dfu.xfer.slot) {
-		bt_mesh_model_send(srv->mod, ctx, &rsp, NULL, NULL);
+		int err = bt_mesh_model_send(srv->mod, ctx, &rsp, NULL, NULL);
+		LOG_WRN("Fw Dist Status err: %d", err);
 		return;
 	}
 
@@ -265,7 +268,8 @@ static void status_rsp(struct bt_mesh_dfd_srv *srv, struct bt_mesh_msg_ctx *ctx,
 				     ((srv->apply & BIT_MASK(1)) << 2)));
 	net_buf_simple_add_le16(&rsp, srv->slot_idx);
 
-	bt_mesh_model_send(srv->mod, ctx, &rsp, NULL, NULL);
+	int err = bt_mesh_model_send(srv->mod, ctx, &rsp, NULL, NULL);
+	LOG_WRN("Fw Dist Status 2 err: %d", err);
 }
 
 static int handle_get(const struct bt_mesh_model *mod, struct bt_mesh_msg_ctx *ctx,
@@ -1152,12 +1156,12 @@ enum bt_mesh_dfd_status bt_mesh_dfd_srv_cancel(struct bt_mesh_dfd_srv *srv,
 		status_rsp(srv, ctx, BT_MESH_DFD_SUCCESS);
 	}
 
-	if (prev_phase == BT_MESH_DFD_PHASE_APPLYING_UPDATE) {
-		dfd_phase_set(srv, BT_MESH_DFD_PHASE_IDLE);
-		if (ctx != NULL) {
-			status_rsp(srv, ctx, BT_MESH_DFD_SUCCESS);
-		}
-	}
+//	if (prev_phase == BT_MESH_DFD_PHASE_APPLYING_UPDATE) {
+//		dfd_phase_set(srv, BT_MESH_DFD_PHASE_IDLE);
+//		if (ctx != NULL) {
+//			status_rsp(srv, ctx, BT_MESH_DFD_SUCCESS);
+//		}
+//	}
 
 	return BT_MESH_DFD_SUCCESS;
 }

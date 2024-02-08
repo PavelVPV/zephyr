@@ -16,7 +16,7 @@
 #include "access.h"
 #include "net.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_ACCESS_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_ACCESS_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_delayable_msg);
 
@@ -190,6 +190,8 @@ static bool push_msg_from_delayable_msgs(void)
 	err = bt_mesh_access_send(&msg->ctx, &buf, msg->src_addr, msg->cb, msg->cb_data);
 	msg->ctx.rnd_delay = true;
 
+	LOG_DBG("bt_mesh_access_send(): err %d", err);
+
 	if (err == -EBUSY || err == -ENOBUFS) {
 		return false;
 	}
@@ -234,6 +236,7 @@ int bt_mesh_delayable_msg_manage(struct bt_mesh_msg_ctx *ctx, struct net_buf_sim
 	}
 
 	if (total_number > CONFIG_BT_MESH_ACCESS_DELAYABLE_MSG_CHUNK_COUNT) {
+		LOG_WRN("More chunks than supported: %d", total_number);
 		return -EINVAL;
 	}
 
