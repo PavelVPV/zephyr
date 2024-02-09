@@ -74,6 +74,8 @@ int settings_nvs_dst(struct settings_nvs *cf)
 }
 
 #if CONFIG_SETTINGS_NVS_NAME_CACHE
+static bool settings_nvs_cache_ovfl;
+
 static void settings_nvs_cache_add(struct settings_nvs *cf, const char *name,
 				   uint16_t name_id)
 {
@@ -81,6 +83,10 @@ static void settings_nvs_cache_add(struct settings_nvs *cf, const char *name,
 
 	cf->cache[cf->cache_next].name_hash = name_hash;
 	cf->cache[cf->cache_next++].name_id = name_id;
+
+	if (cf->cache_next >= CONFIG_SETTINGS_NVS_NAME_CACHE_SIZE) {
+		settings_nvs_cache_ovfl = true;
+	}
 
 	cf->cache_next %= CONFIG_SETTINGS_NVS_NAME_CACHE_SIZE;
 }
@@ -235,6 +241,9 @@ static int settings_nvs_save(struct settings_store *cs, const char *name,
 
 	/*printk("name id: %#2x,\n", name_id);
 	printk("ate_wra: %#4x, data_wra: %#4x\n", cf->cf_nvs.ate_wra, cf->cf_nvs.data_wra);*/
+	if (!settings_nvs_cache_ovfl) {
+		goto found;
+	}
 
 	while (1) {
 		/*loops++;*/
