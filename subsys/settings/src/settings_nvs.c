@@ -332,6 +332,9 @@ found:
 
 	/* write the name if required */
 	if (write_name) {
+#if CONFIG_SETTINGS_NVS_NAME_CACHE
+		settings_nvs_cache_add(cf, name, write_name_id);
+#endif
 		rc = nvs_write(&cf->cf_nvs, write_name_id, name, strlen(name));
 		if (rc < 0) {
 			return rc;
