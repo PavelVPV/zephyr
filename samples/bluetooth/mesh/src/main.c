@@ -381,6 +381,29 @@ static void button_pressed(struct k_work *work)
 	printk("Provisioned and configured!\n");
 }
 
+static uint16_t seq;
+
+int seq_handle_set(const char *name, size_t len, settings_read_cb read_cb,
+		  void *cb_arg)
+{
+	const char *next;
+	size_t name_len;
+	int rc;
+
+	name_len = settings_name_next(name, &next);
+
+	if (!next) {
+		rc = read_cb(cb_arg, &seq, sizeof(seq));
+		printk("seq: %u, err: %d", seq, rc);
+		return rc > 0 ? 0 : rc;
+	}
+
+	return -ENOENT;
+}
+
+/* static subtree handler */
+SETTINGS_STATIC_HANDLER_DEFINE(w_seq, "w_seq", NULL, seq_handle_set, NULL, NULL);
+
 static void button1_pressed(struct k_work *work)
 {
 	struct bt_mesh_rpl *rpl;
@@ -389,7 +412,6 @@ static void button1_pressed(struct k_work *work)
 		.local_match = true,
 		.old_iv = 0
 	};
-	static uint16_t seq;
 
 	rpl_statistic.total_calculated = 0;
 	rpl_statistic.total_measured = 0;
@@ -402,9 +424,15 @@ static void button1_pressed(struct k_work *work)
 
 	for (int i = 0; i < 255; i++) {
 		rx.ctx.addr = i + 5;
-		bt_mesh_rpl_check(&rx, &rpl);
+		if (bt_mesh_rpl_check(&rx, &rpl)) {
+			printk("Replay attack!\n");
+			return;
+		}
+
 		bt_mesh_rpl_update(rpl, &rx);
 	}
+
+	settings_save_one("w_seq", &seq, sizeof(seq));
 
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_RPL_PENDING);
 }
