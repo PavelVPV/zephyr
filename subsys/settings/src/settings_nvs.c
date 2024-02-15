@@ -74,6 +74,10 @@ int settings_nvs_dst(struct settings_nvs *cf)
 }
 
 #if CONFIG_SETTINGS_NVS_NAME_CACHE
+#define SETTINGS_NVS_CACHE_OVFL(cf) \
+	(((cf)->cache[ARRAY_SIZE((cf)->cache) - 1].name_id > NVS_NAMECNT_ID) && \
+	 (cf)->cache_next > 0)
+
 static void settings_nvs_cache_add(struct settings_nvs *cf, const char *name,
 				   uint16_t name_id)
 {
@@ -128,6 +132,13 @@ static int settings_nvs_load(struct settings_store *cs,
 	char buf;
 	ssize_t rc1, rc2;
 	uint16_t name_id = NVS_NAMECNT_ID;
+
+#if CONFIG_SETTINGS_NVS_NAME_CACHE
+	/* We can clear the cache because we will load all values from NVS. */
+	memset(cf->cache, 0, sizeof(cf->cache));
+	cf->cache_next = 0;
+	cf->loaded = true;
+#endif
 
 	name_id = cf->last_name_id + 1;
 
@@ -230,6 +241,13 @@ static int settings_nvs_save(struct settings_store *cs, const char *name,
 	name_id = cf->last_name_id + 1;
 	write_name_id = cf->last_name_id + 1;
 	write_name = true;
+
+#if CONFIG_SETTINGS_NVS_NAME_CACHE
+	/* We can skip reading NVS if we know that the cache wasn't overflowed. */
+	if (cf->loaded && !SETTINGS_NVS_CACHE_OVFL(cf)) {
+		goto found;
+	}
+#endif
 
 	while (1) {
 		name_id--;
