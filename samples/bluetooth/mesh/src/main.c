@@ -20,10 +20,16 @@
 
 #include "board.h"
 
+#include "../../../../subsys/bluetooth/mesh/net.h"
+#include "../../../../subsys/bluetooth/mesh/rpl.h"
+#include "../../../../subsys/bluetooth/mesh/settings.h"
+
 #define OP_ONOFF_GET       BT_MESH_MODEL_OP_2(0x82, 0x01)
 #define OP_ONOFF_SET       BT_MESH_MODEL_OP_2(0x82, 0x02)
 #define OP_ONOFF_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
 #define OP_ONOFF_STATUS    BT_MESH_MODEL_OP_2(0x82, 0x04)
+
+extern struct bt_mesh_rpl_statistics rpl_statistic;
 
 static void attention_on(const struct bt_mesh_model *mod)
 {
@@ -342,14 +348,14 @@ static void button_pressed(struct k_work *work)
 	static uint8_t net_key[16];
 	static uint8_t dev_key[16];
 	static uint8_t app_key[16];
-	uint16_t addr;
+	uint16_t addr = 0x0001;
 	int err;
 
-	if (IS_ENABLED(CONFIG_HWINFO)) {
+	/*if (IS_ENABLED(CONFIG_HWINFO)) {
 		addr = sys_get_le16(&dev_uuid[0]) & BIT_MASK(15);
 	} else {
 		addr = k_uptime_get_32() & BIT_MASK(15);
-	}
+	}*/
 
 	printk("Self-provisioning with address 0x%04x\n", addr);
 	err = bt_mesh_provision(net_key, 0, 0, 0, addr, dev_key);
@@ -372,6 +378,68 @@ static void button_pressed(struct k_work *work)
 	models[3].keys[0] = 0;
 
 	printk("Provisioned and configured!\n");
+}
+
+static uint16_t seq;
+static int src;
+
+int seq_handle_set(const char *name, size_t len, settings_read_cb read_cb,
+		  void *cb_arg)
+{
+	const char *next;
+	size_t name_len;
+	int rc;
+
+	name_len = settings_name_next(name, &next);
+
+	if (!next) {
+		rc = read_cb(cb_arg, &seq, sizeof(seq));
+		printk("seq: %u, err: %d", seq, rc);
+		return rc > 0 ? 0 : rc;
+	}
+
+	return -ENOENT;
+}
+
+/* static subtree handler */
+SETTINGS_STATIC_HANDLER_DEFINE(w_seq, "w_seq", NULL, seq_handle_set, NULL, NULL);
+
+static void button1_pressed(struct k_work *work)
+{
+	struct bt_mesh_rpl *rpl;
+	struct bt_mesh_net_rx rx = {
+		.net_if = BT_MESH_NET_IF_ADV,
+		.local_match = true,
+		.old_iv = 0
+	};
+
+	rpl_statistic.total_calculated = 0;
+	rpl_statistic.total_measured = 0;
+	rpl_statistic.single_entry_max = 0;
+	rpl_statistic.single_entry_min = UINT_FAST32_MAX;
+	rpl_statistic.single_entry_middle = 0;
+
+	rx.seq = seq++;
+
+	for (int i = 0; i < 255; i++) {
+	//for (int i = 0; i < 5; i++) {
+		rx.ctx.addr = i + 5;// + src;
+		if (bt_mesh_rpl_check(&rx, &rpl)) {
+			printk("Replay attack!\n");
+			return;
+		}
+
+		bt_mesh_rpl_update(rpl, &rx);
+	}
+
+	//src += 5;
+	//if (src >= 255) {
+	//	src = 0;
+	//}
+
+	settings_save_one("w_seq", &seq, sizeof(seq));
+
+	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_RPL_PENDING);
 }
 
 static void bt_ready(int err)
@@ -402,6 +470,7 @@ static void bt_ready(int err)
 int main(void)
 {
 	static struct k_work button_work;
+	static struct k_work button1_work;
 	int err = -1;
 
 	printk("Initializing...\n");
@@ -416,8 +485,9 @@ int main(void)
 	}
 
 	k_work_init(&button_work, button_pressed);
+	k_work_init(&button1_work, button1_pressed);
 
-	err = board_init(&button_work);
+	err = board_init(&button_work, &button1_work);
 	if (err) {
 		printk("Board init failed (err: %d)\n", err);
 		return 0;

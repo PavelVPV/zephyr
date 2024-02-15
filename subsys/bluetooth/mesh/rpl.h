@@ -18,6 +18,14 @@ struct bt_mesh_rpl {
 		 seg:24;
 };
 
+struct bt_mesh_rpl_statistics {
+	uint32_t total_calculated;
+	uint32_t total_measured;
+	uint32_t single_entry_max;
+	uint32_t single_entry_min;
+	uint32_t single_entry_middle;
+};
+
 typedef void (*bt_mesh_rpl_func_t)(struct bt_mesh_rpl *rpl,
 					void *user_data);
 
