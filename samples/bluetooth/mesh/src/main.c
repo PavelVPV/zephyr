@@ -382,6 +382,7 @@ static void button_pressed(struct k_work *work)
 }
 
 static uint16_t seq;
+static int src;
 
 int seq_handle_set(const char *name, size_t len, settings_read_cb read_cb,
 		  void *cb_arg)
@@ -422,14 +423,20 @@ static void button1_pressed(struct k_work *work)
 
 	rx.seq = seq++;
 
-	for (int i = 0; i < 255; i++) {
-		rx.ctx.addr = i + 5;
+	//for (int i = 0; i < 255; i++) {
+	for (int i = 0; i < 5; i++) {
+		rx.ctx.addr = i + 5 + src;
 		if (bt_mesh_rpl_check(&rx, &rpl)) {
 			printk("Replay attack!\n");
 			return;
 		}
 
 		bt_mesh_rpl_update(rpl, &rx);
+	}
+
+	src += 5;
+	if (src >= 255) {
+		src = 0;
 	}
 
 	settings_save_one("w_seq", &seq, sizeof(seq));

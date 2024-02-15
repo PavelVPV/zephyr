@@ -45,7 +45,7 @@ struct settings_nvs {
 	} cache[CONFIG_SETTINGS_NVS_NAME_CACHE_SIZE];
 
 	uint16_t cache_next;
-	bool ovfl;
+	bool loaded;
 #endif
 };
 
