@@ -74,12 +74,20 @@ int settings_nvs_dst(struct settings_nvs *cf)
 }
 
 #if CONFIG_SETTINGS_NVS_NAME_CACHE
+//#define SETTINGS_NVS_CACHE_OVFL(cf) \
+//	(((cf)->cache[ARRAY_SIZE((cf)->cache) - 1].name_id > NVS_NAMECNT_ID) && \
+//	 (cf)->cache_next > 0)
+
 #define SETTINGS_NVS_CACHE_OVFL(cf) ((cf)->cache_total > ARRAY_SIZE((cf)->cache))
 
 static void settings_nvs_cache_add(struct settings_nvs *cf, const char *name,
 				   uint16_t name_id)
 {
 	uint16_t name_hash = crc16_ccitt(0xffff, name, strlen(name));
+
+	if (cf->cache[cf->cache_next].name_id >= NVS_NAMECNT_ID) {
+		printk("cache_add(): killing %d\n", cf->cache[cf->cache_next].name_hash);
+	}
 
 	cf->cache[cf->cache_next].name_hash = name_hash;
 	cf->cache[cf->cache_next++].name_id = name_id;
@@ -116,6 +124,7 @@ static uint16_t settings_nvs_cache_match(struct settings_nvs *cf, const char *na
 		return cf->cache[i].name_id;
 	}
 
+	printk("cache_match(): name_hash %d not found\n", name_hash);
 	return NVS_NAMECNT_ID;
 }
 #endif /* CONFIG_SETTINGS_NVS_NAME_CACHE */
@@ -140,10 +149,10 @@ static int settings_nvs_load(struct settings_store *cs,
 	name_id = cf->last_name_id + 1;
 
 	while (1) {
-
 		name_id--;
 		if (name_id == NVS_NAMECNT_ID) {
 #if CONFIG_SETTINGS_NVS_NAME_CACHE
+			printk("load complete: %d\n", cached);
 			cf->loaded = true;
 			cf->cache_total = cached;
 #endif
@@ -206,6 +215,7 @@ static int settings_nvs_load(struct settings_store *cs,
 			settings_nvs_read_fn, &read_fn_arg,
 			(void *)arg);
 		if (ret) {
+			printk("set_handler err: %d\n", ret);
 			break;
 		}
 	}
@@ -231,6 +241,9 @@ static int settings_nvs_save(struct settings_store *cs, const char *name,
 #if CONFIG_SETTINGS_NVS_NAME_CACHE
 	bool name_in_cache = false;
 
+	printk("settings_save_one(): load: %d, t:%d o: %d\n", cf->loaded, cf->cache_total,
+	       SETTINGS_NVS_CACHE_OVFL(cf));
+
 	name_id = settings_nvs_cache_match(cf, name, rdname, sizeof(rdname));
 	if (name_id != NVS_NAMECNT_ID) {
 		write_name_id = name_id;
@@ -247,9 +260,12 @@ static int settings_nvs_save(struct settings_store *cs, const char *name,
 #if CONFIG_SETTINGS_NVS_NAME_CACHE
 	/* We can skip reading NVS if we know that the cache wasn't overflowed. */
 	if (cf->loaded && !SETTINGS_NVS_CACHE_OVFL(cf)) {
+		printk("skipping read\n");
 		goto found;
 	}
 #endif
+
+	printk("settings_save_one(): reaeding NVS: %s\n", name);
 
 	while (1) {
 		name_id--;
@@ -345,9 +361,11 @@ found:
 #if CONFIG_SETTINGS_NVS_NAME_CACHE
 	if (!name_in_cache) {
 		settings_nvs_cache_add(cf, name, write_name_id);
+		printk("settings_save_one(): ovfl: %d\n", SETTINGS_NVS_CACHE_OVFL(cf));
 		if (cf->loaded && !SETTINGS_NVS_CACHE_OVFL(cf)) {
 			cf->cache_total++;
 		}
+		printk("settings_save_one(): ovfl: %d\n", SETTINGS_NVS_CACHE_OVFL(cf));
 	}
 #endif
 
