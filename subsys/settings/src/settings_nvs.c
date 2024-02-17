@@ -74,9 +74,7 @@ int settings_nvs_dst(struct settings_nvs *cf)
 }
 
 #if CONFIG_SETTINGS_NVS_NAME_CACHE
-#define SETTINGS_NVS_CACHE_OVFL(cf) \
-	(((cf)->cache[ARRAY_SIZE((cf)->cache) - 1].name_id > NVS_NAMECNT_ID) && \
-	 (cf)->cache_next > 0)
+#define SETTINGS_NVS_CACHE_OVFL(cf) ((cf)->cache_total > ARRAY_SIZE((cf)->cache))
 
 static void settings_nvs_cache_add(struct settings_nvs *cf, const char *name,
 				   uint16_t name_id)
@@ -134,10 +132,9 @@ static int settings_nvs_load(struct settings_store *cs,
 	uint16_t name_id = NVS_NAMECNT_ID;
 
 #if CONFIG_SETTINGS_NVS_NAME_CACHE
-	/* We can clear the cache because we will load all values from NVS. */
-	memset(cf->cache, 0, sizeof(cf->cache));
-	cf->cache_next = 0;
-	cf->loaded = true;
+	uint16_t cached = 0;
+
+	cf->loaded = false;
 #endif
 
 	name_id = cf->last_name_id + 1;
@@ -146,6 +143,10 @@ static int settings_nvs_load(struct settings_store *cs,
 
 		name_id--;
 		if (name_id == NVS_NAMECNT_ID) {
+#if CONFIG_SETTINGS_NVS_NAME_CACHE
+			cf->loaded = true;
+			cf->cache_total = cached;
+#endif
 			break;
 		}
 
@@ -197,6 +198,7 @@ static int settings_nvs_load(struct settings_store *cs,
 
 #if CONFIG_SETTINGS_NVS_NAME_CACHE
 		settings_nvs_cache_add(cf, name, name_id);
+		cached++;
 #endif
 
 		ret = settings_call_set_handler(
@@ -343,6 +345,9 @@ found:
 #if CONFIG_SETTINGS_NVS_NAME_CACHE
 	if (!name_in_cache) {
 		settings_nvs_cache_add(cf, name, write_name_id);
+		if (cf->loaded && !SETTINGS_NVS_CACHE_OVFL(cf)) {
+			cf->cache_total++;
+		}
 	}
 #endif
 
