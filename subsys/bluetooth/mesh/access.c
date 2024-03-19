@@ -1518,20 +1518,11 @@ static int element_model_recv(struct bt_mesh_msg_ctx *ctx, struct net_buf_simple
 	return ACCESS_STATUS_SUCCESS;
 }
 
-int bt_mesh_model_recv(struct bt_mesh_msg_ctx *ctx, struct net_buf_simple *buf)
+int bt_mesh_model_msg_recv(struct bt_mesh_msg_ctx *ctx, struct net_buf_simple *buf)
 {
 	int err = ACCESS_STATUS_SUCCESS;
 	uint32_t opcode;
 	uint16_t index;
-
-	LOG_DBG("app_idx 0x%04x src 0x%04x dst 0x%04x", ctx->app_idx, ctx->addr,
-		ctx->recv_dst);
-	LOG_DBG("len %u: %s", buf->len, bt_hex(buf->data, buf->len));
-
-	if (IS_ENABLED(CONFIG_BT_TESTING)) {
-		bt_test_mesh_model_recv(ctx->addr, ctx->recv_dst, buf->data,
-					buf->len);
-	}
 
 	if (get_opcode(buf, &opcode) < 0) {
 		LOG_WRN("Unable to decode OpCode");
@@ -1555,11 +1546,33 @@ int bt_mesh_model_recv(struct bt_mesh_msg_ctx *ctx, struct net_buf_simple *buf)
 		for (index = 0; index < dev_comp->elem_count; index++) {
 			const struct bt_mesh_elem *elem = &dev_comp->elem[index];
 
-			(void)element_model_recv(ctx, buf, elem, opcode);
+			int err_elem = element_model_recv(ctx, buf, elem, opcode);
+
+			err = err_elem != ACCESS_STATUS_SUCCESS ? err_elem : err;
 		}
 	}
 
+	return err;
+}
+
+int bt_mesh_model_recv(struct bt_mesh_msg_ctx *ctx, struct net_buf_simple *buf)
+{
+	int err;
+
+	LOG_DBG("app_idx 0x%04x src 0x%04x dst 0x%04x", ctx->app_idx, ctx->addr,
+		ctx->recv_dst);
+	LOG_DBG("len %u: %s", buf->len, bt_hex(buf->data, buf->len));
+
+	if (IS_ENABLED(CONFIG_BT_TESTING)) {
+		bt_test_mesh_model_recv(ctx->addr, ctx->recv_dst, buf->data,
+					buf->len);
+	}
+
+	err = bt_mesh_model_msg_recv(ctx, buf);
+
 	if (IS_ENABLED(CONFIG_BT_MESH_ACCESS_LAYER_MSG) && msg_cb) {
+		/* Overwriting error code as the message is processed by the callback. */
+		err = 0;
 		msg_cb(opcode, ctx, buf);
 	}
 

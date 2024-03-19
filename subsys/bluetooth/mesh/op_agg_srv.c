@@ -81,7 +81,7 @@ static int handle_sequence(const struct bt_mesh_model *model,
 
 		srv.ack = false;
 		srv.rsp_err = 0;
-		err = bt_mesh_model_recv(ctx, &msg);
+		err = bt_mesh_model_msg_recv(ctx, &msg);
 
 		if (srv.rsp_err) {
 			*status = srv.rsp_err;
