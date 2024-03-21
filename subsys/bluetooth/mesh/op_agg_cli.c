@@ -84,7 +84,7 @@ static int handle_status(const struct bt_mesh_model *model,
 		}
 
 		ctx->recv_dst = addr;
-		err = bt_mesh_model_msg_recv(ctx, &msg);
+		err = bt_mesh_model_recv(ctx, &msg);
 		if (err) {
 			LOG_ERR("Opcodes Aggregator receive error %d", err);
 			cli.ctx.initialized = true;

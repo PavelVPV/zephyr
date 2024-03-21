@@ -78,6 +78,12 @@ struct mod_relation {
 	uint8_t type;
 };
 
+#define IS_OP_AGG_MSG(opcode) \
+	((IS_ENABLED(CONFIG_BT_MESH_OP_AGG_SRV) || IS_ENABLED(CONFIG_BT_MESH_OP_AGG_CLI)) && \
+	 (opcode == OP_OPCODES_AGGREGATOR_STATUS || opcode == OP_OPCODES_AGGREGATOR_SEQUENCE))
+
+static bool op_agg_msg_processing;
+
 #ifdef CONFIG_BT_MESH_MODEL_EXTENSION_LIST_SIZE
 #define MOD_REL_LIST_SIZE CONFIG_BT_MESH_MODEL_EXTENSION_LIST_SIZE
 #else
@@ -1518,15 +1524,28 @@ static int element_model_recv(struct bt_mesh_msg_ctx *ctx, struct net_buf_simple
 	return ACCESS_STATUS_SUCCESS;
 }
 
-int bt_mesh_model_msg_recv(struct bt_mesh_msg_ctx *ctx, struct net_buf_simple *buf)
+int bt_mesh_model_recv(struct bt_mesh_msg_ctx *ctx, struct net_buf_simple *buf)
 {
 	int err = ACCESS_STATUS_SUCCESS;
 	uint32_t opcode;
 	uint16_t index;
 
+	LOG_DBG("app_idx 0x%04x src 0x%04x dst 0x%04x", ctx->app_idx, ctx->addr,
+		ctx->recv_dst);
+	LOG_DBG("len %u: %s", buf->len, bt_hex(buf->data, buf->len));
+
+	if (IS_ENABLED(CONFIG_BT_TESTING)) {
+		bt_test_mesh_model_recv(ctx->addr, ctx->recv_dst, buf->data,
+					buf->len);
+	}
+
 	if (get_opcode(buf, &opcode) < 0) {
 		LOG_WRN("Unable to decode OpCode");
 		return ACCESS_STATUS_WRONG_OPCODE;
+	}
+
+	if (IS_OP_AGG_MSG(opcode)) {
+		op_agg_msg_processing = true;
 	}
 
 	LOG_DBG("OpCode 0x%08x", opcode);
@@ -1552,27 +1571,19 @@ int bt_mesh_model_msg_recv(struct bt_mesh_msg_ctx *ctx, struct net_buf_simple *b
 		}
 	}
 
-	return err;
-}
-
-int bt_mesh_model_recv(struct bt_mesh_msg_ctx *ctx, struct net_buf_simple *buf)
-{
-	int err;
-
-	LOG_DBG("app_idx 0x%04x src 0x%04x dst 0x%04x", ctx->app_idx, ctx->addr,
-		ctx->recv_dst);
-	LOG_DBG("len %u: %s", buf->len, bt_hex(buf->data, buf->len));
-
-	if (IS_ENABLED(CONFIG_BT_TESTING)) {
-		bt_test_mesh_model_recv(ctx->addr, ctx->recv_dst, buf->data,
-					buf->len);
+	if (IS_OP_AGG_MSG(opcode)) {
+		op_agg_msg_processing = false;
 	}
 
-	err = bt_mesh_model_msg_recv(ctx, buf);
-
 	if (IS_ENABLED(CONFIG_BT_MESH_ACCESS_LAYER_MSG) && msg_cb) {
-		/* Overwriting error code as the message is processed by the callback. */
-		err = 0;
+		/* Overwriting error code to store any message processed by the callback in RPL.
+		 * When processing Opcode Aggregator Sequence or Status messages, don't overwrite
+		 * the error code to not affect the opcode aggregator message processing.
+		 */
+		if (!op_agg_msg_processing) {
+			err = ACCESS_STATUS_SUCCESS;
+		}
+
 		msg_cb(opcode, ctx, buf);
 	}
 
