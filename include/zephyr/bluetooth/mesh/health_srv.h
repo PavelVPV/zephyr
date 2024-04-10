@@ -19,6 +19,7 @@
 
 #include <zephyr/bluetooth/mesh.h>
 #include <zephyr/bluetooth/byteorder.h>
+#include <zephyr/sys/util_macro.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -171,19 +172,18 @@ struct bt_mesh_health_srv {
  *
  *  @param srv Pointer to a unique struct bt_mesh_health_srv.
  *  @param pub Pointer to a unique struct bt_mesh_model_pub.
+ *  @param meta (optional) Health Server metadata (if compiled with Large Composition Data Server
+ *                         support).
  *
  *  @return New mesh model instance.
  */
-#define BT_MESH_MODEL_HEALTH_SRV(srv, pub)                                     \
-	BT_MESH_MODEL_CB(BT_MESH_MODEL_ID_HEALTH_SRV, bt_mesh_health_srv_op,   \
-			 pub, srv, &bt_mesh_health_srv_cb)
-
-/**
- * Same as BT_MESH_MODEL_HEALTH_SRV but with metadata
- */
-#define BT_MESH_MODEL_HEALTH_SRV_METADATA(srv, pub, meta)                               \
-	BT_MESH_MODEL_METADATA_CB(BT_MESH_MODEL_ID_HEALTH_SRV, bt_mesh_health_srv_op,   \
-			 pub, srv, &bt_mesh_health_srv_cb, meta)
+#define BT_MESH_MODEL_HEALTH_SRV(srv, pub, ...)                                \
+	COND_CODE_1(CONFIG_BT_MESH_LARGE_COMP_DATA_SRV,                           \
+		    (BT_MESH_MODEL_METADATA_CB(BT_MESH_MODEL_ID_HEALTH_SRV, bt_mesh_health_srv_op, \
+					      pub, srv, &bt_mesh_health_srv_cb, \
+					      GET_ARG_N(1, __VA_ARGS__))), \
+		    (BT_MESH_MODEL_CB(BT_MESH_MODEL_ID_HEALTH_SRV, bt_mesh_health_srv_op, \
+					      pub, srv, &bt_mesh_health_srv_cb)))
 
 /**
  *
