@@ -924,7 +924,7 @@ struct bt_mesh_model {
 
 #if defined(CONFIG_BT_MESH_LARGE_COMP_DATA_SRV) || defined(__DOXYGEN__)
 	/* Pointer to the array of model metadata entries. */
-	const struct bt_mesh_models_metadata_entry * const * const metadata;
+	const struct bt_mesh_models_metadata_entry * const metadata;
 #endif
 };
 

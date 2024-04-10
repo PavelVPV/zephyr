@@ -174,15 +174,16 @@ struct bt_mesh_health_srv {
  *
  *  @return New mesh model instance.
  */
-#ifdef CONFIG_BT_MESH_LARGE_COMP_DATA_SRV
-#define BT_MESH_MODEL_HEALTH_SRV(srv, pub)                                              \
-	BT_MESH_MODEL_METADATA_CB(BT_MESH_MODEL_ID_HEALTH_SRV, bt_mesh_health_srv_op,   \
-			 pub, srv, &bt_mesh_health_srv_cb, &(srv)->metadata)
-#else
 #define BT_MESH_MODEL_HEALTH_SRV(srv, pub)                                     \
 	BT_MESH_MODEL_CB(BT_MESH_MODEL_ID_HEALTH_SRV, bt_mesh_health_srv_op,   \
 			 pub, srv, &bt_mesh_health_srv_cb)
-#endif
+
+/**
+ * Same as BT_MESH_MODEL_HEALTH_SRV but with metadata
+ */
+#define BT_MESH_MODEL_HEALTH_SRV_METADATA(srv, pub, meta)                               \
+	BT_MESH_MODEL_METADATA_CB(BT_MESH_MODEL_ID_HEALTH_SRV, bt_mesh_health_srv_op,   \
+			 pub, srv, &bt_mesh_health_srv_cb, meta)
 
 /**
  *
