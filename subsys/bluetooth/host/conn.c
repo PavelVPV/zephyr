@@ -302,6 +302,10 @@ static void tx_notify(struct bt_conn *conn)
 }
 #endif	/* CONFIG_BT_CONN_TX */
 
+#if defined(CONFIG_BT_CONN)
+static void auto_initiated_procedures(struct k_work *work);
+#endif	/* defined(CONFIG_BT_CONN) */
+
 struct bt_conn *bt_conn_new(struct bt_conn *conns, size_t size)
 {
 	struct bt_conn *conn = NULL;
@@ -322,6 +326,7 @@ struct bt_conn *bt_conn_new(struct bt_conn *conns, size_t size)
 
 #if defined(CONFIG_BT_CONN)
 	k_work_init_delayable(&conn->deferred_work, deferred_work);
+	k_work_init(&conn->auto_initiated_procedures, auto_initiated_procedures);
 #endif /* CONFIG_BT_CONN */
 #if defined(CONFIG_BT_CONN_TX)
 	k_work_init(&conn->tx_complete_work, tx_complete_work);
@@ -1152,6 +1157,104 @@ struct bt_conn *conn_lookup_handle(struct bt_conn *conns, size_t size,
 
 	return NULL;
 }
+
+#if defined(CONFIG_BT_CONN)
+/* We don't want the application to get a PHY update callback upon connection
+ * establishment on 2M PHY. Therefore we must prevent issuing LE Set PHY
+ * in this scenario.
+ */
+static bool skip_auto_phy_update_on_conn_establishment(struct bt_conn *conn)
+{
+#if defined(CONFIG_BT_USER_PHY_UPDATE)
+	if (IS_ENABLED(CONFIG_BT_AUTO_PHY_UPDATE) &&
+	    IS_ENABLED(CONFIG_BT_EXT_ADV) &&
+	    BT_DEV_FEAT_LE_EXT_ADV(bt_dev.le.features)) {
+		if (conn->le.phy.tx_phy == BT_HCI_LE_PHY_2M &&
+		    conn->le.phy.rx_phy == BT_HCI_LE_PHY_2M) {
+			return true;
+		}
+	}
+#else
+	ARG_UNUSED(conn);
+#endif /* defined(CONFIG_BT_USER_PHY_UPDATE) */
+
+	return false;
+}
+
+static void auto_initiated_procedures(struct k_work *work)
+{
+	int err;
+	struct bt_conn *conn = CONTAINER_OF(work, struct bt_conn, auto_initiated_procedures);
+
+	if (conn->state != BT_CONN_CONNECTED) {
+		/* It is possible that connection was disconnected directly from
+		 * connected callback so we must check state before doing
+		 * connection parameters update.
+		 */
+		goto exit;
+	}
+
+	if (!atomic_test_bit(conn->flags, BT_CONN_AUTO_FEATURE_EXCH) &&
+	    ((conn->role == BT_HCI_ROLE_CENTRAL) ||
+	     BT_FEAT_LE_PER_INIT_FEAT_XCHG(bt_dev.le.features))) {
+		err = bt_hci_le_read_remote_features(conn);
+		if (err) {
+			LOG_ERR("Failed read remote features (%d)", err);
+		}
+		if (conn->state != BT_CONN_CONNECTED) {
+			goto exit;
+		}
+	}
+
+	if (IS_ENABLED(CONFIG_BT_REMOTE_VERSION) &&
+	    !atomic_test_bit(conn->flags, BT_CONN_AUTO_VERSION_INFO)) {
+		err = bt_hci_read_remote_version(conn);
+		if (err) {
+			LOG_ERR("Failed read remote version (%d)", err);
+		}
+		if (conn->state != BT_CONN_CONNECTED) {
+			goto exit;
+		}
+	}
+
+	if (IS_ENABLED(CONFIG_BT_AUTO_PHY_UPDATE) &&
+	    BT_FEAT_LE_PHY_2M(bt_dev.le.features) &&
+	    !skip_auto_phy_update_on_conn_establishment(conn)) {
+		err = bt_le_set_phy(conn, 0U, BT_HCI_LE_PHY_PREFER_2M,
+				    BT_HCI_LE_PHY_PREFER_2M,
+				    BT_HCI_LE_PHY_CODED_ANY);
+		if (err) {
+			LOG_ERR("Failed LE Set PHY (%d)", err);
+		}
+		if (conn->state != BT_CONN_CONNECTED) {
+			goto exit;
+		}
+	}
+
+	if (IS_ENABLED(CONFIG_BT_AUTO_DATA_LEN_UPDATE) &&
+	    BT_FEAT_LE_DLE(bt_dev.le.features)) {
+		if (bt_drv_quirk_no_auto_dle()) {
+			uint16_t tx_octets, tx_time;
+
+			err = bt_hci_le_read_max_data_len(&tx_octets, &tx_time);
+			if (!err) {
+				err = bt_le_set_data_len(conn,
+						tx_octets, tx_time);
+				if (err) {
+					LOG_ERR("Failed to set data len (%d)", err);
+				}
+			}
+		} else {
+			/* No need to auto-initiate DLE procedure.
+			 * It is done by the controller.
+			 */
+		}
+	}
+
+exit:
+	bt_conn_unref(conn);
+}
+#endif	/* defined(CONFIG_BT_CONN) */
 
 void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 {

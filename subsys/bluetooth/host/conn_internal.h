@@ -253,6 +253,14 @@ struct bt_conn {
 	 */
 	struct k_work_delayable	deferred_work;
 
+	/* Executes procedures after a connection is established:
+	 * - read remote features
+	 * - read remote version
+	 * - update PHY
+	 * - update data length
+	 */
+	struct k_work auto_initiated_procedures;
+
 	union {
 		struct bt_conn_le	le;
 #if defined(CONFIG_BT_CLASSIC)
