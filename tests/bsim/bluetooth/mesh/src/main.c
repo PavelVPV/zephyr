@@ -42,6 +42,7 @@ extern struct bst_test_list *test_blob_install(struct bst_test_list *test);
 extern struct bst_test_list *test_op_agg_install(struct bst_test_list *test);
 extern struct bst_test_list *test_sar_install(struct bst_test_list *test);
 extern struct bst_test_list *test_cdp1_install(struct bst_test_list *test);
+extern struct bst_test_list *test_brg_install(struct bst_test_list *test);
 #endif
 
 bst_test_install_t test_installers[] = {
@@ -80,6 +81,7 @@ bst_test_install_t test_installers[] = {
 	test_op_agg_install,
 	test_sar_install,
 	test_cdp1_install,
+	test_brg_install,
 #endif
 	NULL
 };

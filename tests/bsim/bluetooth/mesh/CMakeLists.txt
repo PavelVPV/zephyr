@@ -72,6 +72,7 @@ else()
   src/test_op_agg.c
   src/test_sar.c
   src/test_cdp1.c
+  src/test_brg.c
  )
 
 endif()
