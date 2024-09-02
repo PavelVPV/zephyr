@@ -25,6 +25,13 @@ static uint32_t bt_mesh_brg_cfg_row_cnt;
 /* Bridging enabled state */
 static bool brg_enabled;
 
+enum {
+	STATE_UPDATED,
+	TABLE_UPDATED,
+	BRG_CFG_FLAGS_COUNT,
+};
+static ATOMIC_DEFINE(brg_cfg_flags, BRG_CFG_FLAGS_COUNT);
+
 static void brg_tbl_compact(void)
 {
 	int j = 0;
@@ -117,6 +124,7 @@ int bt_mesh_brg_cfg_enable_set(bool enable)
 
 	brg_enabled = enable;
 #if IS_ENABLED(CONFIG_BT_SETTINGS)
+	atomic_set_bit(brg_cfg_flags, STATE_UPDATED);
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_BRG_PENDING);
 #endif
 	return 0;
@@ -129,26 +137,29 @@ void bt_mesh_brg_cfg_pending_store(void)
 	char *path_tbl = "bt/mesh/brg_tbl";
 	int err;
 
-	if (brg_enabled) {
-		err = settings_save_one(path_en, &brg_enabled, sizeof(brg_enabled));
-	} else {
-		err = settings_delete(path_en);
+	if (atomic_test_and_clear_bit(brg_cfg_flags, STATE_UPDATED)) {
+		if (brg_enabled) {
+			err = settings_save_one(path_en, &brg_enabled, sizeof(brg_enabled));
+		} else {
+			err = settings_delete(path_en);
+		}
+
+		if (err) {
+			LOG_ERR("Failed to store %s value", path_en);
+		}
 	}
 
-	if (err) {
-		LOG_ERR("Failed to store %s value", path_en);
-	}
+	if (atomic_test_and_clear_bit(brg_cfg_flags, TABLE_UPDATED)) {
+		if (bt_mesh_brg_cfg_row_cnt) {
+			err = settings_save_one(path_tbl, &brg_tbl,
+						bt_mesh_brg_cfg_row_cnt * sizeof(brg_tbl[0]));
+		} else {
+			err = settings_delete(path_tbl);
+		}
 
-
-	if (bt_mesh_brg_cfg_row_cnt) {
-		err = settings_save_one(path_tbl, &brg_tbl,
-					bt_mesh_brg_cfg_row_cnt * sizeof(brg_tbl[0]));
-	} else {
-		err = settings_delete(path_tbl);
-	}
-
-	if (err) {
-		LOG_ERR("Failed to store %s value", path_tbl);
+		if (err) {
+			LOG_ERR("Failed to store %s value", path_tbl);
+		}
 	}
 #endif
 }
@@ -172,6 +183,7 @@ static void brg_tbl_netkey_removed_evt(struct bt_mesh_subnet *sub, enum bt_mesh_
 	}
 
 #if IS_ENABLED(CONFIG_BT_SETTINGS)
+	atomic_set_bit(brg_cfg_flags, TABLE_UPDATED);
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_BRG_PENDING);
 #endif
 }
@@ -257,6 +269,7 @@ int bt_mesh_brg_cfg_tbl_add(enum bt_mesh_brg_cfg_dir direction, uint16_t net_idx
 
 store:
 #if IS_ENABLED(CONFIG_BT_SETTINGS)
+	atomic_set_bit(brg_cfg_flags, TABLE_UPDATED);
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_BRG_PENDING);
 #endif
 
@@ -328,6 +341,7 @@ int bt_mesh_brg_cfg_tbl_remove(uint16_t net_idx1, uint16_t net_idx2, uint16_t ad
 
 #if IS_ENABLED(CONFIG_BT_SETTINGS)
 	if (store) {
+		atomic_set_bit(brg_cfg_flags, TABLE_UPDATED);
 		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_BRG_PENDING);
 	}
 #endif
