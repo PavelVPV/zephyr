@@ -13,17 +13,6 @@
 
 #define BT_MESH_BRG_CFG_NKEY_PRHB_FLT_MASK 0x000C
 
-enum bt_mesh_brg_cfg_dir {
-	/* Value is prohibited. */
-	BT_MESH_BRG_CFG_DIR_PROHIBITED = 0,
-	/* Briging from Addr1 to Addr2. */
-	BT_MESH_BRG_CFG_DIR_ONEWAY = 1,
-	/* Briging to/from Addr1 from/to Addr2. */
-	BT_MESH_BRG_CFG_DIR_TWOWAY = 2,
-	/* Values above these are prohibited. */
-	BT_MESH_BRG_CFG_DIR_MAX = 3,
-};
-
 #define BT_MESH_BRG_CFG_NETIDX_NOMATCH 0xFFFF
 
 /* One row of the bridging table */
