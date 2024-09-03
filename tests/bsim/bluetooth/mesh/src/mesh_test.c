@@ -13,6 +13,7 @@
 #define COMPANY_ID_LF 0x05F1
 #define COMPANY_ID_NORDIC_SEMI 0x05F9
 
+#define LOG_LEVEL 4
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
@@ -88,7 +89,7 @@ static int ra_rx(const struct bt_mesh_model *mod, struct bt_mesh_msg_ctx *ctx,
 	LOG_INF("\trssi: %d", ctx->recv_rssi);
 
 	if (ra_cb) {
-		ra_cb(net_buf_simple_pull_mem(buf, buf->len), buf->len);
+		ra_cb(buf->data, buf->len);
 	}
 
 	return 0;
