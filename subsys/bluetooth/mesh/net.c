@@ -83,6 +83,7 @@ struct iv_val {
 static struct {
 	uint32_t src : 15, /* MSb of source is always 0 */
 	      seq : 17;
+	uint16_t nid;
 } msg_cache[CONFIG_BT_MESH_MSG_CACHE_SIZE];
 static uint16_t msg_cache_next;
 
@@ -151,14 +152,16 @@ static bool msg_cache_match(struct net_buf_simple *pdu)
 
 	for (i = msg_cache_next; i > 0U;) {
 		if (msg_cache[--i].src == SRC(pdu->data) &&
-		    msg_cache[i].seq == (SEQ(pdu->data) & BIT_MASK(17))) {
+		    msg_cache[i].seq == (SEQ(pdu->data) & BIT_MASK(17)) &&
+		    msg_cache[i].nid == NID(pdu->data)) {
 			return true;
 		}
 	}
 
 	for (i = ARRAY_SIZE(msg_cache); i > msg_cache_next;) {
 		if (msg_cache[--i].src == SRC(pdu->data) &&
-		    msg_cache[i].seq == (SEQ(pdu->data) & BIT_MASK(17))) {
+		    msg_cache[i].seq == (SEQ(pdu->data) & BIT_MASK(17)) &&
+		    msg_cache[i].nid == NID(pdu->data)) {
 			return true;
 		}
 	}
@@ -171,6 +174,7 @@ static void msg_cache_add(struct bt_mesh_net_rx *rx)
 	msg_cache_next %= ARRAY_SIZE(msg_cache);
 	msg_cache[msg_cache_next].src = rx->ctx.addr;
 	msg_cache[msg_cache_next].seq = rx->seq;
+	msg_cache[msg_cache_next].nid = rx->ctx.net_idx;
 	msg_cache_next++;
 }
 
