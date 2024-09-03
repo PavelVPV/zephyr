@@ -687,7 +687,7 @@ static bool relay_to_adv(enum bt_mesh_net_if net_if)
 }
 
 static void bt_mesh_net_relay(struct net_buf_simple *sbuf,
-			      struct bt_mesh_net_rx *rx)
+			      struct bt_mesh_net_rx *rx, bool update_nid)
 {
 	const struct bt_mesh_net_cred *cred;
 	struct bt_mesh_adv *adv;
@@ -735,7 +735,7 @@ static void bt_mesh_net_relay(struct net_buf_simple *sbuf,
 	LOG_DBG("Relaying packet. TTL is now %u", TTL(adv->b.data));
 
 	/* Update NID if RX or RX was with friend credentials */
-	if (rx->friend_cred) {
+	if (rx->friend_cred || update_nid) {
 		adv->b.data[0] &= 0x80; /* Clear everything except IVI */
 		adv->b.data[0] |= cred->nid;
 	}
@@ -769,14 +769,29 @@ done:
 }
 
 #if IS_ENABLED(CONFIG_BT_MESH_BRG_CFG_SRV)
+static bool find_subnet_cb(struct bt_mesh_subnet *sub, void *cb_data)
+{
+	uint16_t *net_idx = cb_data;
+
+	return sub->net_idx == *net_idx;
+}
+
 static void bt_mesh_sbr_check_cb(uint16_t new_net_idx, void *user_data)
 {
 	struct pdu_ctx *ctx = (struct pdu_ctx *)user_data;
 
 	if (new_net_idx < BT_MESH_BRG_CFG_NETIDX_NOMATCH) {
+		struct bt_mesh_subnet *subnet = bt_mesh_subnet_find(find_subnet_cb, &new_net_idx);
+		if (!subnet) {
+			LOG_ERR("Failed to find subnet 0x%04x", new_net_idx);
+			return;
+		}
+
+		ctx->rx->sub = subnet;
 		ctx->rx->ctx.net_idx = new_net_idx;
+
 		net_buf_simple_restore(ctx->sbuf, ctx->state);
-		bt_mesh_net_relay(ctx->sbuf, ctx->rx);
+		bt_mesh_net_relay(ctx->sbuf, ctx->rx, true);
 	}
 }
 #endif
@@ -916,7 +931,7 @@ void bt_mesh_net_recv(struct net_buf_simple *data, int8_t rssi,
 	if (!BT_MESH_ADDR_IS_UNICAST(rx.ctx.recv_dst) ||
 	    (!rx.local_match && !rx.friend_match)) {
 		net_buf_simple_restore(&buf, &state);
-		bt_mesh_net_relay(&buf, &rx);
+		bt_mesh_net_relay(&buf, &rx, false);
 	}
 
 #if IS_ENABLED(CONFIG_BT_MESH_BRG_CFG_SRV)
