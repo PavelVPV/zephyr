@@ -30,7 +30,9 @@ enum {
 	TABLE_UPDATED,
 	BRG_CFG_FLAGS_COUNT,
 };
+#if defined(CONFIG_BT_SETTINGS)
 static ATOMIC_DEFINE(brg_cfg_flags, BRG_CFG_FLAGS_COUNT);
+#endif
 
 static void brg_tbl_compact(void)
 {
