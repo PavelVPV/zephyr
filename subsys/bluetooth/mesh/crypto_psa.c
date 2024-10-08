@@ -17,6 +17,10 @@ LOG_MODULE_REGISTER(bt_mesh_crypto_psa);
 #include "crypto.h"
 #include "prov.h"
 
+#if defined(CONFIG_BT_SETTINGS) && !defined(CONFIG_SECURE_STORAGE)
+#error "Secure storage is required for persistent storage of keys"
+#endif
+
 /* Mesh requires to keep in persistent memory network keys (2 keys per subnetwork),
  * application keys (2 real keys per 1 configured) and device key + device key candidate.
  */

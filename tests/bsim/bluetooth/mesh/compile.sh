@@ -15,12 +15,12 @@ app=tests/bsim/bluetooth/mesh conf_overlay=overlay_pst.conf compile
 app=tests/bsim/bluetooth/mesh conf_overlay=overlay_gatt.conf compile
 app=tests/bsim/bluetooth/mesh conf_overlay=overlay_low_lat.conf compile
 app=tests/bsim/bluetooth/mesh conf_overlay=overlay_psa.conf compile
-app=tests/bsim/bluetooth/mesh conf_overlay="overlay_pst.conf;overlay_psa.conf" compile
+app=tests/bsim/bluetooth/mesh conf_overlay="overlay_pst.conf;overlay_psa.conf;overlay_pst_psa.conf" compile
 app=tests/bsim/bluetooth/mesh conf_overlay="overlay_gatt.conf;overlay_psa.conf" compile
 app=tests/bsim/bluetooth/mesh conf_overlay="overlay_low_lat.conf;overlay_psa.conf" compile
 app=tests/bsim/bluetooth/mesh conf_overlay="overlay_gatt.conf;overlay_low_lat.conf" compile
 app=tests/bsim/bluetooth/mesh conf_overlay="overlay_pst.conf;overlay_gatt.conf" compile
 app=tests/bsim/bluetooth/mesh \
-  conf_overlay="overlay_pst.conf;overlay_gatt.conf;overlay_psa.conf" compile
+  conf_overlay="overlay_pst.conf;overlay_gatt.conf;overlay_psa.conf;overlay_pst_psa.conf" compile
 
 wait_for_background_jobs

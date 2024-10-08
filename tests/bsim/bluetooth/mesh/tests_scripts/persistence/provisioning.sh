@@ -16,8 +16,8 @@ RunTestFlash mesh_pst_prov_data_check persistence_provisioning_data_save -flash_
 overlay=overlay_pst_conf
 RunTestFlash mesh_pst_prov_data_check persistence_provisioning_data_load -flash_rm
 
-overlay="overlay_pst_conf_overlay_psa_conf"
+overlay="overlay_pst_conf_overlay_psa_conf_overlay_pst_psa"
 RunTestFlash mesh_pst_prov_data_check_psa persistence_provisioning_data_save -flash_erase
 
-overlay="overlay_pst_conf_overlay_psa_conf"
+overlay="overlay_pst_conf_overlay_psa_conf_overlay_pst_psa"
 RunTestFlash mesh_pst_prov_data_check_psa persistence_provisioning_data_load -flash_rm
