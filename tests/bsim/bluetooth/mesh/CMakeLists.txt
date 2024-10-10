@@ -74,6 +74,7 @@ else()
   src/test_sar.c
   src/test_cdp1.c
   src/test_brg.c
+  src/test_tx_stress.c
  )
 
 endif()

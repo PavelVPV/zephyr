@@ -13,6 +13,7 @@
 #define COMPANY_ID_LF 0x05F1
 #define COMPANY_ID_NORDIC_SEMI 0x05F9
 
+#define LOG_LEVEL LOG_LEVEL_WRN
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
