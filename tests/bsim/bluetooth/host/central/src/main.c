@@ -45,7 +45,7 @@ static struct bt_conn_cb conn_cb = {
 static void test_central_connect_timeout_with_timeout(uint32_t timeout_ms)
 {
 	int err;
-	struct bt_conn *conn;
+	struct bt_conn *conn = NULL;
 
 	/* A zero value for `bt_conn_le_create_param.timeout` shall be
 	 * interpreted as `CONFIG_BT_CREATE_CONN_TIMEOUT`.
@@ -112,7 +112,7 @@ static void test_central_connect_when_connecting(void)
 	err = bt_enable(NULL);
 	TEST_ASSERT(err == 0, "Can't enable Bluetooth (err %d)", err);
 
-	struct bt_conn *conn;
+	struct bt_conn *conn = NULL;
 
 	bt_addr_le_t peer = {.a.val = {0x01}};
 
@@ -132,7 +132,8 @@ static void test_central_connect_when_connecting(void)
 
 	TEST_ASSERT(initial_refs >= 1, "Expect to have at least once reference");
 
-	err = bt_conn_le_create(&peer, &create_param, BT_LE_CONN_PARAM_DEFAULT, &conn);
+	struct bt_conn *dummy_conn = NULL;
+	err = bt_conn_le_create(&peer, &create_param, BT_LE_CONN_PARAM_DEFAULT, &dummy_conn);
 	TEST_ASSERT(err == -EALREADY, "Expected to fail to create connection (err %d)", err);
 
 	/* Expect the number of refs to be unchanged. */
@@ -157,7 +158,7 @@ static void test_central_connect_to_existing(void)
 	err = bt_enable(NULL);
 	TEST_ASSERT(err == 0, "Can't enable Bluetooth (err %d)", err);
 
-	struct bt_conn *conn;
+	struct bt_conn *conn = NULL;
 
 	bt_addr_le_t peer = {.type = BT_ADDR_LE_RANDOM,
 			     .a.val = {0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0}};
@@ -181,7 +182,8 @@ static void test_central_connect_to_existing(void)
 
 	TEST_ASSERT(initial_refs >= 1, "Expect to have at least once reference");
 
-	err = bt_conn_le_create(&peer, &create_param, BT_LE_CONN_PARAM_DEFAULT, &conn);
+	struct bt_conn *dummy_conn = NULL;
+	err = bt_conn_le_create(&peer, &create_param, BT_LE_CONN_PARAM_DEFAULT, &dummy_conn);
 	TEST_ASSERT(err == -EINVAL, "Expected to fail to create a connection (err %d)", err);
 
 	/* Expect the number of refs to be unchanged. */

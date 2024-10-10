@@ -22,10 +22,13 @@
 #include "utils.h"
 #include "bstests.h"
 
+/* Include conn_internal for the purpose of checking reference counts. */
+#include "host/conn_internal.h"
+
 #define strucc struct
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 DEFINE_FLAG(is_connected);
 DEFINE_FLAG(is_subscribed);
@@ -49,7 +52,7 @@ static void connected(struct bt_conn *conn, uint8_t conn_err)
 		return;
 	}
 
-	LOG_DBG("%s", addr);
+	LOG_ERR("%s", addr);
 
 	dconn = bt_conn_ref(conn);
 	SET_FLAG(is_connected);
@@ -101,7 +104,7 @@ static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 {
 	char str[BT_ADDR_LE_STR_LEN];
 	struct bt_le_conn_param *param;
-	struct bt_conn *conn;
+	struct bt_conn *conn = NULL;
 	int err;
 
 	err = bt_le_scan_stop();
@@ -139,6 +142,8 @@ static strucc bt_conn *connecc(void)
 	conn = dconn;
 	dconn = NULL;
 
+	bt_conn_unref(conn);
+
 	return conn;
 }
 
@@ -152,12 +157,14 @@ static struct bt_conn *connect(void)
 	err = bt_le_scan_start(BT_LE_SCAN_ACTIVE_CONTINUOUS, device_found);
 	ASSERT(!err, "Scanning failed to start (err %d)\n", err);
 
-	LOG_DBG("Central initiating connection...");
+	LOG_ERR("Central initiating connection...");
 	WAIT_FOR_FLAG(is_connected);
 	LOG_INF("Connected as central");
 
 	conn = dconn;
 	dconn = NULL;
+
+	bt_conn_unref(conn);
 
 	return conn;
 }
@@ -295,6 +302,7 @@ void dut_procedure(void)
 
 	struct bt_conn *good, *bad;
 
+
 	err = bt_enable(NULL);
 	ASSERT(err == 0, "Can't enable Bluetooth (err %d)\n", err);
 	LOG_DBG("Central: Bluetooth initialized.");
@@ -309,6 +317,14 @@ void dut_procedure(void)
 
 	do_dlu(bad);
 	send_write_handle(bad);
+
+	k_sleep(K_MSEC(PROCEDURE_1_TIMEOUT_MS + 1000));
+
+	bt_conn_disconnect(good, BT_HCI_ERR_REMOTE_POWER_OFF);
+	bt_conn_unref(good);
+
+	bt_conn_disconnect(bad, BT_HCI_ERR_REMOTE_POWER_OFF);
+	bt_conn_unref(bad);
 
 	/* Pass unless some assert in callbacks fails. */
 	PASS("DUT done\n");
@@ -433,18 +449,40 @@ void test_init(void)
 	bst_result = In_progress;
 }
 
+static void check_bt_conn_objs(struct bt_conn *conn, void *data)
+{
+	/* Now we have a valid connection reference */
+	atomic_val_t refs = atomic_get(&conn->ref);
+
+	if (refs != 0) {
+		char addr[BT_ADDR_LE_STR_LEN];
+
+		bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+		LOG_ERR("Connection object %p has %d references: %s", conn, refs, addr);
+		ASSERT(refs == 0, "Expect to have no references: %d", refs);
+	}
+}
+
+static void test_delete(void)
+{
+	bt_conn_foreach(BT_CONN_TYPE_ALL, check_bt_conn_objs, NULL);
+}
+
 static const struct bst_test_instance test_to_add[] = {
 	{
 		.test_id = "dut",
 		.test_pre_init_f = test_init,
 		.test_tick_f = test_tick,
 		.test_main_f = test_procedure_0,
+		.test_delete_f = test_delete,
 	},
 	{
 		.test_id = "dut_1",
 		.test_pre_init_f = test_init,
 		.test_tick_f = test_tick,
 		.test_main_f = test_procedure_1,
+		.test_delete_f = test_delete,
 	},
 	BSTEST_END_MARKER,
 };
