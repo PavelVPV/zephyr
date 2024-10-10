@@ -228,7 +228,9 @@ static int adv_send(struct bt_mesh_ext_adv *ext_adv, struct bt_mesh_adv *adv)
 		ext_adv->adv = bt_mesh_adv_ref(adv);
 	}
 
-	bt_mesh_adv_send_start(duration, err, &adv->ctx);
+	if (err != -ENOBUFS) {
+		bt_mesh_adv_send_start(duration, err, &adv->ctx);
+	}
 
 	return err;
 }
@@ -284,6 +286,11 @@ static void send_pending_adv(struct k_work *work)
 
 		adv->ctx.busy = 0U;
 		err = adv_send(ext_adv, adv);
+
+		if (err == -ENOBUFS) {
+			k_work_submit(&ext_adv->work);
+			return;
+		}
 
 		bt_mesh_adv_unref(adv);
 
