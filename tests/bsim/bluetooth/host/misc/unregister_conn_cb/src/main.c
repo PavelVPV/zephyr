@@ -14,6 +14,9 @@
 
 #include "common.h"
 
+/* Include conn_internal for the purpose of checking reference counts. */
+#include "host/conn_internal.h"
+
 CREATE_FLAG(flag_is_connected);
 
 static struct bt_conn *g_conn;
@@ -63,7 +66,7 @@ void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct ne
 {
 	char addr_str[BT_ADDR_LE_STR_LEN];
 	int err;
-	struct bt_conn *conn;
+	struct bt_conn *conn = NULL;
 
 	if (g_conn != NULL) {
 		printk("g_conn != NULL\n");
@@ -228,16 +231,40 @@ static void test_central_main(void)
 	PASS("Central device passed\n");
 }
 
+static void check_bt_conn_objs(struct bt_conn *conn, void *data)
+{
+	/* Now we have a valid connection reference */
+	atomic_val_t refs = atomic_get(&conn->ref);
+
+	if (refs != 0) {
+		char addr[BT_ADDR_LE_STR_LEN];
+
+		bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+		printk("Connection object %p has %d references: %s", conn, refs, addr);
+		__ASSERT(refs == 0, "Expect to have no references: %d", refs);
+	}
+}
+
+static void test_delete(void)
+{
+	bt_conn_foreach(BT_CONN_TYPE_ALL, check_bt_conn_objs, NULL);
+}
+
 static const struct bst_test_instance test_def[] = {{.test_id = "peripheral",
 						     .test_descr = "Peripheral device",
 						     .test_pre_init_f = test_init,
 						     .test_tick_f = test_tick,
-						     .test_main_f = test_peripheral_main},
+						     .test_main_f = test_peripheral_main,
+						     .test_delete_f = test_delete,
+						    },
 						    {.test_id = "central",
 						     .test_descr = "Central device",
 						     .test_pre_init_f = test_init,
 						     .test_tick_f = test_tick,
-						     .test_main_f = test_central_main},
+						     .test_main_f = test_central_main,
+						     .test_delete_f = test_delete,
+						    },
 						    BSTEST_END_MARKER};
 
 struct bst_test_list *test_unregister_conn_cb_install(struct bst_test_list *tests)
