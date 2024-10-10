@@ -1101,7 +1101,7 @@ static void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type,
 	}
 
 	if (connection_to_test) {
-		struct bt_conn *conn;
+		struct bt_conn *conn = NULL;
 		int err;
 
 		connection_to_test = false;

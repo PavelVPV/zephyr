@@ -429,7 +429,7 @@ static void test_cis_central(void)
 		int i = 0;
 #endif
 
-		struct bt_conn *conn;
+		struct bt_conn *conn = NULL;
 		int conn_index;
 		int chan;
 
