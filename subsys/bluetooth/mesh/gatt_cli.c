@@ -233,7 +233,7 @@ int bt_mesh_gatt_cli_connect(const bt_addr_le_t *addr,
 			     void *user_data)
 {
 	int err;
-	struct bt_conn *conn;
+	struct bt_conn *conn = NULL;
 	struct bt_mesh_gatt_server *server;
 
 	/* Avoid interconnection between proxy client and server */
