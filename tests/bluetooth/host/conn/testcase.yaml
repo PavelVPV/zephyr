@@ -1,0 +1,11 @@
+common:
+  tags:
+    - bluetooth
+    - host
+tests:
+  bluetooth.host.conn.test_default:
+    type: unit
+  bluetoot.host.conn.check_null_before_create:
+    type: unit
+    extra_args:
+      - EXTRA_CPPFLAGS=-DCONFIG_BT_CONN_CHECK_NULL_BEFORE_CREATE=1
