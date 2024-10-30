@@ -35,10 +35,11 @@ LOG_MODULE_REGISTER(bt_mesh_adv_legacy);
 #define ADV_INT_DEFAULT_MS 100
 #define ADV_INT_FAST_MS    20
 
+#define ADV_ENABLED (!atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED))
+
 static struct k_thread adv_thread_data;
 static K_KERNEL_STACK_DEFINE(adv_thread_stack, CONFIG_BT_MESH_ADV_STACK_SIZE);
 static int32_t adv_timeout;
-static bool enabled;
 
 static int bt_data_send(uint8_t num_events, uint16_t adv_int,
 			const struct bt_data *ad, size_t ad_len,
@@ -104,7 +105,7 @@ static int bt_data_send(uint8_t num_events, uint16_t adv_int,
 		bt_mesh_adv_send_start(duration, err, ctx);
 	}
 
-	if (enabled) {
+	if (ADV_ENABLED) {
 		k_sleep(K_MSEC(duration));
 	}
 
@@ -148,7 +149,7 @@ static void adv_thread(void *p1, void *p2, void *p3)
 	LOG_DBG("started");
 	struct bt_mesh_adv *adv;
 
-	while (enabled) {
+	while (ADV_ENABLED) {
 		if (IS_ENABLED(CONFIG_BT_MESH_GATT_SERVER)) {
 			adv = bt_mesh_adv_get(K_NO_WAIT);
 			if (IS_ENABLED(CONFIG_BT_MESH_PROXY_SOLICITATION) && !adv) {
@@ -234,7 +235,11 @@ void bt_mesh_adv_init(void)
 
 int bt_mesh_adv_enable(void)
 {
-	enabled = true;
+	/* The advertiser thread relies on BT_MESH_SUSPENDED flag. No point in starting the
+	 * advertiser thread if the flag is not set.
+	 */
+	__ASSERT_NO_MSG(ADV_ENABLED);
+
 	k_thread_start(&adv_thread_data);
 	return 0;
 }
@@ -243,7 +248,11 @@ int bt_mesh_adv_disable(void)
 {
 	int err;
 
-	enabled = false;
+	/* k_thread_join will sleep forever if BT_MESH_SUSPENDED flag is not set. The advertiser
+	 * thread will exit once the flag is set. The flag is set by the higher layer function. Here
+	 * we need to check that the flag is dropped and ensure that the thread is stopped.
+	 */
+	__ASSERT_NO_MSG(!ADV_ENABLED);
 
 	err = k_thread_join(&adv_thread_data, K_FOREVER);
 	LOG_DBG("Advertising disabled: %d", err);
