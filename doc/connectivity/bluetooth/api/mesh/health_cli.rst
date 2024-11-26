@@ -19,6 +19,16 @@ primary, an instance must also be present on the primary element.
 See :ref:`bluetooth_mesh_health_faults` for a list of specification defined
 fault values.
 
+Periodic publications
+=====================
+
+The model doesn't support periodic publications out of the box. In order to
+support periodic publications, the application must initialize the
+:c:member:`bt_mesh_model_pub::update` callback in the
+:c:member:`bt_mesh_health_cli::pub` model publication context in the Health
+Client model instance.
+
+
 API reference
 *************
 
