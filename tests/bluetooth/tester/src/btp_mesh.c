@@ -679,8 +679,14 @@ static struct bt_mesh_large_comp_data_cli lcd_cli = {
 };
 #endif
 
+static int health_cli_update(const struct bt_mesh_model *mod)
+{
+	return -EINVAL;
+}
+
 static struct bt_mesh_health_cli health_cli = {
 	.current_status = health_current_status,
+	.pub.update = health_cli_update,
 };
 
 
