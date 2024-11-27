@@ -71,3 +71,83 @@ ZTEST(test_buf_data_api, test_buf_freed_cb)
 			      "Unexpected buffer type");
 	}
 }
+
+/** The test checks that after releasing a buffer allocated through bt_buf_get_rx the type_mask
+ * returned through the bt_buf_rx_freed_cb_t correctly provides freed buffer
+ * types.
+ *
+ * Test procedure:
+ *
+ * 1. For each bt_buf_type accepted by bt_buf_get_rx, pre-allocate buf and store it.
+ * 2. Allocate rest buffer until pools for each bt_buf_type is empty.
+ * 3. For each allocated bt_buf_type:
+ * 3.1. Release the buffer
+ * 3.2. Store the freed type_mask
+ * 3.3. For each bt_buf_type in the freed type_mask:
+ * 3.3.1. Allocate the buffer
+ * 3.3.2. Check that it is not NULL
+ * 3.3.3. Release the buffer
+ * 3.4. Re-allocate the released buffer
+ */
+ZTEST(test_buf_data_api, test_buf_freed_cb_2)
+{
+	bt_buf_rx_freed_cb_set(bt_buf_rx_freed_cb);
+
+	struct {
+		enum bt_buf_type type;
+		struct net_buf *buf;
+	} test_vector[] = {
+		{ BT_BUF_EVT, },
+		{ BT_BUF_ACL_IN, },
+		{ BT_BUF_ISO_IN, },
+	};
+
+	printk("Step 1: pre-allocating bufs\n");
+
+	for (int i = 0; i < ARRAY_SIZE(test_vector); i++) {
+		test_vector[i].buf = bt_buf_get_rx(test_vector[i].type, K_NO_WAIT);
+		zassert_not_null(test_vector[i].buf, "Failed to get buf");
+	}
+
+	printk("Step 2: Emptying the pools\n");
+
+	for (int i = 0; i < ARRAY_SIZE(test_vector); i++) {
+		struct net_buf *buf;
+
+		do {
+			buf = bt_buf_get_rx(test_vector[i].type, K_NO_WAIT);
+		} while (buf != NULL);
+	}
+
+	printk("Step 3: Verifying type_mask returned in the bt_buf_get_rx_freed_cb_t\n");
+
+	for (int i = 0; i < ARRAY_SIZE(test_vector); i++) {
+		enum bt_buf_type freed_buf_type_mask;
+
+		net_buf_unref(test_vector[i].buf);
+
+		printk("i: %d, freed_buf_type: %X\n", i, freed_buf_type);
+
+		freed_buf_type_mask = freed_buf_type;
+
+		for (int j = 0; j < NUM_BITS(freed_buf_type_mask); j++) {
+			enum bt_buf_type tested_type = 1 << j;
+
+			printk("j: %d, tested_type: %X\n", i, tested_type);
+
+			if (freed_buf_type_mask & tested_type) {
+				struct net_buf *buf;
+
+				printk("type was freed, reallocating it\n");
+
+				buf = bt_buf_get_rx(tested_type, K_NO_WAIT);
+				zassert_not_null(buf, "Failed to get buf");
+
+				net_buf_unref(buf);
+			}
+		}
+
+		test_vector[i].buf = bt_buf_get_rx(test_vector[i].type, K_NO_WAIT);
+		zassert_not_null(test_vector[i].buf);
+	}
+}
