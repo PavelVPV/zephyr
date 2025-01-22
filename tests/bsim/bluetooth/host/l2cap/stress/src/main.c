@@ -20,16 +20,31 @@
 
 #define LOG_MODULE_NAME main
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
 static DEFINE_FLAG(is_connected);
 static DEFINE_FLAG(flag_l2cap_connected);
 
-#define NUM_PERIPHERALS 6
-#define L2CAP_CHANS     NUM_PERIPHERALS
+#define NUM_PERIPHERALS 1
+#define L2CAP_CHANS     4
 #define SDU_NUM         20
 #define SDU_LEN         3000
 #define RESCHEDULE_DELAY K_MSEC(100)
+
+static void tx_power_get(struct bt_conn *conn)
+{
+	struct bt_conn_le_tx_power power_level = {0};
+	int err;
+
+	LOG_INF("Reading TX power");
+
+	err = bt_conn_le_get_tx_power_level(conn, &power_level);
+	if (err) {
+		TEST_FAIL("Failed to get tx power level (err %d)", err);
+	}
+
+	LOG_INF("Tx power level: %d", power_level.current_level);
+}
 
 static void sdu_destroy(struct net_buf *buf)
 {
@@ -47,12 +62,12 @@ static void rx_destroy(struct net_buf *buf)
 
 /* Only one SDU per link will be transmitted at a time */
 NET_BUF_POOL_DEFINE(sdu_tx_pool,
-		    CONFIG_BT_MAX_CONN, BT_L2CAP_SDU_BUF_SIZE(SDU_LEN),
+		    120, BT_L2CAP_SDU_BUF_SIZE(SDU_LEN),
 		    CONFIG_BT_CONN_TX_USER_DATA_SIZE, sdu_destroy);
 
 /* Only one SDU per link will be received at a time */
 NET_BUF_POOL_DEFINE(sdu_rx_pool,
-		    CONFIG_BT_MAX_CONN, BT_L2CAP_SDU_BUF_SIZE(SDU_LEN),
+		    120, BT_L2CAP_SDU_BUF_SIZE(SDU_LEN),
 		    8, rx_destroy);
 
 static uint8_t tx_data[SDU_LEN];
@@ -157,6 +172,9 @@ int recv_cb(struct bt_l2cap_chan *chan, struct net_buf *buf)
 				 p, buf->data[p], p, tx_data[p]);
 		}
 	}
+
+	k_sleep(K_SECONDS(10));
+	tx_power_get(chan->conn);
 
 	return 0;
 }
@@ -396,22 +414,24 @@ static void connect_peripheral(void)
 
 static void connect_l2cap_channel(struct bt_conn *conn, void *data)
 {
-	int err;
-	struct test_ctx *ctx = alloc_test_context();
+	for (int i = 0; i < L2CAP_CHANS; i++) {
+		int err;
+		struct test_ctx *ctx = alloc_test_context();
 
-	TEST_ASSERT(ctx, "No more available test contexts");
+		TEST_ASSERT(ctx, "No more available test contexts");
 
-	struct bt_l2cap_le_chan *le_chan = &ctx->le_chan;
+		struct bt_l2cap_le_chan *le_chan = &ctx->le_chan;
 
-	le_chan->chan.ops = &ops;
-	le_chan->rx.mtu = SDU_LEN;
+		le_chan->chan.ops = &ops;
+		le_chan->rx.mtu = SDU_LEN;
 
-	UNSET_FLAG(flag_l2cap_connected);
+		UNSET_FLAG(flag_l2cap_connected);
 
-	err = bt_l2cap_chan_connect(conn, &le_chan->chan, 0x0080);
-	TEST_ASSERT(!err, "Error connecting l2cap channel (err %d)", err);
+		err = bt_l2cap_chan_connect(conn, &le_chan->chan, 0x0080);
+		TEST_ASSERT(!err, "Error connecting l2cap channel (err %d)\n", err);
 
-	WAIT_FOR_FLAG(flag_l2cap_connected);
+		WAIT_FOR_FLAG(flag_l2cap_connected);
+	}
 }
 
 static void test_central_main(void)
@@ -438,7 +458,7 @@ static void test_central_main(void)
 	bt_conn_foreach(BT_CONN_TYPE_LE, connect_l2cap_channel, NULL);
 
 	/* Send SDU_NUM SDUs to each peripheral */
-	for (int i = 0; i < NUM_PERIPHERALS; i++) {
+	for (int i = 0; i < L2CAP_CHANS; i++) {
 		contexts[i].tx_left = SDU_NUM;
 		l2cap_chan_send(&contexts[i].le_chan.chan, tx_data, sizeof(tx_data));
 	}
