@@ -341,11 +341,16 @@ static void prov_dh_key_gen(void)
 		remote_priv_key = NULL;
 	}
 
+	uint64_t start = k_uptime_get();
+
 	if (bt_mesh_dhkey_gen(remote_pub_key, remote_priv_key, bt_mesh_prov_link.dhkey)) {
 		LOG_ERR("Failed to generate DHKey");
 		prov_fail(PROV_ERR_UNEXP_ERR);
 		return;
 	}
+
+	int64_t duration = k_uptime_delta(&start);
+	LOG_ERR("DHKey generation took %lld ms", duration);
 
 	LOG_DBG("DHkey: %s", bt_hex(bt_mesh_prov_link.dhkey, DH_KEY_SIZE));
 

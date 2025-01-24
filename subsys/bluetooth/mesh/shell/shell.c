@@ -14,6 +14,7 @@
 #include <zephyr/settings/settings.h>
 
 #include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/hci_vs.h>
 #include <zephyr/bluetooth/mesh.h>
 #include <zephyr/bluetooth/mesh/shell.h>
 
@@ -1754,6 +1755,76 @@ SHELL_STATIC_SUBCMD_SET_CREATE(stat_cmds,
 /* Placeholder for model shell modules that is configured in the application */
 SHELL_SUBCMD_SET_CREATE(model_cmds, (mesh, models));
 
+static int cmd_set_tx_power_lvl(const struct shell *sh, size_t argc, char *argv[])
+{
+	struct bt_hci_cp_vs_write_tx_power_level *cp;
+	struct bt_hci_rp_vs_write_tx_power_level *rp;
+	struct net_buf *buf, *rsp = NULL;
+	int err;
+
+	int8_t tx_pwr_lvl = shell_strtoul(argv[1], 0, &err);
+
+	buf = bt_hci_cmd_create(BT_HCI_OP_VS_WRITE_TX_POWER_LEVEL,
+				sizeof(*cp));
+	if (!buf) {
+		shell_print(sh, "Unable to allocate command buffer\n");
+		return 0;
+	}
+
+	cp = net_buf_add(buf, sizeof(*cp));
+	cp->handle = sys_cpu_to_le16(0);
+	cp->handle_type = BT_HCI_VS_LL_HANDLE_TYPE_ADV;
+	cp->tx_power_level = tx_pwr_lvl;
+
+	err = bt_hci_cmd_send_sync(BT_HCI_OP_VS_WRITE_TX_POWER_LEVEL,
+				   buf, &rsp);
+	if (err) {
+		shell_print(sh, "Set Tx power err: %d\n", err);
+		return 0;
+	}
+
+	rp = (void *)rsp->data;
+	shell_print(sh, "Actual Tx Power: %d\n", rp->selected_tx_power);
+
+	net_buf_unref(rsp);
+
+	return 0;
+}
+
+static int cmd_get_tx_power_lvl(const struct shell *sh, size_t argc, char *argv[])
+{
+	struct bt_hci_cp_vs_read_tx_power_level *cp;
+	struct bt_hci_rp_vs_read_tx_power_level *rp;
+	struct net_buf *buf, *rsp = NULL;
+	int err;
+
+	buf = bt_hci_cmd_create(BT_HCI_OP_VS_READ_TX_POWER_LEVEL,
+				sizeof(*cp));
+	if (!buf) {
+		shell_print(sh, "Unable to allocate command buffer\n");
+		return 0;
+	}
+
+	cp = net_buf_add(buf, sizeof(*cp));
+	cp->handle = sys_cpu_to_le16(0);
+	cp->handle_type = BT_HCI_VS_LL_HANDLE_TYPE_ADV;
+
+	err = bt_hci_cmd_send_sync(BT_HCI_OP_VS_READ_TX_POWER_LEVEL,
+				   buf, &rsp);
+	if (err) {
+		shell_print(sh, "Read Tx power err: %d\n", err);
+		return 0;
+	}
+
+	rp = (void *)rsp->data;
+	shell_print(sh, "Tx Power: %d\n", rp->tx_power_level);
+
+	net_buf_unref(rsp);
+
+	return 0;
+}
+
+
 /* List of Mesh subcommands.
  *
  * Each command is documented in doc/reference/bluetooth/mesh/shell.rst.
@@ -1764,6 +1835,8 @@ SHELL_SUBCMD_SET_CREATE(model_cmds, (mesh, models));
 SHELL_STATIC_SUBCMD_SET_CREATE(mesh_cmds,
 	SHELL_CMD_ARG(init, NULL, NULL, cmd_init, 1, 0),
 	SHELL_CMD_ARG(reset-local, NULL, NULL, cmd_reset, 1, 0),
+	SHELL_CMD_ARG(set-tx-power, NULL, NULL, cmd_set_tx_power_lvl, 2, 0),
+	SHELL_CMD_ARG(get-tx-power, NULL, NULL, cmd_get_tx_power_lvl, 1, 0),
 
 	SHELL_CMD(models, &model_cmds, "Model commands", bt_mesh_shell_mdl_cmds_help),
 
