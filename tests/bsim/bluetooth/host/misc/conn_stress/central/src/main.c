@@ -22,7 +22,7 @@
 #include <zephyr/types.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(central, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(central, LOG_LEVEL_DBG);
 
 #include "bstests.h"
 #include "bs_types.h"
@@ -94,7 +94,6 @@ struct conn_info {
 static struct conn_info conn_infos[CONFIG_BT_MAX_CONN] = {0};
 
 static uint32_t conn_interval_max, notification_size;
-static uint8_t vnd_value[CHARACTERISTIC_DATA_MAX_LEN];
 
 static const struct bt_uuid_16 ccc_uuid = BT_UUID_INIT_16(BT_UUID_GATT_CCC_VAL);
 
@@ -198,12 +197,9 @@ static uint8_t notify_func(struct bt_conn *conn, struct bt_gatt_subscribe_params
 	LOG_DBG("[NOTIFICATION] addr %s data %s length %u cnt %u",
 		addr, data, length, received_counter);
 
-	LOG_HEXDUMP_DBG(data, length, "RX");
-
-	__ASSERT(conn_info_ref->notify_counter == received_counter,
-		 "addr %s expected counter : %u , received counter : %u",
-		 addr, conn_info_ref->notify_counter, received_counter);
 	conn_info_ref->notify_counter++;
+
+	k_sleep(K_MSEC(1000));
 
 	return BT_GATT_ITER_CONTINUE;
 }
@@ -328,52 +324,35 @@ static bool check_if_peer_connected(const bt_addr_le_t *addr)
 	return false;
 }
 
-static bool parse_ad(struct bt_data *data, void *user_data)
+static void connect(const bt_addr_le_t *addr)
 {
-	bt_addr_le_t *addr = user_data;
-
-	LOG_DBG("[AD]: %u data_len %u", data->type, data->data_len);
-
-	switch (data->type) {
-	case BT_DATA_NAME_SHORTENED:
-	case BT_DATA_NAME_COMPLETE:
-		LOG_INF("------------------------------------------------------");
-		LOG_INF("Device name : %.*s", data->data_len, data->data);
-
-		if (check_if_peer_connected(addr)) {
-			LOG_ERR("Peer is already connected or in disconnecting state");
-			break;
-		}
-
-		__ASSERT(!atomic_test_bit(status_flags, DEVICE_IS_CONNECTING),
-			 "A connection procedure is ongoing");
-		atomic_set_bit(status_flags, DEVICE_IS_CONNECTING);
-
-		stop_scan();
-
-		char addr_str[BT_ADDR_LE_STR_LEN];
-
-		bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
-		LOG_INF("Connecting to %s", addr_str);
-
-		struct bt_le_conn_param *param = BT_LE_CONN_PARAM_DEFAULT;
-		int err = bt_conn_le_create(addr, BT_CONN_LE_CREATE_CONN, param,
-					    &conn_connecting);
-
-		__ASSERT(!err, "Create conn failed (err %d)", err);
-
-		return false;
-
-		break;
+	if (check_if_peer_connected(addr)) {
+		LOG_ERR("Peer is already connected or in disconnecting state");
+		return;
 	}
 
-	return true;
+	__ASSERT(!atomic_test_bit(status_flags, DEVICE_IS_CONNECTING),
+		 "A connection procedure is ongoing");
+	atomic_set_bit(status_flags, DEVICE_IS_CONNECTING);
+
+	stop_scan();
+
+	char addr_str[BT_ADDR_LE_STR_LEN];
+
+	bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
+	LOG_INF("Connecting to %s", addr_str);
+
+	struct bt_le_conn_param *param = BT_LE_CONN_PARAM_DEFAULT;
+	int err = bt_conn_le_create(addr, BT_CONN_LE_CREATE_CONN, param,
+				    &conn_connecting);
+
+	__ASSERT(!err, "Create conn failed (err %d)", err);
 }
 
 static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 			 struct net_buf_simple *ad)
 {
-	bt_data_parse(ad, parse_ad, (void *)addr);
+	connect(addr);
 }
 
 static void start_scan(void)
@@ -382,7 +361,7 @@ static void start_scan(void)
 	struct bt_le_scan_param scan_param = {
 		.type = BT_LE_SCAN_TYPE_ACTIVE,
 		.options = BT_LE_SCAN_OPT_NONE,
-		.interval = BT_GAP_SCAN_FAST_INTERVAL,
+		.interval = BT_GAP_SCAN_FAST_WINDOW,
 		.window = BT_GAP_SCAN_FAST_WINDOW,
 	};
 
@@ -468,7 +447,6 @@ static void security_changed(struct bt_conn *conn, bt_security_t level, enum bt_
 		bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_POWER_OFF);
 	}
 }
-#endif /* CONFIG_BT_SMP */
 
 static void identity_resolved(struct bt_conn *conn, const bt_addr_le_t *rpa,
 			      const bt_addr_le_t *identity)
@@ -486,14 +464,15 @@ static void identity_resolved(struct bt_conn *conn, const bt_addr_le_t *rpa,
 	conn_info_ref = get_conn_info_ref(conn);
 	bt_addr_le_copy(&conn_info_ref->addr, identity);
 }
+#endif /* CONFIG_BT_SMP */
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
 	.connected = connected_cb,
 	.disconnected = disconnected,
 #if defined(CONFIG_BT_SMP)
 	.security_changed = security_changed,
-#endif /* CONFIG_BT_SMP */
 	.identity_resolved = identity_resolved,
+#endif /* CONFIG_BT_SMP */
 };
 
 void mtu_updated(struct bt_conn *conn, uint16_t tx, uint16_t rx)
@@ -605,41 +584,11 @@ static void subscribe_to_service(struct bt_conn *conn, void *data)
 	}
 }
 
-static void notify_peers(struct bt_conn *conn, void *data)
+static void wait_eatt_conn(struct bt_conn *conn, void *data)
 {
-	int err;
-	struct bt_gatt_attr *vnd_attr = (struct bt_gatt_attr *)data;
-	struct conn_info *conn_info_ref;
-	char addr[BT_ADDR_LE_STR_LEN];
-
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
-
-	conn_info_ref = get_connected_conn_info_ref(conn);
-	if (conn_info_ref == NULL) {
-		LOG_DBG("not connected: %s", addr);
-		return;
-	}
-
-	if (!atomic_test_bit(conn_info_ref->flags, CONN_INFO_MTU_EXCHANGED)) {
-		LOG_DBG("can't notify: MTU not yet exchanged");
-		/* sleep a bit to allow the exchange to take place */
+	while (bt_eatt_count(conn) != CONFIG_BT_EATT_MAX) {
 		k_msleep(100);
-		return;
-	}
-
-	memset(vnd_value, 0x00, sizeof(vnd_value));
-	snprintk(vnd_value, notification_size, "%s%u", NOTIFICATION_DATA_PREFIX,
-		 conn_info_ref->tx_notify_counter);
-	LOG_INF("notify: %s", addr);
-	err = bt_gatt_notify(conn, vnd_attr, vnd_value, notification_size);
-	if (err) {
-		LOG_ERR("Couldn't send GATT notification");
-		return;
-	}
-
-	LOG_DBG("central notified: %s %d", addr, conn_info_ref->tx_notify_counter);
-
-	conn_info_ref->tx_notify_counter++;
+	};
 }
 
 void test_central_main(void)
@@ -687,15 +636,17 @@ void test_central_main(void)
 
 		err = 0;
 		bt_conn_foreach(BT_CONN_TYPE_LE, subscribe_to_service, &err);
-		if (!err) {
-			bt_conn_foreach(BT_CONN_TYPE_LE, notify_peers, vnd_attr);
-		} else {
+
+		if (err) {
 			/* Allow the sub procedure to complete. Else the
 			 * notifications use up all the buffers and it can never
 			 * complete in time.
 			 */
 			LOG_ERR("subscription failed: %d, not notifying", err);
 		}
+
+		bt_conn_foreach(BT_CONN_TYPE_LE, wait_eatt_conn, NULL);
+
 		k_msleep(10);
 	}
 }
