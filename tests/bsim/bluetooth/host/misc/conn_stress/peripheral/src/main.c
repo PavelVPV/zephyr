@@ -24,7 +24,7 @@
 #include <zephyr/types.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(peripheral, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(peripheral, LOG_LEVEL_DBG);
 
 #include "bstests.h"
 #include "bs_types.h"
@@ -429,6 +429,11 @@ void test_peripheral_main(void)
 			k_sleep(K_MSEC(10));
 		}
 
+		while (bt_eatt_count(conn_info.conn_ref) != CONFIG_BT_EATT_MAX) {
+			k_msleep(100);
+		};
+
+
 		LOG_INF("Begin sending notifications to central..");
 		while (central_subscription &&
 		       atomic_test_bit(conn_info.flags, CONN_INFO_CONNECTED)) {
@@ -439,7 +444,7 @@ void test_peripheral_main(void)
 				if (atomic_get(&conn_info.tx_notify_counter) > 0) {
 					atomic_dec(&conn_info.tx_notify_counter);
 				}
-				LOG_DBG("Couldn't send GATT notification");
+				LOG_ERR("Couldn't send GATT notification");
 				k_msleep(10);
 			} else {
 				atomic_inc(&conn_info.tx_notify_counter);
