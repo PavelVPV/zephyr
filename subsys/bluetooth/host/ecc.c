@@ -123,6 +123,14 @@ static void generate_pub_key(struct k_work *work)
 	int err;
 	psa_status_t ret;
 
+	static bool a = false;
+	if (!a) {
+		a = true;
+		err = BT_HCI_ERR_UNSPECIFIED;
+		k_sleep(K_SECONDS(2));
+		goto done;
+	}
+
 	set_key_attributes(&attr);
 
 	ret = psa_generate_key(&attr, &key_id);

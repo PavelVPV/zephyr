@@ -269,6 +269,50 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 	.disconnected = disconnected,
 };
 
+#define NUM_OF_WORK 2
+static K_THREAD_STACK_ARRAY_DEFINE(bt_lw_stack_area, NUM_OF_WORK, 1024);
+static struct k_work_q long_wq[NUM_OF_WORK];
+static void long_work_handler(struct k_work *work);
+static struct k_work long_work[NUM_OF_WORK];
+
+static void long_work_handler(struct k_work *work)
+{
+	int err;
+	struct bt_le_oob oob = {};
+	err = bt_le_oob_get_local(BT_ID_DEFAULT, &oob);
+
+	printk("<long_wq [%lu]>: Bluetooth local OOB data (err %d)\n", (intptr_t)work, err);
+}
+
+static void long_wq_init(void)
+{
+	k_sched_lock();
+
+	for (int i = 0; i < NUM_OF_WORK; i++) {
+		k_work_init(&long_work[i], long_work_handler);
+
+//		k_work_queue_init(&long_wq[i]);
+		k_work_queue_start(&long_wq[i], bt_lw_stack_area[i],
+				   K_THREAD_STACK_SIZEOF(bt_lw_stack_area[i]),
+				   K_PRIO_PREEMPT(1), NULL);
+
+		k_work_submit_to_queue(&long_wq[i], &long_work[i]);
+	}
+
+	k_sched_unlock();
+}
+
+static void long_wq_submit(void)
+{
+	k_sched_lock();
+
+	for (int i = 0; i < NUM_OF_WORK; i++) {
+		k_work_submit_to_queue(&long_wq[i], &long_work[i]);
+	}
+
+	k_sched_unlock();
+}
+
 int main(void)
 {
 	int err;
@@ -281,6 +325,18 @@ int main(void)
 
 	printk("Bluetooth initialized\n");
 
-	start_scan();
+//	k_sleep(K_SECONDS(1));
+
+	long_wq_init();
+
+	struct bt_le_oob oob = {};
+	err = bt_le_oob_get_local(BT_ID_DEFAULT, &oob);
+	printk("<main>: Bluetooth local OOB data (err %d)\n", err);
+
+	k_sleep(K_SECONDS(10));
+	printf("requesting again\n");
+	long_wq_submit();
+
+//	start_scan();
 	return 0;
 }
