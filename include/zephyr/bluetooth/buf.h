@@ -113,6 +113,8 @@ struct bt_buf_data {
 BUILD_ASSERT(BT_BUF_ACL_RX_COUNT <= BT_BUF_ACL_RX_COUNT_MAX,
 	     "Maximum number of ACL RX buffer is 65535, reduce CONFIG_BT_BUF_ACL_RX_COUNT_EXTRA");
 
+#pragma message "BT_BUF_ACL_RX_COUNT: " STRINGIFY(BT_BUF_ACL_RX_COUNT)
+
 /** Data size needed for HCI ACL, HCI ISO or Event RX buffers */
 #define BT_BUF_RX_SIZE (MAX(MAX(BT_BUF_ACL_RX_SIZE, BT_BUF_EVT_RX_SIZE), \
 			    BT_BUF_ISO_RX_SIZE))
@@ -121,7 +123,8 @@ BUILD_ASSERT(BT_BUF_ACL_RX_COUNT <= BT_BUF_ACL_RX_COUNT_MAX,
  * Packets events.
  */
 BUILD_ASSERT(CONFIG_BT_BUF_EVT_RX_COUNT > CONFIG_BT_BUF_ACL_TX_COUNT,
-	     "Increase Event RX buffer count to be greater than ACL TX buffer count");
+	     "Increase Event RX buffer count to be greater than ACL TX buffer count: "
+	     STRINGIFY(CONFIG_BT_BUF_EVT_RX_COUNT) " > " STRINGIFY(CONFIG_BT_BUF_ACL_TX_COUNT));
 
 /** Buffer count needed for HCI ACL or HCI ISO plus Event RX buffers */
 #define BT_BUF_RX_COUNT (CONFIG_BT_BUF_EVT_RX_COUNT + \

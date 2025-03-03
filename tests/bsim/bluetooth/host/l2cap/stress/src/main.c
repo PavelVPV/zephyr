@@ -40,7 +40,7 @@ static void heavy_work_handler(struct k_work *work)
 	k_sleep(K_SECONDS(2));
 
 	LOG_INF("Heavy work started");
-	k_busy_wait(100 * 1000);
+	k_busy_wait(1000 * 1000);
 	LOG_INF("Heavy work done");
 
 	// TODO: Uncomment if doesn't fail from the first attempt
@@ -179,6 +179,9 @@ int recv_cb(struct bt_l2cap_chan *chan, struct net_buf *buf)
 				 p, buf->data[p], p, tx_data[p]);
 		}
 	}
+
+	k_sleep(K_SECONDS(1));
+	k_busy_wait(1000 * 1000);
 
 	return 0;
 }
