@@ -61,11 +61,7 @@ NET_BUF_POOL_FIXED_DEFINE(discardable_pool, CONFIG_BT_BUF_EVT_DISCARDABLE_COUNT,
 			  sizeof(struct bt_buf_data), NULL);
 
 #if defined(CONFIG_BT_HCI_ACL_FLOW_CONTROL)
-static void acl_in_pool_destroy(struct net_buf *buf)
-{
-	bt_hci_host_num_completed_packets(buf);
-	buf_rx_freed_notify(BT_BUF_ACL_IN);
-}
+static void acl_in_pool_destroy(struct net_buf *buf);
 
 static void evt_pool_destroy(struct net_buf *buf)
 {
@@ -76,6 +72,13 @@ static void evt_pool_destroy(struct net_buf *buf)
 NET_BUF_POOL_DEFINE(acl_in_pool, (BT_BUF_ACL_RX_COUNT_EXTRA + BT_BUF_HCI_ACL_RX_COUNT),
 		    BT_BUF_ACL_SIZE(CONFIG_BT_BUF_ACL_RX_SIZE), sizeof(struct acl_data),
 		    acl_in_pool_destroy);
+
+static void acl_in_pool_destroy(struct net_buf *buf)
+{
+	bt_hci_host_num_completed_packets(buf);
+	buf_rx_freed_notify(BT_BUF_ACL_IN);
+	LOG_WRN("acl_in_pool.avail_count (inc) %u", atomic_get(&acl_in_pool.avail_count));
+}
 
 NET_BUF_POOL_FIXED_DEFINE(evt_pool, CONFIG_BT_BUF_EVT_RX_COUNT, BT_BUF_EVT_RX_SIZE,
 			  sizeof(struct bt_buf_data), evt_pool_destroy);
@@ -110,6 +113,7 @@ struct net_buf *bt_buf_get_rx(enum bt_buf_type type, k_timeout_t timeout)
 	if (type == BT_BUF_EVT) {
 		buf = net_buf_alloc(&evt_pool, timeout);
 	} else {
+		LOG_WRN("acl_in_pool.avail_count (dec) %u", atomic_get(&acl_in_pool.avail_count));
 		buf = net_buf_alloc(&acl_in_pool, timeout);
 	}
 #else

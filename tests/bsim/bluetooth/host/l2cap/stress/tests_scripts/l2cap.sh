@@ -11,17 +11,23 @@ source ${ZEPHYR_BASE}/tests/bsim/sh_common.source
 # EATT test
 simulation_id="l2cap_stress"
 verbosity_level=2
-EXECUTE_TIMEOUT=240
+EXECUTE_TIMEOUT=1240
 
 bsim_exe=./bs_${BOARD_TS}_tests_bsim_bluetooth_host_l2cap_stress_prj_conf
 
 cd ${BSIM_OUT_PATH}/bin
 
 #ATTACH_CMD=("btmon" "--tty" "%s" "--tty-speed" "115200" "&")
-ATTACH_CMD="xterm -e btmon --tty %s --tty-speed 115200 &"
+#ATTACH_CMD="sleep 10"
+#ATTACH_CMD="bash -c \"/usr/bin/btmon --tty %s --tty-speed 115200 -w hci_log.txt\" &"
+#ATTACH_CMD="xterm -e screen %s -L -LogFile hci_log.txt &"
+ATTACH_CMD="btmon --tty=%s -w hci_log_central.btsnoop &"
 
 Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=0 -testid=central -rs=43 \
-    -uart0_pty_attach_cmd="${ATTACH_CMD}" -uart_pty_wait
+    -attach_uart_cmd="${ATTACH_CMD}"
+#    -wait_uart
+#Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=0 -testid=central -rs=43 \
+#    -uart0_pty_attach_cmd="${ATTACH_CMD}" #-uart_pty_wait
 
 Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=1 -testid=peripheral -rs=42 #--uart0_pty --uart_pty_wait
 #Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=2 -testid=peripheral -rs=10
