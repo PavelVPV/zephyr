@@ -521,6 +521,7 @@ static void set_ctl_to_host_flow(struct net_buf *buf, struct net_buf **evt)
 	hci_hbuf_acked = 0U;
 	(void)memset(hci_hbuf_pend, 0, sizeof(hci_hbuf_pend));
 	hci_hbuf_total = -hci_hbuf_total;
+	LOG_WRN("set_ctl_to_host_flow: %d, %d", flow_enable, hci_hbuf_total);
 }
 
 static void host_buffer_size(struct net_buf *buf, struct net_buf **evt)
@@ -544,7 +545,7 @@ static void host_buffer_size(struct net_buf *buf, struct net_buf **evt)
 		return;
 	}
 
-	LOG_DBG("FC: host buf size: %d", acl_pkts);
+	LOG_WRN("FC: host buf size: %d, total: %d", acl_pkts, hci_hbuf_total);
 	hci_hbuf_total = -acl_pkts;
 }
 
@@ -582,8 +583,8 @@ static void host_num_completed_packets(struct net_buf *buf,
 		count += c;
 	}
 
-	LOG_DBG("FC: acked: %d", count);
 	hci_hbuf_acked += count;
+	LOG_WRN("FC: acked: %u, hci_hbuf_acked: %u", count, hci_hbuf_acked);
 	k_poll_signal_raise(hbuf_signal, 0x0);
 }
 #endif
@@ -9085,6 +9086,8 @@ void hci_acl_encode(struct node_rx_pdu *node_rx, struct net_buf *buf)
 		memcpy(data, pdu_data->lldata, pdu_data->len);
 #if defined(CONFIG_BT_HCI_ACL_FLOW_CONTROL)
 		if (hci_hbuf_total > 0) {
+			LOG_WRN("ACL encode, sent: %u, acked: %u, total: %u",
+				hci_hbuf_sent, hci_hbuf_acked, hci_hbuf_total);
 			LL_ASSERT((hci_hbuf_sent - hci_hbuf_acked) <
 				  hci_hbuf_total);
 			hci_hbuf_sent++;
