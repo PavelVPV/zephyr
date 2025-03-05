@@ -1,0 +1,15 @@
+/delete-node/ &uart0;
+
+/ {
+	chosen {
+		zephyr,bt-mon-uart = &uart0;
+	};
+	uart0: uart {
+		status = "okay";
+		compatible = "zephyr,native-posix-uart";
+		/* Dummy current-speed entry to comply with serial
+		 * DTS binding
+		 */
+		current-speed = <0>;
+	};
+};
