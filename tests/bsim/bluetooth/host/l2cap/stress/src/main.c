@@ -42,7 +42,7 @@ static void tx_power_get(struct bt_conn *conn)
 
 	err = bt_conn_le_get_tx_power_level(conn, &power_level);
 	if (err) {
-		FAIL("Failed to get tx power level (err %d)", err);
+		TEST_FAIL("Failed to get tx power level (err %d)", err);
 	}
 
 	LOG_INF("Tx power level: %d", power_level.current_level);
@@ -54,7 +54,7 @@ static K_THREAD_STACK_DEFINE(dut_work_stack, 1024);
 static void heavy_work_handler(struct k_work *work)
 {
 	LOG_INF("Heavy work started");
-	k_busy_wait(1000 * 1000);
+	k_busy_wait(100 * 1000);
 	LOG_INF("Heavy work done");
 
 	tx_power_get(default_conn);
@@ -189,8 +189,8 @@ int recv_cb(struct bt_l2cap_chan *chan, struct net_buf *buf)
 		}
 	}
 
-	k_sleep(K_SECONDS(1));
-	k_busy_wait(1000 * 1000);
+//	k_sleep(K_SECONDS(1));
+//	k_busy_wait(1000 * 1000);
 
 	return 0;
 }

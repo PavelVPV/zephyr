@@ -81,20 +81,14 @@ config BT_BUF_ACL_RX_COUNT_EXTRA
 	# As Host implementation unconditionally references this Kconfig, we
 	# hide it for !BT_CONN and default to 0.
 	int "Number of extra incoming ACL data buffers" if BT_CONN
-	range 1 65535 if BT_CONN
-	default BT_MAX_CONN if BT_CONN
-	range 0 0
 	default 0
+	range 0 65535
 	help
 	  Number of incoming extra ACL data buffers sent from the Controller to
 	  the Host.
 
 	  By default, the total number of incoming ACL data buffers is equal to
-	  CONFIG_BT_MAX_CONN + 1, to support L2CAP recombination.
-
-	  The L2CAP recombination in the Host keeps the first Rx buffer for each
-	  connection and uses one Rx buffer across all connections to receive a
-	  fragment from the Controller.
+	  CONFIG_BT_MAX_CONN + 1.
 
 config BT_BUF_ACL_RX_COUNT
 	int "[DEPRECATED] Number of incoming ACL data buffers"

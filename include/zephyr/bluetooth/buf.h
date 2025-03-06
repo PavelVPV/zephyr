@@ -97,10 +97,11 @@ struct bt_buf_data {
   * available for the HCI driver to allocate from.
   *
   * TODO: When CONFIG_BT_BUF_ACL_RX_COUNT is removed,
-  *       remove the MAX and only keep the 1.
+  *       remove the MAX and only keep (CONFIG_BT_MAX_CONN + 1).
   */
 #define BT_BUF_ACL_RX_COUNT_EXTRA CONFIG_BT_BUF_ACL_RX_COUNT_EXTRA
-#define BT_BUF_ACL_RX_COUNT       (MAX(CONFIG_BT_BUF_ACL_RX_COUNT, 1) + BT_BUF_ACL_RX_COUNT_EXTRA)
+#define BT_BUF_ACL_RX_COUNT       (MAX(CONFIG_BT_BUF_ACL_RX_COUNT, (CONFIG_BT_MAX_CONN + 1)) + \
+				   BT_BUF_ACL_RX_COUNT_EXTRA)
 #else
 #define BT_BUF_ACL_RX_COUNT_EXTRA 0
 #define BT_BUF_ACL_RX_COUNT       0
@@ -114,6 +115,7 @@ BUILD_ASSERT(BT_BUF_ACL_RX_COUNT <= BT_BUF_ACL_RX_COUNT_MAX,
 	     "Maximum number of ACL RX buffer is 65535, reduce CONFIG_BT_BUF_ACL_RX_COUNT_EXTRA");
 
 #pragma message "BT_BUF_ACL_RX_COUNT: " STRINGIFY(BT_BUF_ACL_RX_COUNT)
+#pragma message "BT_BUF_ACL_RX_COUNT_EXTRA: " STRINGIFY(BT_BUF_ACL_RX_COUNT_EXTRA)
 
 /** Data size needed for HCI ACL, HCI ISO or Event RX buffers */
 #define BT_BUF_RX_SIZE (MAX(MAX(BT_BUF_ACL_RX_SIZE, BT_BUF_EVT_RX_SIZE), \

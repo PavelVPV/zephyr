@@ -38,16 +38,11 @@ BUILD_ASSERT((CONFIG_BT_BUF_CMD_TX_COUNT == CONFIG_BT_CTLR_HCI_NUM_CMD_PKT_MAX),
  * enqueuing Host Number of Completed Packets command.
  *
  * Host keeps the first, and subsequent, Rx buffers (that comes from the driver) for each connection
- * to do re-assembly into, up to the L2CAP SDU length required number of Rx buffers.
- * BT_BUF_ACL_RX_COUNT_EXTRA holds the application configured number of buffers across active
- * connections for recombination of HCI data packets to L2CAP SDUs.
- *
- * BT_BUF_HCI_EVT_RX_COUNT defines the number of available buffers reserved for "synchronous"
- * processing of HCI events like Number of Completed Packets, disconnection complete etc.
+ * to do re-assembly into, up to the L2CAP SDU length required number of Rx buffers + 1 for
+ * recombination of HCI data packets to L2CAP SDUs.
  *
  * BT_BUF_HCI_ACL_RX_COUNT defines the number of available buffers for Controller to Host data
- * flow control; keeping the application configured BT_BUF_ACL_RX_COUNT_EXTRA number of buffers
- * available for L2CAP recombination, and a reserved number of buffers for processing HCI events.
+ * flow control.
  */
 
 /* FIXME: Calculate the maximum number of HCI events of different types that a connection can
@@ -65,12 +60,9 @@ BUILD_ASSERT((CONFIG_BT_BUF_CMD_TX_COUNT == CONFIG_BT_CTLR_HCI_NUM_CMD_PKT_MAX),
  * control to restrict buffers required on resource constraint devices, i.e. if these events are not
  * processed "synchronous".
  */
-#define BT_BUF_HCI_EVT_RX_COUNT          1
-#define BT_BUF_HCI_ACL_RX_COUNT          (BT_BUF_RX_COUNT - BT_BUF_HCI_EVT_RX_COUNT - \
-					  BT_BUF_ACL_RX_COUNT_EXTRA - 1)
-#define BT_BUF_CMD_TX_HOST_NUM_CMPLT_PKT (BT_BUF_HCI_ACL_RX_COUNT)
+#define BT_BUF_HCI_ACL_RX_COUNT       (BT_BUF_ACL_RX_COUNT)
 
-#pragma message "1 BT_BUF_HCI_ACL_RX_COUNT: " STRINGIFY(BT_BUF_HCI_ACL_RX_COUNT)
+#define BT_BUF_CMD_TX_HOST_NUM_CMPLT_PKT (BT_BUF_HCI_ACL_RX_COUNT)
 
 #else /* !CONFIG_BT_HCI_ACL_FLOW_CONTROL */
 #define BT_BUF_CMD_TX_HOST_NUM_CMPLT_PKT 0
@@ -96,9 +88,16 @@ BUILD_ASSERT(IS_ENABLED(CONFIG_BT_CTLR_HCI_NUM_CMD_PKT_MAX),
 /** Can use all of buffer count needed for HCI ACL, HCI ISO or Event RX buffers for ACL RX */
 #define BT_BUF_HCI_ACL_RX_COUNT (BT_BUF_RX_COUNT)
 
-#pragma message "2 BT_BUF_HCI_ACL_RX_COUNT: " STRINGIFY(BT_BUF_HCI_ACL_RX_COUNT)
-
 /* Controller-only with Controller to Host data flow control */
+/**
+ * CONFIG_BT_CTLR_HCI_NUM_CMD_PKT_MAX is the maximum number of HCI command packets that the
+ * Controller will allow Host to send.
+ * However, Host Number Of Completed Packets command is not counted in this.
+ * Host will send this command when it has processed the received ACL data packets.
+ */
 #define BT_BUF_CMD_TX_COUNT     (BT_BUF_RX_COUNT + CONFIG_BT_CTLR_HCI_NUM_CMD_PKT_MAX)
 
 #endif /* CONFIG_BT_HCI_ACL_FLOW_CONTROL */
+
+#pragma message "BT_BUF_HCI_ACL_RX_COUNT: " STRINGIFY(BT_BUF_HCI_ACL_RX_COUNT)
+#pragma message "BT_BUF_CMD_TX_COUNT: " STRINGIFY(BT_BUF_CMD_TX_COUNT)
