@@ -128,7 +128,9 @@ static struct net_buf *bt_ipc_acl_recv(const uint8_t *data, size_t remaining)
 	}
 
 	k_timeout_t rx_timeout = K_NO_WAIT;
+#if 0
 retry:
+#endif
 	buf = bt_buf_get_rx(BT_BUF_ACL_IN, rx_timeout);
 	if (buf) {
 		memcpy((void *)&hdr, data, sizeof(hdr));
@@ -137,12 +139,13 @@ retry:
 
 		net_buf_add_mem(buf, &hdr, sizeof(hdr));
 	} else {
+#if 0
 		if (K_TIMEOUT_EQ(rx_timeout, K_NO_WAIT)) {
 			LOG_WRN("No available ACL buffers! retrying...");
 			rx_timeout = K_FOREVER;
 			goto retry;
 		}
-
+#endif
 		LOG_ERR("No available ACL buffers!");
 		return NULL;
 	}
