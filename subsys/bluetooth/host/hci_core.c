@@ -278,6 +278,7 @@ void bt_hci_host_num_completed_packets(struct net_buf *buf)
 
 	net_buf_destroy(buf);
 
+	LOG_WRN("Host NCP sent for handle %u: %s", handle, acl(buf)->host_ncp_sent ? "true" : "false");
 	if (acl(buf)->host_ncp_sent) {
 		return;
 	}

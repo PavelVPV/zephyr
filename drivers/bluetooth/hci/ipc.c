@@ -147,6 +147,7 @@ retry:
 		}
 #endif
 		LOG_ERR("No available ACL buffers!");
+		__ASSERT_NO_MSG(false);
 		return NULL;
 	}
 
