@@ -465,9 +465,9 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 		return;
 	}
 
-	if (flags == BT_ACL_CONT) {
-		bt_acl_set_ncp_sent(buf, true);
-	}
+//	if (flags == BT_ACL_CONT) {
+//		bt_acl_set_ncp_sent(buf, true);
+//	}
 	net_buf_unref(buf);
 //	bt_acl_set_ncp_sent(buf, false);
 
@@ -480,7 +480,7 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 	/* L2CAP frame complete. */
 	buf = conn->rx;
 	conn->rx = NULL;
-	bt_acl_set_ncp_sent(buf, false);
+//	bt_acl_set_ncp_sent(buf, false);
 
 	__ASSERT(buf->ref == 1, "buf->ref %d", buf->ref);
 

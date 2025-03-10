@@ -21,6 +21,23 @@
 
 LOG_MODULE_REGISTER(dut, CONFIG_APP_LOG_LEVEL);
 
+static struct k_work_q dut_work_q;
+static K_THREAD_STACK_DEFINE(dut_work_stack, 1024);
+
+static void heavy_work_handler(struct k_work *work)
+{
+	while (1) {
+		LOG_INF("Heavy work started");
+		k_busy_wait(100 * 1000);
+		LOG_INF("Heavy work done");
+		k_sleep(K_MSEC(100));
+	}
+
+//	tx_power_get(default_conn);
+}
+
+static K_WORK_DEFINE(heavy_work, heavy_work_handler);
+
 #define NUM_TESTERS CONFIG_BT_MAX_CONN
 
 /* Build with the minimum possible amount of RX buffers */
@@ -185,6 +202,11 @@ void entrypoint_dut(void)
 	/* Mark test as in progress. */
 	TEST_START("dut");
 
+	k_work_queue_start(&dut_work_q, dut_work_stack,
+			   K_THREAD_STACK_SIZEOF(dut_work_stack),
+			   K_PRIO_COOP(CONFIG_BT_RX_PRIO + 1), NULL);
+	k_thread_name_set(&dut_work_q.thread, "DUT workq");
+
 	/* Initialize Bluetooth */
 	err = bt_enable(NULL);
 	TEST_ASSERT(err == 0, "Can't enable Bluetooth (err %d)", err);
@@ -202,6 +224,10 @@ void entrypoint_dut(void)
 	}
 
 	LOG_DBG("Connected all testers");
+
+	(void)dut_work_q;
+	k_sleep(K_MSEC(800));
+	k_work_submit(&heavy_work);
 
 	while (!all_data_transferred()) {
 		/* Wait until we have received all expected data. */
