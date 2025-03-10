@@ -60,7 +60,10 @@ BUILD_ASSERT((CONFIG_BT_BUF_CMD_TX_COUNT == CONFIG_BT_CTLR_HCI_NUM_CMD_PKT_MAX),
  * control to restrict buffers required on resource constraint devices, i.e. if these events are not
  * processed "synchronous".
  */
-#define BT_BUF_HCI_ACL_RX_COUNT       (BT_BUF_ACL_RX_COUNT)
+//#define BT_BUF_HCI_ACL_RX_COUNT       (BT_BUF_ACL_RX_COUNT)
+#define BT_BUF_HCI_EVT_RX_COUNT          1
+#define BT_BUF_HCI_ACL_RX_COUNT          (BT_BUF_RX_COUNT - BT_BUF_HCI_EVT_RX_COUNT - \
+					  BT_BUF_ACL_RX_COUNT_EXTRA)
 
 #define BT_BUF_CMD_TX_HOST_NUM_CMPLT_PKT (BT_BUF_HCI_ACL_RX_COUNT)
 
