@@ -441,10 +441,10 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 		 * length field.
 		 */
 		LOG_ERR("Not enough data for L2CAP header: %u", conn->rx->len);
-		if (flags != BT_ACL_START) {
+//		if (flags == BT_ACL_START) {
 			bt_send_one_host_num_completed_packets(conn->handle);
 			bt_acl_set_ncp_sent(buf, true);
-		}
+//		}
 		net_buf_unref(buf);
 
 		return;
@@ -455,14 +455,18 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 	if (conn->rx->len < acl_total_len) {
 		/* L2CAP frame not complete. */
 		LOG_ERR("L2CAP frame not complete (%u < %u)", conn->rx->len, acl_total_len);
-		if (flags != BT_ACL_START) {
+//		if (flags == BT_ACL_START) {
 			bt_send_one_host_num_completed_packets(conn->handle);
 			bt_acl_set_ncp_sent(buf, true);
-		}
+//		}
 		net_buf_unref(buf);
 
 		return;
 	}
+
+//	if (flags == BT_ACL_CONT) {
+		bt_acl_set_ncp_sent(buf, true);
+//	}
 
 	net_buf_unref(buf);
 
@@ -475,6 +479,7 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 	/* L2CAP frame complete. */
 	buf = conn->rx;
 	conn->rx = NULL;
+//	bt_acl_set_ncp_sent(buf, false);
 
 	__ASSERT(buf->ref == 1, "buf->ref %d", buf->ref);
 
