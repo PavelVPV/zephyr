@@ -103,8 +103,9 @@ struct bt_buf_data {
 #if 0
 #define BT_BUF_ACL_RX_COUNT       (MAX(CONFIG_BT_BUF_ACL_RX_COUNT, (CONFIG_BT_MAX_CONN + 1)) + \
 				   BT_BUF_ACL_RX_COUNT_EXTRA)
-#endif
+#else
 #define BT_BUF_ACL_RX_COUNT (MAX(CONFIG_BT_BUF_ACL_RX_COUNT, 1) + BT_BUF_ACL_RX_COUNT_EXTRA)
+#endif
 #else
 #define BT_BUF_ACL_RX_COUNT_EXTRA 0
 #define BT_BUF_ACL_RX_COUNT       0

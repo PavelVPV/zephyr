@@ -406,6 +406,9 @@ static void complete_acl_rx_process(struct k_work *work)
 	buf = conn->rx;
 	conn->rx = NULL;
 
+	/* For last segment, keep HNCP until host is done processing. */
+	bt_acl_set_ncp_sent(buf, false);
+
 	__ASSERT(buf->ref == 1, "buf->ref %d", buf->ref);
 
 	LOG_WRN("Successfully parsed %u byte L2CAP packet", buf->len);
@@ -506,6 +509,8 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 
 	// TODO: Hold HNCP until L2CAP is done
 	LOG_WRN("Unreferencing last segment, conn: %p, handle: %d", (void *)conn, conn->handle);
+	/* Mark the buffer as HNCP is sent. Keep it until `conn->rx` is unreferenced. */
+	bt_acl_set_ncp_sent(buf, true);
 	net_buf_unref(buf);
 
 	LOG_WRN("L2CAP frame complete, conn %p", (void *)conn);
