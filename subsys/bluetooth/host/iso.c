@@ -150,7 +150,7 @@ void hci_iso(struct net_buf *buf)
 
 	iso(buf)->index = bt_conn_index(iso);
 
-	bt_conn_recv(iso, buf, flags);
+	bt_conn_iso_recv(iso, buf, flags);
 	bt_conn_unref(iso);
 }
 

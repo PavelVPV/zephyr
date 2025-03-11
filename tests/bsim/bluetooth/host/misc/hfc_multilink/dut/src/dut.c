@@ -24,19 +24,19 @@ LOG_MODULE_REGISTER(dut, CONFIG_APP_LOG_LEVEL);
 static struct k_work_q dut_work_q;
 static K_THREAD_STACK_DEFINE(dut_work_stack, 1024);
 
+static void heavy_work_handler(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(heavy_work, heavy_work_handler);
+
 static void heavy_work_handler(struct k_work *work)
 {
-	while (1) {
-		LOG_INF("Heavy work started");
-		k_busy_wait(100 * 1000);
-		LOG_INF("Heavy work done");
-		k_sleep(K_MSEC(100));
-	}
+	LOG_INF("Heavy work started");
+	k_busy_wait(100 * 1000);
+	LOG_INF("Heavy work done");
+
+	k_work_schedule(&heavy_work, K_MSEC(100));
 
 //	tx_power_get(default_conn);
 }
-
-static K_WORK_DEFINE(heavy_work, heavy_work_handler);
 
 #define NUM_TESTERS CONFIG_BT_MAX_CONN
 
@@ -226,8 +226,9 @@ void entrypoint_dut(void)
 	LOG_DBG("Connected all testers");
 
 	(void)dut_work_q;
+//	(void)heavy_work;
 	k_sleep(K_MSEC(800));
-	k_work_submit(&heavy_work);
+	k_work_schedule(&heavy_work, K_NO_WAIT);
 
 	while (!all_data_transferred()) {
 		/* Wait until we have received all expected data. */

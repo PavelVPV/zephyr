@@ -660,7 +660,7 @@ static void hci_acl(struct net_buf *buf)
 
 	acl(buf)->index = bt_conn_index(conn);
 
-	bt_conn_recv(conn, buf, flags);
+	bt_conn_acl_recv(conn, buf, flags);
 	bt_conn_unref(conn);
 }
 
@@ -4091,18 +4091,25 @@ void hci_event_prio(struct net_buf *buf)
 	}
 }
 
+int bt_rx_workq_submit(struct k_work *work)
+{
+#if defined(CONFIG_BT_RECV_WORKQ_SYS)
+	const int err = k_work_submit(work);
+#elif defined(CONFIG_BT_RECV_WORKQ_BT)
+	const int err = k_work_submit_to_queue(&bt_workq, work);
+#endif /* CONFIG_BT_RECV_WORKQ_SYS */
+	if (err < 0) {
+		LOG_ERR("Could not submit work [%p] to bt_workq: %d", (void *)work, err);
+	}
+
+	return err;
+}
+
 static void rx_queue_put(struct net_buf *buf)
 {
 	net_buf_slist_put(&bt_dev.rx_queue, buf);
 
-#if defined(CONFIG_BT_RECV_WORKQ_SYS)
-	const int err = k_work_submit(&rx_work);
-#elif defined(CONFIG_BT_RECV_WORKQ_BT)
-	const int err = k_work_submit_to_queue(&bt_workq, &rx_work);
-#endif /* CONFIG_BT_RECV_WORKQ_SYS */
-	if (err < 0) {
-		LOG_ERR("Could not submit rx_work: %d", err);
-	}
+	(void)bt_rx_workq_submit(&rx_work);
 }
 
 static int bt_recv_unsafe(struct net_buf *buf)
@@ -4114,7 +4121,7 @@ static int bt_recv_unsafe(struct net_buf *buf)
 	switch (bt_buf_get_type(buf)) {
 #if defined(CONFIG_BT_CONN)
 	case BT_BUF_ACL_IN:
-		rx_queue_put(buf);
+		hci_acl(buf);
 		return 0;
 #endif /* BT_CONN */
 	case BT_BUF_EVT:
@@ -4215,8 +4222,6 @@ static void init_work(struct k_work *work)
 
 static void rx_work_handler(struct k_work *work)
 {
-	int err;
-
 	struct net_buf *buf;
 
 	LOG_DBG("Getting net_buf from queue");
@@ -4228,11 +4233,11 @@ static void rx_work_handler(struct k_work *work)
 	LOG_DBG("buf %p type %u len %u", buf, bt_buf_get_type(buf), buf->len);
 
 	switch (bt_buf_get_type(buf)) {
-#if defined(CONFIG_BT_CONN)
-	case BT_BUF_ACL_IN:
-		hci_acl(buf);
-		break;
-#endif /* CONFIG_BT_CONN */
+//#if defined(CONFIG_BT_CONN)
+//	case BT_BUF_ACL_IN:
+//		hci_acl(buf);
+//		break;
+//#endif /* CONFIG_BT_CONN */
 #if defined(CONFIG_BT_ISO)
 	case BT_BUF_ISO_IN:
 		hci_iso(buf);
@@ -4253,15 +4258,7 @@ static void rx_work_handler(struct k_work *work)
 	 * we used a while() loop with a k_yield() statement.
 	 */
 	if (!sys_slist_is_empty(&bt_dev.rx_queue)) {
-
-#if defined(CONFIG_BT_RECV_WORKQ_SYS)
-		err = k_work_submit(&rx_work);
-#elif defined(CONFIG_BT_RECV_WORKQ_BT)
-		err = k_work_submit_to_queue(&bt_workq, &rx_work);
-#endif
-		if (err < 0) {
-			LOG_ERR("Could not submit rx_work: %d", err);
-		}
+		(void)bt_rx_workq_submit(&rx_work);
 	}
 }
 
