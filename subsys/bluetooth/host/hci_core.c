@@ -242,7 +242,7 @@ void bt_send_one_host_num_completed_packets(uint16_t handle)
 	struct net_buf *buf;
 	int err;
 
-	LOG_DBG("Reporting completed packet for handle %u", handle);
+	LOG_ERR("Reporting completed packet for handle %u", handle);
 
 	buf = bt_hci_cmd_create(BT_HCI_OP_HOST_NUM_COMPLETED_PACKETS,
 				sizeof(*cp) + sizeof(*hc));

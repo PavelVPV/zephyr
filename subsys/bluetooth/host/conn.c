@@ -505,6 +505,7 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 	}
 
 	// TODO: Hold HNCP until L2CAP is done
+	LOG_WRN("Unreferencing last segment, conn: %p, handle: %d", (void *)conn, conn->handle);
 	net_buf_unref(buf);
 
 	LOG_WRN("L2CAP frame complete, conn %p", (void *)conn);

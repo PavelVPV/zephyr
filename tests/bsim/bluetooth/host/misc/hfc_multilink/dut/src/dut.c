@@ -76,7 +76,9 @@ static int recv_cb(struct bt_l2cap_chan *chan, struct net_buf *buf)
 
 	bt_addr_le_to_str(bt_conn_get_dst(chan->conn), addr, sizeof(addr));
 
-	LOG_INF("Received SDU %d / %d from (%s)", tester->sdu_count, SDU_NUM, addr);
+	LOG_INF("Received SDU %d / %d from (%s), conn: %p", tester->sdu_count, SDU_NUM, addr, chan->conn);
+
+	k_sleep(K_MSEC(1000));
 
 	return 0;
 }

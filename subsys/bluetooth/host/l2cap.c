@@ -320,6 +320,7 @@ static void l2cap_rx_process(struct k_work *work)
 	while ((buf = k_fifo_get(&ch->rx_queue, K_NO_WAIT))) {
 		LOG_WRN("ch %p buf %p", ch, buf);
 		l2cap_chan_le_recv(ch, buf);
+		LOG_WRN("L2CAP net_buf_unref, conn: %p", (void *)ch->chan.conn);
 		net_buf_unref(buf);
 	}
 }
