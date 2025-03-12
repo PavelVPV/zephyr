@@ -2005,6 +2005,8 @@ static int set_flow_control(void)
 	hbs->acl_mtu = sys_cpu_to_le16(CONFIG_BT_BUF_ACL_RX_SIZE);
 	hbs->acl_pkts = sys_cpu_to_le16(BT_BUF_HCI_ACL_RX_COUNT);
 
+	LOG_ERR("acl_pkts %u acl_mtu %u", hbs->acl_pkts, hbs->acl_mtu);
+
 	err = bt_hci_cmd_send_sync(BT_HCI_OP_HOST_BUFFER_SIZE, buf, NULL);
 	if (err) {
 		return err;

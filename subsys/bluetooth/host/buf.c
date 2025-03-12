@@ -69,7 +69,9 @@ static void evt_pool_destroy(struct net_buf *buf)
 	buf_rx_freed_notify(BT_BUF_EVT);
 }
 
-NET_BUF_POOL_DEFINE(acl_in_pool, (BT_BUF_ACL_RX_COUNT_EXTRA + BT_BUF_HCI_ACL_RX_COUNT + 1),
+//#define ACL_IN_POOL_SIZE (CONFIG_BT_MAX_CONN * 2 + 1)
+
+NET_BUF_POOL_DEFINE(acl_in_pool, (BT_BUF_HCI_ACL_RX_COUNT + CONFIG_BT_MAX_CONN + 1),
 		    BT_BUF_ACL_SIZE(CONFIG_BT_BUF_ACL_RX_SIZE), sizeof(struct acl_data),
 		    acl_in_pool_destroy);
 

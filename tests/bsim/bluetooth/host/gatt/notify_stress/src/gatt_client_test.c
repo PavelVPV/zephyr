@@ -19,6 +19,9 @@
 #include "babblekit/flags.h"
 #include "common.h"
 
+#define TEST_CONN_PARAM BT_LE_CONN_PARAM(BT_GAP_INIT_CONN_INT_MIN, BT_GAP_INIT_CONN_INT_MAX, 0, \
+					 BT_GAP_MS_TO_CONN_TIMEOUT(4000))
+
 static const struct bt_uuid *test_svc_uuid = TEST_SERVICE_UUID;
 
 struct server {
@@ -143,7 +146,7 @@ void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type, struct ne
 		return;
 	}
 
-	err = bt_conn_le_create(addr, BT_CONN_LE_CREATE_CONN, BT_LE_CONN_PARAM_DEFAULT,
+	err = bt_conn_le_create(addr, BT_CONN_LE_CREATE_CONN, TEST_CONN_PARAM,
 				&stub_conn);
 	if (err != 0) {
 		TEST_FAIL("Could not connect to peer: %d", err);
@@ -241,7 +244,11 @@ static void test_long_subscribed(struct bt_conn *conn, uint8_t err,
 	}
 
 	if (params->value_handle == server->long_chrc_handle) {
-		printk("Subscribed to long characteristic\n");
+		if ((params->value & BT_GATT_CCC_NOTIFY) == 0) {
+			printk("Subscribed to long characteristic for server %d\n", ARRAY_INDEX(servers, server));
+		} else {
+			printk("Unsubscribed from long characteristic for server %d\n", ARRAY_INDEX(servers, server));
+		}
 	} else {
 		TEST_FAIL("Unknown handle %d", params->value_handle);
 	}
@@ -255,10 +262,14 @@ uint8_t test_notify(struct bt_conn *conn, struct bt_gatt_subscribe_params *param
 	server = server_find(conn);
 	__ASSERT(server != NULL, "Received notification for unknown connection");
 
-	printk("Received notification #%u with length %d\n", server->num_notifications++, length);
+	printk("Received notification #%u with length %d from server %d\n", server->num_notifications++, length, ARRAY_INDEX(servers, server));
+
+	if (server->num_notifications == NOTIFICATION_COUNT) {
+		printk("All notifications received from server %d\n", ARRAY_INDEX(servers, server));
+	}
 
 	/* This causes ACL data drop in HCI IPC driver. */
-	k_sleep(K_MSEC(1000));
+	k_sleep(K_MSEC(300));
 
 	return BT_GATT_ITER_CONTINUE;
 }
@@ -365,6 +376,8 @@ static void test_main_client(void)
 		printk("Server %d subscribed\n", i);
 	}
 
+	printk("All servers subscribed\n");
+
 	uint32_t num_notifications;
 
 	do {
@@ -376,10 +389,16 @@ static void test_main_client(void)
 
 			num_notifications += server->num_notifications;
 		}
-	} while (num_notifications < NOTIFICATION_COUNT);
+	} while (num_notifications < NOTIFICATION_COUNT * ARRAY_SIZE(servers));
+
+	printk("All notifications received\n");
 
 	for (size_t i = 0; i < CONFIG_BT_MAX_CONN; i++) {
 		struct server *server = &servers[i];
+
+//		if (server->conn == NULL) {
+//			continue;
+//		}
 
 		gatt_unsubscribe_long(server, BT_ATT_CHAN_OPT_ENHANCED_ONLY);
 		WAIT_FOR_FLAG(server->flag_long_subscribed);
