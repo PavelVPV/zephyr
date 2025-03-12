@@ -1,5 +1,6 @@
 common:
   build_only: true
+  sysbuild: true
   tags:
     - bluetooth
   platform_allow:

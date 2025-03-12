@@ -64,7 +64,7 @@ BUILD_ASSERT((CONFIG_BT_BUF_CMD_TX_COUNT == CONFIG_BT_CTLR_HCI_NUM_CMD_PKT_MAX),
 //#define BT_BUF_HCI_EVT_RX_COUNT          1
 //#define BT_BUF_HCI_ACL_RX_COUNT          (BT_BUF_RX_COUNT - BT_BUF_HCI_EVT_RX_COUNT - BT_BUF_ACL_RX_COUNT_EXTRA)
 
-#define BT_BUF_HCI_ACL_RX_COUNT (CONFIG_BT_MAX_CONN)
+#define BT_BUF_HCI_ACL_RX_COUNT (CONFIG_BT_MAX_CONN + CONFIG_BT_BUF_ACL_RX_COUNT_EXTRA)
 
 #define BT_BUF_CMD_TX_HOST_NUM_CMPLT_PKT (BT_BUF_HCI_ACL_RX_COUNT)
 
@@ -90,7 +90,8 @@ BUILD_ASSERT(IS_ENABLED(CONFIG_BT_CTLR_HCI_NUM_CMD_PKT_MAX),
 	     "Undefined Controller implementation supported Num_HCI_Command_Packets value.");
 
 /** Can use all of buffer count needed for HCI ACL, HCI ISO or Event RX buffers for ACL RX */
-#define BT_BUF_HCI_ACL_RX_COUNT (BT_BUF_RX_COUNT)
+//#define BT_BUF_HCI_ACL_RX_COUNT (BT_BUF_RX_COUNT)
+#define BT_BUF_HCI_ACL_RX_COUNT (CONFIG_BT_MAX_CONN + CONFIG_BT_BUF_ACL_RX_COUNT_EXTRA)
 
 /* Controller-only with Controller to Host data flow control */
 /**
