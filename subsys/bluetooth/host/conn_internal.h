@@ -242,6 +242,7 @@ struct bt_conn {
 	bt_conn_state_t		state;
 	uint16_t rx_len;
 	struct net_buf		*rx;
+	uint32_t pending_pkts;
 
 	/* Pending TX that are awaiting the NCP event. len(tx_pending) == in_ll */
 	sys_slist_t		tx_pending;

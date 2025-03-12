@@ -494,7 +494,7 @@ int bt_setup_public_id_addr(void);
 
 void bt_finalize_init(void);
 
-void bt_hci_host_num_completed_packets(struct net_buf *buf);
+void bt_hci_host_num_completed_packets(struct net_buf *buf, uint32_t avail_count);
 
 /* HCI event handlers */
 void bt_hci_pin_code_req(struct net_buf *buf);

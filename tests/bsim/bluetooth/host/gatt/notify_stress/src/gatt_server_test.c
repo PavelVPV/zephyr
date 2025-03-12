@@ -172,6 +172,7 @@ static void test_main_server(void)
 
 	for (int i = 0; i < NOTIFICATION_COUNT; i++) {
 		notify();
+//		k_sleep(K_MSEC(50));
 	}
 
 	while (num_notifications_sent < NOTIFICATION_COUNT) {

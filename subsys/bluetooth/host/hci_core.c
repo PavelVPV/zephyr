@@ -230,7 +230,7 @@ void bt_acl_set_ncp_sent(struct net_buf *packet, bool value)
 	acl(packet)->host_ncp_sent = value;
 }
 
-void bt_send_one_host_num_completed_packets(uint16_t handle)
+static void bt_send_host_num_completed_packets(uint16_t handle, uint32_t count)
 {
 	if (!IS_ENABLED(CONFIG_BT_HCI_ACL_FLOW_CONTROL)) {
 		ARG_UNUSED(handle);
@@ -242,7 +242,7 @@ void bt_send_one_host_num_completed_packets(uint16_t handle)
 	struct net_buf *buf;
 	int err;
 
-	LOG_ERR("Reporting completed packet for handle %u", handle);
+	LOG_ERR("Reporting completed %d packet(s) for handle %u", count, handle);
 
 	buf = bt_hci_cmd_create(BT_HCI_OP_HOST_NUM_COMPLETED_PACKETS,
 				sizeof(*cp) + sizeof(*hc));
@@ -253,10 +253,15 @@ void bt_send_one_host_num_completed_packets(uint16_t handle)
 
 	hc = net_buf_add(buf, sizeof(*hc));
 	hc->handle = sys_cpu_to_le16(handle);
-	hc->count  = sys_cpu_to_le16(1);
+	hc->count  = sys_cpu_to_le16(count);
 
 	err = bt_hci_cmd_send(BT_HCI_OP_HOST_NUM_COMPLETED_PACKETS, buf);
 	BT_ASSERT_MSG(err == 0, "Unable to send Host NCP (err %d)", err);
+}
+
+void bt_send_one_host_num_completed_packets(uint16_t handle)
+{
+	bt_send_host_num_completed_packets(handle, 1);
 }
 
 #if defined(CONFIG_BT_TESTING)
@@ -266,7 +271,9 @@ __weak void bt_testing_trace_event_acl_pool_destroy(struct net_buf *buf)
 #endif
 
 #if defined(CONFIG_BT_HCI_ACL_FLOW_CONTROL)
-void bt_hci_host_num_completed_packets(struct net_buf *buf)
+extern atomic_val_t bt_buf_get_acl_in_pool_avail_count(void);
+
+void bt_hci_host_num_completed_packets(struct net_buf *buf, uint32_t avail_count)
 {
 	uint16_t handle = acl(buf)->handle;
 	struct bt_conn *conn;
@@ -303,7 +310,17 @@ void bt_hci_host_num_completed_packets(struct net_buf *buf)
 
 	bt_conn_unref(conn);
 
-	bt_send_one_host_num_completed_packets(handle);
+#if 0
+	uint32_t pending_pkts = MIN(conn->pending_pkts + 1, bt_buf_get_acl_in_pool_avail_count());
+	conn->pending_pkts -= pending_pkts - 1;
+
+	bt_send_host_num_completed_packets(handle, pending_pkts);
+#else
+	uint32_t pending_pkts = MIN(conn->pending_pkts, bt_buf_get_acl_in_pool_avail_count());
+	conn->pending_pkts -= pending_pkts;
+
+	bt_send_host_num_completed_packets(handle, pending_pkts + 1);
+#endif
 }
 #endif /* defined(CONFIG_BT_HCI_ACL_FLOW_CONTROL) */
 

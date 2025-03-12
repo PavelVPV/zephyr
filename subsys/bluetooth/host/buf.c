@@ -72,16 +72,24 @@ static void evt_pool_destroy(struct net_buf *buf)
 //#define ACL_IN_POOL_SIZE (CONFIG_BT_MAX_CONN * 2 + 1)
 
 //NET_BUF_POOL_DEFINE(acl_in_pool, (BT_BUF_HCI_ACL_RX_COUNT + CONFIG_BT_MAX_CONN + 1 + CONFIG_BT_BUF_ACL_RX_COUNT_EXTRA),
+static atomic_t acl_in_pool_avail_count = ATOMIC_INIT(BT_BUF_ACL_RX_COUNT);
 NET_BUF_POOL_DEFINE(acl_in_pool, BT_BUF_ACL_RX_COUNT,
 		    BT_BUF_ACL_SIZE(CONFIG_BT_BUF_ACL_RX_SIZE), sizeof(struct acl_data),
 		    acl_in_pool_destroy);
 
+atomic_val_t bt_buf_get_acl_in_pool_avail_count(void)
+{
+	return atomic_get(&acl_in_pool_avail_count);
+}
+
 static void acl_in_pool_destroy(struct net_buf *buf)
 {
-	bt_hci_host_num_completed_packets(buf);
+	__ASSERT_NO_MSG(atomic_get(&acl_in_pool_avail_count) < BT_BUF_ACL_RX_COUNT);
+	bt_hci_host_num_completed_packets(buf, atomic_get(&acl_in_pool_avail_count));
 	buf_rx_freed_notify(BT_BUF_ACL_IN);
+	atomic_inc(&acl_in_pool_avail_count);
 #if defined(CONFIG_NET_BUF_POOL_USAGE)
-	LOG_WRN("acl_in_pool.avail_count (inc) %u", atomic_get(&acl_in_pool.avail_count));
+	LOG_WRN("acl_in_pool.avail_count (inc) %u/%u", atomic_get(&acl_in_pool.avail_count), atomic_get(&acl_in_pool_avail_count));
 #endif
 }
 
@@ -122,6 +130,11 @@ struct net_buf *bt_buf_get_rx(enum bt_buf_type type, k_timeout_t timeout)
 		LOG_WRN("acl_in_pool.avail_count (dec) %u", atomic_get(&acl_in_pool.avail_count));
 #endif
 		buf = net_buf_alloc(&acl_in_pool, timeout);
+		if (buf) {
+			__ASSERT_NO_MSG(atomic_get(&acl_in_pool_avail_count) > 0);
+			atomic_dec(&acl_in_pool_avail_count);
+			LOG_WRN("acl_in_pool_avail_count (dec) %u", atomic_get(&acl_in_pool_avail_count));
+		}
 	}
 #else
 	buf = net_buf_alloc(&hci_rx_pool, timeout);

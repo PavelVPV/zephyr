@@ -418,6 +418,7 @@ acl_rx_reschedule:
 }
 
 static K_WORK_DEFINE(complete_acl_rx_work, complete_acl_rx_process);
+extern atomic_val_t bt_buf_get_acl_in_pool_avail_count(void);
 
 static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags)
 {
@@ -497,7 +498,15 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 		/* L2CAP frame not complete. */
 		LOG_ERR("L2CAP frame not complete (%u < %u), conn: %p", conn->rx->len, acl_total_len,
 			(void *)conn);
-		bt_send_one_host_num_completed_packets(conn->handle);
+
+		if ((flags == BT_ACL_START && bt_buf_get_acl_in_pool_avail_count() > 1) ||
+		    (flags == BT_ACL_CONT && bt_buf_get_acl_in_pool_avail_count() > 0)) {
+			bt_send_one_host_num_completed_packets(conn->handle);
+		} else {
+			LOG_ERR("No more buffers available, skipping HNCP");
+			conn->pending_pkts++;
+		}
+
 		bt_acl_set_ncp_sent(buf, true);
 		net_buf_unref(buf);
 
