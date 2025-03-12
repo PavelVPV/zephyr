@@ -19,7 +19,7 @@
 #include "babblekit/flags.h"
 #include "common.h"
 
-#define TEST_CONN_PARAM BT_LE_CONN_PARAM(BT_GAP_INIT_CONN_INT_MIN, BT_GAP_INIT_CONN_INT_MAX, 4, \
+#define TEST_CONN_PARAM BT_LE_CONN_PARAM(BT_GAP_INIT_CONN_INT_MIN, BT_GAP_INIT_CONN_INT_MAX, 2, \
 					 BT_GAP_MS_TO_CONN_TIMEOUT(32000))
 
 static const struct bt_uuid *test_svc_uuid = TEST_SERVICE_UUID;
@@ -269,7 +269,7 @@ uint8_t test_notify(struct bt_conn *conn, struct bt_gatt_subscribe_params *param
 	}
 
 	/* This causes ACL data drop in HCI IPC driver. */
-	k_sleep(K_MSEC(500));
+	k_sleep(K_MSEC(1000));
 
 	return BT_GATT_ITER_CONTINUE;
 }
