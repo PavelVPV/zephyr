@@ -23,19 +23,19 @@ cd ${BSIM_OUT_PATH}/bin
 #ATTACH_CMD="xterm -e screen %s -L -LogFile hci_log.txt &"
 ATTACH_CMD="btmon --tty=%s -w hci_log_central.btsnoop &"
 
-Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=0 -testid=central -rs=43 \
-    -attach_uart_cmd="${ATTACH_CMD}"
+Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=0 -testid=central -rs=43
+#    -attach_uart_cmd="${ATTACH_CMD}"
 #    -wait_uart
 #Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=0 -testid=central -rs=43 \
 #    -uart0_pty_attach_cmd="${ATTACH_CMD}" #-uart_pty_wait
 
 Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=1 -testid=peripheral -rs=42 #--uart0_pty --uart_pty_wait
-#Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=2 -testid=peripheral -rs=10
-#Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=3 -testid=peripheral -rs=23
+Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=2 -testid=peripheral -rs=10
+Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=3 -testid=peripheral -rs=23
 #Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=4 -testid=peripheral -rs=7884
 #Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=5 -testid=peripheral -rs=230
 #Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=6 -testid=peripheral -rs=9
 
-Execute ./bs_2G4_phy_v1 -v=${verbosity_level} -s=${simulation_id} -D=2 -sim_length=400e6 $@
+Execute ./bs_2G4_phy_v1 -v=${verbosity_level} -s=${simulation_id} -D=4 -sim_length=400e6 $@
 
 wait_for_background_jobs

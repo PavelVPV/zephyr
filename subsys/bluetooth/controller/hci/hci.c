@@ -622,7 +622,8 @@ static void host_num_completed_packets(struct net_buf *buf,
 	}
 
 	hci_hbuf_acked += count;
-	LOG_WRN("FC: acked: %u, hci_hbuf_acked: %u", count, hci_hbuf_acked);
+	LOG_WRN("FC: acked: %u, hci_hbuf_acked: %u, unacked: %u", count, hci_hbuf_acked,
+		hci_hbuf_sent - hci_hbuf_acked);
 	k_poll_signal_raise(hbuf_signal, 0x0);
 }
 #endif /* CONFIG_BT_HCI_ACL_FLOW_CONTROL */
@@ -9151,8 +9152,9 @@ void hci_acl_encode(struct node_rx_pdu *node_rx, struct net_buf *buf)
 		memcpy(data, pdu_data->lldata, pdu_data->len);
 #if defined(CONFIG_BT_HCI_ACL_FLOW_CONTROL)
 		if (hci_hbuf_total > 0) {
-			LOG_WRN("ACL encode, sent: %u, acked: %u, total: %u",
-				hci_hbuf_sent, hci_hbuf_acked, hci_hbuf_total);
+			LOG_WRN("ACL encode, sent: %u, acked: %u, total: %u, unacked: %u",
+				hci_hbuf_sent, hci_hbuf_acked, hci_hbuf_total,
+				(hci_hbuf_sent - hci_hbuf_acked));
 			LL_ASSERT((hci_hbuf_sent - hci_hbuf_acked) <
 				  hci_hbuf_total);
 			hci_hbuf_sent++;

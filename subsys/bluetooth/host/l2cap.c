@@ -41,7 +41,7 @@ LOG_MODULE_REGISTER(bt_l2cap, CONFIG_BT_L2CAP_LOG_LEVEL);
 
 #define L2CAP_LE_MIN_MTU		23
 
-#define L2CAP_LE_MAX_CREDITS		(BT_BUF_ACL_RX_COUNT - 1)
+//#define L2CAP_LE_MAX_CREDITS		(BT_BUF_ACL_RX_COUNT - 1)
 
 #define L2CAP_LE_CID_DYN_START	0x0040
 #define L2CAP_LE_CID_DYN_END	0x007f
@@ -799,7 +799,7 @@ static void chan_take_credit(struct bt_l2cap_le_chan *lechan)
 
 	/* Notify channel user that it can't send anymore on this channel. */
 	if (!atomic_get(&lechan->tx.credits)) {
-		LOG_DBG("chan %p paused", lechan);
+		LOG_ERR("chan %p paused", lechan);
 		atomic_clear_bit(lechan->chan.status, BT_L2CAP_STATUS_OUT);
 
 		if (lechan->chan.ops->status) {
@@ -878,7 +878,7 @@ static bool chan_has_credits(struct bt_l2cap_le_chan *lechan)
 		return true;
 	}
 
-	LOG_DBG("chan %p credits %ld", lechan, atomic_get(&lechan->tx.credits));
+	LOG_INF("chan %p credits %ld", lechan, atomic_get(&lechan->tx.credits));
 
 	return atomic_get(&lechan->tx.credits) >= 1;
 #else

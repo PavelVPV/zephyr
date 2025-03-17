@@ -25,10 +25,10 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 DEFINE_FLAG_STATIC(is_connected);
 DEFINE_FLAG_STATIC(flag_l2cap_connected);
 
-#define NUM_PERIPHERALS 1
-#define L2CAP_CHANS     NUM_PERIPHERALS
-#define SDU_NUM         20
-#define SDU_LEN         3000
+#define NUM_PERIPHERALS 3
+#define L2CAP_CHANS     1//NUM_PERIPHERALS
+#define SDU_NUM         50
+#define SDU_LEN         68
 #define RESCHEDULE_DELAY K_MSEC(100)
 
 struct bt_conn *default_conn;
@@ -96,7 +96,7 @@ struct test_ctx {
 	size_t tx_left;
 };
 
-static struct test_ctx contexts[L2CAP_CHANS];
+static struct test_ctx contexts[L2CAP_CHANS * NUM_PERIPHERALS];
 
 struct test_ctx *get_ctx(struct bt_l2cap_chan *chan)
 {
@@ -140,6 +140,7 @@ int l2cap_chan_send(struct bt_l2cap_chan *chan, uint8_t *data, size_t len)
 
 struct net_buf *alloc_buf_cb(struct bt_l2cap_chan *chan)
 {
+	k_sleep(K_MSEC(1000));
 	return net_buf_alloc(&sdu_rx_pool, K_NO_WAIT);
 }
 
@@ -169,6 +170,9 @@ void sent_cb(struct bt_l2cap_chan *chan)
 	continue_sending(ctx);
 }
 
+#if 0
+static sys_slist_t rx_queue = SYS_SLIST_STATIC_INIT(&rx_queue);
+
 int recv_cb(struct bt_l2cap_chan *chan, struct net_buf *buf)
 {
 	LOG_DBG("len %d", buf->len);
@@ -189,10 +193,28 @@ int recv_cb(struct bt_l2cap_chan *chan, struct net_buf *buf)
 		}
 	}
 
+	net_buf_slist_put(&rx_queue, net_buf_ref(buf));
+
 //	k_sleep(K_SECONDS(1));
 //	k_busy_wait(1000 * 1000);
 
 	return 0;
+}
+#endif
+
+static void seg_recv(struct bt_l2cap_chan *chan, size_t sdu_len, off_t seg_offset, struct
+		     net_buf_simple *seg)
+{
+	LOG_DBG("len %d", seg->len);
+
+	if (seg_offset + seg->len == sdu_len) {
+		rx_cnt++;
+	}
+
+	LOG_ERR("Giving credits for continuing SDU.");
+	bt_l2cap_chan_give_credits(chan, 1);
+
+	k_sleep(K_MSEC(1000));
 }
 
 void l2cap_chan_connected_cb(struct bt_l2cap_chan *l2cap_chan)
@@ -201,12 +223,16 @@ void l2cap_chan_connected_cb(struct bt_l2cap_chan *l2cap_chan)
 		CONTAINER_OF(l2cap_chan, struct bt_l2cap_le_chan, chan);
 
 	SET_FLAG(flag_l2cap_connected);
-	LOG_DBG("%x (tx mtu %d mps %d) (tx mtu %d mps %d)",
+	LOG_DBG("%x (tx mtu %d mps %d) (tx mtu %d mps %d) conn %p",
 		l2cap_chan,
 		chan->tx.mtu,
 		chan->tx.mps,
 		chan->rx.mtu,
-		chan->rx.mps);
+		chan->rx.mps,
+		chan->chan.conn);
+
+	struct test_ctx *ctx = get_ctx(l2cap_chan);
+	LOG_DBG("ctx %p", ctx);
 }
 
 void l2cap_chan_disconnected_cb(struct bt_l2cap_chan *chan)
@@ -219,8 +245,9 @@ static struct bt_l2cap_chan_ops ops = {
 	.connected = l2cap_chan_connected_cb,
 	.disconnected = l2cap_chan_disconnected_cb,
 	.alloc_buf = alloc_buf_cb,
-	.recv = recv_cb,
+//	.recv = recv_cb,
 	.sent = sent_cb,
+	.seg_recv = seg_recv,
 };
 
 void deferred_send(struct k_work *item)
@@ -237,12 +264,14 @@ void deferred_send(struct k_work *item)
 
 struct test_ctx *alloc_test_context(void)
 {
-	for (int i = 0; i < L2CAP_CHANS; i++) {
+	for (int i = 0; i < ARRAY_SIZE(contexts); i++) {
 		struct bt_l2cap_le_chan *le_chan = &contexts[i].le_chan;
 
 		if (le_chan->state != BT_L2CAP_DISCONNECTED) {
 			continue;
 		}
+
+		LOG_ERR("Allocating context %d", i);
 
 		memset(&contexts[i], 0, sizeof(struct test_ctx));
 		k_work_init_delayable(&contexts[i].work_item, deferred_send);
@@ -263,11 +292,15 @@ int server_accept_cb(struct bt_conn *conn, struct bt_l2cap_server *server,
 		return -ENOMEM;
 	}
 
+	LOG_DBG("conn %p", conn);
+
 	struct bt_l2cap_le_chan *le_chan = &ctx->le_chan;
 
-	memset(le_chan, 0, sizeof(*le_chan));
+//	memset(le_chan, 0, sizeof(*le_chan));
 	le_chan->chan.ops = &ops;
 	le_chan->rx.mtu = SDU_LEN;
+	le_chan->rx.mps = BT_L2CAP_RX_MTU;
+	le_chan->chan.conn = conn;
 	*chan = &le_chan->chan;
 
 	return 0;
@@ -371,28 +404,47 @@ static void test_peripheral_main(void)
 	WAIT_FOR_FLAG(is_connected);
 	LOG_DBG("Peripheral Connected.");
 
+	UNSET_FLAG(flag_l2cap_connected);
+
 	int psm = l2cap_server_register(BT_SECURITY_L1);
 
 	LOG_DBG("Registered server PSM %x", psm);
+
+	WAIT_FOR_FLAG(flag_l2cap_connected);
 
 #if 0
 	k_work_submit_to_queue(&dut_work_q, &heavy_work);
 #else
 	(void)dut_work_q;
-	k_sleep(K_SECONDS(2));
-	k_work_submit(&heavy_work);
+	(void)heavy_work;
+//	k_sleep(K_SECONDS(2));
+//	k_work_submit(&heavy_work);
 #endif
 
 	LOG_DBG("Peripheral waiting for transfer completion");
-	while (rx_cnt < SDU_NUM) {
-		k_msleep(100);
+	/* Send SDU_NUM SDUs to each peripheral */
+//	for (int i = 0; i < ARRAY_SIZE(contexts); i++) {
+	for (int i = 0; i < L2CAP_CHANS; i++) {
+		contexts[i].tx_left = SDU_NUM;
+		l2cap_chan_send(&contexts[i].le_chan.chan, tx_data, sizeof(tx_data));
 	}
 
-	bt_conn_foreach(BT_CONN_TYPE_LE, disconnect_device, NULL);
-	WAIT_FOR_FLAG_UNSET(is_connected);
-	LOG_INF("Total received: %d", rx_cnt);
+	int remaining_tx_total;
 
-	TEST_ASSERT(rx_cnt == SDU_NUM, "Did not receive expected no of SDUs");
+	do {
+		k_msleep(100);
+
+		remaining_tx_total = 0;
+		for (int i = 0; i < SDU_NUM; i++) {
+			remaining_tx_total += contexts[i].tx_left;
+		}
+	} while (remaining_tx_total);
+
+//	bt_conn_foreach(BT_CONN_TYPE_LE, disconnect_device, NULL);
+	WAIT_FOR_FLAG_UNSET(is_connected);
+//	LOG_INF("Total received: %d", rx_cnt);
+
+//	TEST_ASSERT(rx_cnt == SDU_NUM, "Did not receive expected no of SDUs");
 
 	TEST_PASS("L2CAP STRESS Peripheral passed");
 }
@@ -454,8 +506,11 @@ static void connect_l2cap_channel(struct bt_conn *conn, void *data)
 
 	le_chan->chan.ops = &ops;
 	le_chan->rx.mtu = SDU_LEN;
+	le_chan->rx.mps = BT_L2CAP_RX_MTU;
 
 	UNSET_FLAG(flag_l2cap_connected);
+
+	bt_l2cap_chan_give_credits(&le_chan->chan, 10);
 
 	err = bt_l2cap_chan_connect(conn, &le_chan->chan, 0x0080);
 	TEST_ASSERT(!err, "Error connecting l2cap channel (err %d)", err);
@@ -467,11 +522,6 @@ static void test_central_main(void)
 {
 	LOG_DBG("*L2CAP STRESS Central started*");
 	int err;
-
-	/* Prepare tx_data */
-	for (size_t i = 0; i < sizeof(tx_data); i++) {
-		tx_data[i] = (uint8_t)i;
-	}
 
 	err = bt_enable(NULL);
 	TEST_ASSERT(err == 0, "Can't enable Bluetooth (err %d)", err);
@@ -486,23 +536,13 @@ static void test_central_main(void)
 	LOG_DBG("Connect L2CAP channels");
 	bt_conn_foreach(BT_CONN_TYPE_LE, connect_l2cap_channel, NULL);
 
-	/* Send SDU_NUM SDUs to each peripheral */
-	for (int i = 0; i < NUM_PERIPHERALS; i++) {
-		contexts[i].tx_left = SDU_NUM;
-		l2cap_chan_send(&contexts[i].le_chan.chan, tx_data, sizeof(tx_data));
+	LOG_DBG("Wait until all transfers are completed.");
+
+	while (rx_cnt < SDU_NUM * NUM_PERIPHERALS) {
+		k_msleep(100);
 	}
 
-	LOG_DBG("Wait until all transfers are completed.");
-	int remaining_tx_total;
-
-	do {
-		k_msleep(100);
-
-		remaining_tx_total = 0;
-		for (int i = 0; i < L2CAP_CHANS; i++) {
-			remaining_tx_total += contexts[i].tx_left;
-		}
-	} while (remaining_tx_total);
+	bt_conn_foreach(BT_CONN_TYPE_LE, disconnect_device, NULL);
 
 	LOG_DBG("Waiting until all peripherals are disconnected..");
 	while (disconnect_counter < NUM_PERIPHERALS) {

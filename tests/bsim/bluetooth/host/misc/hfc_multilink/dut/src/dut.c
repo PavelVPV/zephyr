@@ -83,6 +83,11 @@ static int recv_cb(struct bt_l2cap_chan *chan, struct net_buf *buf)
 	return 0;
 }
 
+static void seg_recv(struct bt_l2cap_chan *chan, size_t sdu_len,
+		     off_t seg_offset, struct net_buf_simple *seg)
+{
+}
+
 static void l2cap_chan_connected_cb(struct bt_l2cap_chan *chan)
 {
 	LOG_DBG("%p", chan);
@@ -101,6 +106,7 @@ static int server_accept_cb(struct bt_conn *conn, struct bt_l2cap_server *server
 		.disconnected = l2cap_chan_disconnected_cb,
 		.recv = recv_cb,
 		.sent = sent_cb,
+		.seg_recv = seg_recv,
 	};
 
 	struct tester *tester = get_tester(conn);
@@ -109,6 +115,8 @@ static int server_accept_cb(struct bt_conn *conn, struct bt_l2cap_server *server
 	memset(le_chan, 0, sizeof(*le_chan));
 	le_chan->chan.ops = &ops;
 	*chan = &le_chan->chan;
+
+	bt_l2cap_chan_give_credit(*chan, 10);
 
 	return 0;
 }

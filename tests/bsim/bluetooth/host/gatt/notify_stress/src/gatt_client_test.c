@@ -7,6 +7,9 @@
 #include <stddef.h>
 #include <errno.h>
 
+#include "bs_sync.h"
+#include <argparse.h>
+
 #include <zephyr/kernel.h>
 #include <zephyr/types.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -19,8 +22,33 @@
 #include "babblekit/flags.h"
 #include "common.h"
 
-#define TEST_CONN_PARAM BT_LE_CONN_PARAM(BT_GAP_INIT_CONN_INT_MIN, BT_GAP_INIT_CONN_INT_MAX, 2, \
-					 BT_GAP_MS_TO_CONN_TIMEOUT(32000))
+#define TEST_CONN_PARAM BT_LE_CONN_PARAM(BT_GAP_INIT_CONN_INT_MIN, BT_GAP_INIT_CONN_INT_MAX, 0, \
+					 BT_GAP_MS_TO_CONN_TIMEOUT(4000))
+
+static void heavy_work_handler(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(heavy_work, heavy_work_handler);
+
+static void heavy_work_handler(struct k_work *work)
+{
+	printk("Heavy work started");
+	k_busy_wait(200 * 1000);
+	printk("Heavy work done");
+
+	k_work_schedule(&heavy_work, K_MSEC(100));
+}
+
+static void bs_sync_all_log(char *log_msg)
+{
+	/* Everyone meets here. */
+	bt_testlib_bs_sync_all();
+
+	if (get_device_nbr() == 0) {
+		printk("Sync point: %s", log_msg);
+	}
+
+	/* Everyone waits for d0 to finish logging. */
+	bt_testlib_bs_sync_all();
+}
 
 static const struct bt_uuid *test_svc_uuid = TEST_SERVICE_UUID;
 
@@ -269,7 +297,9 @@ uint8_t test_notify(struct bt_conn *conn, struct bt_gatt_subscribe_params *param
 	}
 
 	/* This causes ACL data drop in HCI IPC driver. */
-	k_sleep(K_MSEC(1000));
+//	if (ARRAY_INDEX(servers, server) != 0) {
+		k_sleep(K_MSEC(300));
+//	}
 
 	return BT_GATT_ITER_CONTINUE;
 }
@@ -379,6 +409,11 @@ static void test_main_client(void)
 	printk("All servers subscribed\n");
 
 	uint32_t num_notifications;
+
+	bs_sync_all_log("Syncing with peripherals");
+
+	k_sleep(K_MSEC(800));
+	k_work_schedule(&heavy_work, K_NO_WAIT);
 
 	do {
 		k_sleep(K_MSEC(100));

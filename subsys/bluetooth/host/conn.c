@@ -435,7 +435,7 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 			bt_conn_reset_rx_state(conn);
 		}
 
-		LOG_DBG("First, len %u final %u", buf->len,
+		LOG_INF("First, len %u final %u", buf->len,
 			(buf->len < sizeof(uint16_t)) ? 0 : sys_get_le16(buf->data));
 
 		conn->rx = net_buf_ref(buf);

@@ -7,6 +7,14 @@
 #include <stddef.h>
 #include <errno.h>
 
+#include "bs_sync.h"
+
+//#include "bs_types.h"
+//#include "bs_tracing.h"
+//#include "bstests.h"
+//#include "time_machine.h"
+#include <argparse.h>
+
 #include <zephyr/kernel.h>
 #include <zephyr/types.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -28,6 +36,19 @@ static struct bt_conn *g_conn;
 
 #define ARRAY_ITEM(i, _) i
 const uint8_t chrc_data[] = { LISTIFY(CHRC_SIZE, ARRAY_ITEM, (,)) }; /* 1, 2, 3 ... */
+
+static void bs_sync_all_log(char *log_msg)
+{
+	/* Everyone meets here. */
+	bt_testlib_bs_sync_all();
+
+	if (get_device_nbr() == 0) {
+		printk("Sync point: %s", log_msg);
+	}
+
+	/* Everyone waits for d0 to finish logging. */
+	bt_testlib_bs_sync_all();
+}
 
 static void connected(struct bt_conn *conn, uint8_t err)
 {
@@ -168,11 +189,15 @@ static void test_main_server(void)
 {
 	setup();
 
-	k_sleep(K_SECONDS(5));
+	k_sleep(K_SECONDS(30));// * get_device_nbr()));
+
+//	k_sleep(K_SECONDS(1 * get_device_nbr()));
+
+	bs_sync_all_log("Syncing before notifications");
 
 	for (int i = 0; i < NOTIFICATION_COUNT; i++) {
 		notify();
-//		k_sleep(K_MSEC(50));
+//		k_sleep(K_MSEC(10));
 	}
 
 	while (num_notifications_sent < NOTIFICATION_COUNT) {

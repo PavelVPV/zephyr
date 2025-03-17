@@ -45,19 +45,21 @@ client_id="gatt_client_enhanced_notif_stress"
 cd ${BSIM_OUT_PATH}/bin
 
 Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
-    -v=${verbosity_level} -s=${simulation_id} -d=0 -testid=${client_id} -RealEncryption=1
+    -v=${verbosity_level} -s=${simulation_id} -d=0 -testid=${client_id} -RealEncryption=1 -D=4
 
 Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
-    -v=${verbosity_level} -s=${simulation_id} -d=1 -testid=${server_id} -RealEncryption=1 -rs=12
+    -v=${verbosity_level} -s=${simulation_id} -d=1 -testid=${server_id} -RealEncryption=1 -rs=12 -D=4
 Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
-    -v=${verbosity_level} -s=${simulation_id} -d=2 -testid=${server_id} -RealEncryption=1 -rs=32
+    -v=${verbosity_level} -s=${simulation_id} -d=2 -testid=${server_id} -RealEncryption=1 -rs=32 -D=4
 Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
-    -v=${verbosity_level} -s=${simulation_id} -d=3 -testid=${server_id} -RealEncryption=1 -rs=64
-Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
-    -v=${verbosity_level} -s=${simulation_id} -d=4 -testid=${server_id} -RealEncryption=1 -rs=2
-Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
-    -v=${verbosity_level} -s=${simulation_id} -d=5 -testid=${server_id} -RealEncryption=1 -rs=6
+    -v=${verbosity_level} -s=${simulation_id} -d=3 -testid=${server_id} -RealEncryption=1 -rs=64 -D=4
+#Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
+#    -v=${verbosity_level} -s=${simulation_id} -d=4 -testid=${server_id} -RealEncryption=1 -rs=2
+#Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
+#    -v=${verbosity_level} -s=${simulation_id} -d=5 -testid=${server_id} -RealEncryption=1 -rs=6
+#Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
+#    -v=${verbosity_level} -s=${simulation_id} -d=6 -testid=${server_id} -RealEncryption=1 -rs=6
 
-Execute ./bs_2G4_phy_v1 -v=${verbosity_level} -s=${simulation_id} -D=6 -sim_length=700e6 $@
+Execute ./bs_2G4_phy_v1 -v=${verbosity_level} -s=${simulation_id} -D=4 -sim_length=700e6 $@
 
 wait_for_background_jobs
