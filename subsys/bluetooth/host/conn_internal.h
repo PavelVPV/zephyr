@@ -366,7 +366,8 @@ void bt_conn_tx_notify(struct bt_conn *conn, bool wait_for_completion);
 void bt_conn_reset_rx_state(struct bt_conn *conn);
 
 /* Process incoming data for a connection */
-void bt_conn_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags);
+void bt_conn_iso_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags);
+void bt_conn_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags);
 
 /* Send data over a connection
  *

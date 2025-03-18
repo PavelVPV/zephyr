@@ -120,6 +120,8 @@ static struct bt_conn sco_conns[CONFIG_BT_MAX_SCO_CONN];
 #if defined(CONFIG_BT_CONN_TX)
 void frag_destroy(struct net_buf *buf);
 
+static sys_slist_t acl_rx_queue = SYS_SLIST_STATIC_INIT(&acl_rx_queue);
+
 /* Storage for fragments (views) into the upper layers' PDUs. */
 /* TODO: remove user-data requirements */
 NET_BUF_POOL_FIXED_DEFINE(fragments, CONFIG_BT_CONN_FRAG_COUNT, 0,
@@ -378,6 +380,46 @@ void bt_conn_reset_rx_state(struct bt_conn *conn)
 	conn->rx = NULL;
 }
 
+#define acl(buf) ((struct acl_data *)net_buf_user_data(buf))
+
+static void complete_acl_rx_process(struct k_work *work)
+{
+	struct net_buf *buf;
+	struct bt_conn *conn;
+	uint16_t index;
+
+	LOG_WRN("Getting net_buf from acl_rx_queue");
+
+	buf = net_buf_slist_get(&acl_rx_queue);
+	if (!buf) {
+		goto acl_rx_reschedule;
+	}
+
+	index = acl(buf)->index;
+	conn = bt_conn_lookup_index(index);
+	if (!conn) {
+		LOG_WRN("Unable to look up conn with index 0x%02x", index);
+		goto acl_rx_reschedule;
+	}
+
+	/* L2CAP frame complete. */
+	buf = conn->rx;
+	conn->rx = NULL;
+
+	__ASSERT(buf->ref == 1, "buf->ref %d", buf->ref);
+
+	LOG_WRN("Successfully parsed %u byte L2CAP packet", buf->len);
+	bt_l2cap_recv(conn, buf, true);
+acl_rx_reschedule:
+	if (sys_slist_is_empty(&acl_rx_queue)) {
+		return;
+	}
+
+	(void)bt_rx_workq_submit(work);
+}
+
+static K_WORK_DEFINE(complete_acl_rx_work, complete_acl_rx_process);
+
 static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags)
 {
 	uint16_t acl_total_len;
@@ -441,6 +483,7 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 		/* Still not enough data received to retrieve the L2CAP header
 		 * length field.
 		 */
+		LOG_ERR("Not enough data for L2CAP header: %u", conn->rx->len);
 		bt_send_one_host_num_completed_packets(conn->handle);
 		bt_acl_set_ncp_sent(buf, true);
 		net_buf_unref(buf);
@@ -452,6 +495,8 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 
 	if (conn->rx->len < acl_total_len) {
 		/* L2CAP frame not complete. */
+		LOG_ERR("L2CAP frame not complete (%u < %u), conn: %p", conn->rx->len, acl_total_len,
+			(void *)conn);
 		bt_send_one_host_num_completed_packets(conn->handle);
 		bt_acl_set_ncp_sent(buf, true);
 		net_buf_unref(buf);
@@ -463,42 +508,39 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 	LOG_INF("Unreferencing last segment, conn: %p, handle: %d", (void *)conn, conn->handle);
 	net_buf_unref(buf);
 
+	LOG_WRN("L2CAP frame complete, conn %p", (void *)conn);
+
 	if (conn->rx->len > acl_total_len) {
 		LOG_ERR("ACL len mismatch (%u > %u)", conn->rx->len, acl_total_len);
 		bt_conn_reset_rx_state(conn);
 		return;
 	}
 
-	/* L2CAP frame complete. */
-	buf = conn->rx;
-	conn->rx = NULL;
 
-	__ASSERT(buf->ref == 1, "buf->ref %d", buf->ref);
-
-	LOG_DBG("Successfully parsed %u byte L2CAP packet", buf->len);
-	bt_l2cap_recv(conn, buf, true);
+	net_buf_slist_put(&acl_rx_queue, conn->rx);
+	(void)bt_rx_workq_submit(&complete_acl_rx_work);
 }
 
-void bt_conn_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags)
+void bt_conn_iso_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags)
 {
-	/* Make sure we notify any pending TX callbacks before processing
-	 * new data for this connection.
-	 *
-	 * Always do so from the same context for sanity. In this case that will
-	 * be either a dedicated Bluetooth connection TX workqueue or system workqueue.
-	 */
-	bt_conn_tx_notify(conn, true);
-
 	LOG_DBG("handle %u len %u flags %02x", conn->handle, buf->len, flags);
 
-	if (IS_ENABLED(CONFIG_BT_ISO_RX) && conn->type == BT_CONN_TYPE_ISO) {
-		bt_iso_recv(conn, buf, flags);
-		return;
-	} else if (IS_ENABLED(CONFIG_BT_CONN)) {
-		bt_acl_recv(conn, buf, flags);
-	} else {
+	if (!IS_ENABLED(CONFIG_BT_ISO_RX) || conn->type != BT_CONN_TYPE_ISO) {
 		__ASSERT(false, "Invalid connection type %u", conn->type);
 	}
+
+	bt_iso_recv(conn, buf, flags);
+}
+
+void bt_conn_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags)
+{
+	LOG_DBG("handle %u len %u flags %02x", conn->handle, buf->len, flags);
+
+	if (!IS_ENABLED(CONFIG_BT_CONN)) {
+		__ASSERT(false, "Invalid connection type %u", conn->type);
+	}
+
+	bt_acl_recv(conn, buf, flags);
 }
 
 static bool dont_have_tx_context(struct bt_conn *conn)

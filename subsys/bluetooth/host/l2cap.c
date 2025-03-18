@@ -315,6 +315,8 @@ static void l2cap_rx_process(struct k_work *work)
 	struct bt_l2cap_le_chan *ch = CHAN_RX(work);
 	struct net_buf *buf;
 
+	LOG_WRN("l2cap_rx_process: ch %p", ch);
+
 	while ((buf = k_fifo_get(&ch->rx_queue, K_NO_WAIT))) {
 		LOG_WRN("ch %p buf %p", ch, buf);
 		l2cap_chan_le_recv(ch, buf);
@@ -2677,6 +2679,8 @@ static void l2cap_chan_le_recv(struct bt_l2cap_le_chan *chan,
 static void l2cap_chan_recv_queue(struct bt_l2cap_le_chan *chan,
 				  struct net_buf *buf)
 {
+	LOG_WRN("l2cap_chan_recv_queue");
+
 	if (chan->state == BT_L2CAP_DISCONNECTING) {
 		LOG_WRN("Ignoring data received while disconnecting");
 		net_buf_unref(buf);
@@ -2690,13 +2694,16 @@ static void l2cap_chan_recv_queue(struct bt_l2cap_le_chan *chan,
 	}
 
 	if (!L2CAP_LE_PSM_IS_DYN(chan->psm)) {
+		LOG_WRN("!L2CAP_LE_PSM_IS_DYN");
 		l2cap_chan_le_recv(chan, buf);
 		net_buf_unref(buf);
 		return;
 	}
 
+	LOG_WRN("Putting buf %p to rx_queue", buf);
 	k_fifo_put(&chan->rx_queue, buf);
-	k_work_submit(&chan->rx_work);
+	int err = k_work_submit(&chan->rx_work);
+	LOG_WRN("k_work_submit: %d", err);
 }
 #endif /* CONFIG_BT_L2CAP_DYNAMIC_CHANNEL */
 
@@ -2707,6 +2714,7 @@ static void l2cap_chan_recv(struct bt_l2cap_chan *chan, struct net_buf *buf,
 	struct bt_l2cap_le_chan *le_chan = BT_L2CAP_LE_CHAN(chan);
 
 	if (L2CAP_LE_CID_IS_DYN(le_chan->rx.cid)) {
+		LOG_WRN("L2CAP_LE_CID_IS_DYN, complete: %d", complete);
 		if (complete) {
 			l2cap_chan_recv_queue(le_chan, buf);
 		} else {
@@ -2721,7 +2729,7 @@ static void l2cap_chan_recv(struct bt_l2cap_chan *chan, struct net_buf *buf,
 	}
 #endif /* CONFIG_BT_L2CAP_DYNAMIC_CHANNEL */
 
-	LOG_DBG("chan %p len %u", chan, buf->len);
+	LOG_WRN("chan %p len %u", chan, buf->len);
 
 	chan->ops->recv(chan, buf);
 	net_buf_unref(buf);
