@@ -245,7 +245,7 @@ void bt_send_one_host_num_completed_packets(uint16_t handle)
 	struct net_buf *buf;
 	int err;
 
-	LOG_DBG("Reporting completed packet for handle %u", handle);
+	LOG_INF("Reporting completed packet for handle %u", handle);
 
 	buf = bt_hci_cmd_create(BT_HCI_OP_HOST_NUM_COMPLETED_PACKETS,
 				sizeof(*cp) + sizeof(*hc));
@@ -281,6 +281,7 @@ void bt_hci_host_num_completed_packets(struct net_buf *buf)
 
 	net_buf_destroy(buf);
 
+	LOG_WRN("Host NCP sent for handle %u: %s", handle, acl(buf)->host_ncp_sent ? "true" : "false");
 	if (acl(buf)->host_ncp_sent) {
 		return;
 	}
@@ -2006,6 +2007,8 @@ static int set_flow_control(void)
 	(void)memset(hbs, 0, sizeof(*hbs));
 	hbs->acl_mtu = sys_cpu_to_le16(CONFIG_BT_BUF_ACL_RX_SIZE);
 	hbs->acl_pkts = sys_cpu_to_le16(BT_BUF_HCI_ACL_RX_COUNT);
+
+	LOG_ERR("acl_pkts %u acl_mtu %u", hbs->acl_pkts, hbs->acl_mtu);
 
 	err = bt_hci_cmd_send_sync(BT_HCI_OP_HOST_BUFFER_SIZE, buf, NULL);
 	if (err) {
