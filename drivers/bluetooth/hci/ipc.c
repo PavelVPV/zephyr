@@ -148,6 +148,7 @@ static struct net_buf *bt_ipc_acl_recv(const uint8_t *data, size_t remaining)
 		net_buf_add_mem(buf, &hdr, sizeof(hdr));
 	} else {
 		LOG_ERR("No available ACL buffers!");
+		__ASSERT_NO_MSG(false);
 		return NULL;
 	}
 
