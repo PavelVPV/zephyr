@@ -35,7 +35,7 @@ set -eu
 
 source ${ZEPHYR_BASE}/tests/bsim/sh_common.source
 
-EXECUTE_TIMEOUT=150
+EXECUTE_TIMEOUT=250
 
 verbosity_level=2
 simulation_id="gatt_notify_enhanced_stress"
@@ -49,7 +49,15 @@ Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
 
 Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
     -v=${verbosity_level} -s=${simulation_id} -d=1 -testid=${server_id} -RealEncryption=1
+Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
+    -v=${verbosity_level} -s=${simulation_id} -d=2 -testid=${server_id} -RealEncryption=1
+Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
+    -v=${verbosity_level} -s=${simulation_id} -d=3 -testid=${server_id} -RealEncryption=1
+Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
+    -v=${verbosity_level} -s=${simulation_id} -d=4 -testid=${server_id} -RealEncryption=1
+Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_stress_prj_conf \
+    -v=${verbosity_level} -s=${simulation_id} -d=5 -testid=${server_id} -RealEncryption=1
 
-Execute ./bs_2G4_phy_v1 -v=${verbosity_level} -s=${simulation_id} -D=2 -sim_length=70e6 $@
+Execute ./bs_2G4_phy_v1 -v=${verbosity_level} -s=${simulation_id} -D=6 -sim_length=700e6 $@
 
 wait_for_background_jobs
