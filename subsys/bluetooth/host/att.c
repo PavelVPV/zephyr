@@ -2981,7 +2981,7 @@ static int bt_att_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 	}
 
 	hdr = net_buf_pull_mem(buf, sizeof(*hdr));
-	LOG_DBG("Received ATT chan %p code 0x%02x len %zu", att_chan, hdr->code,
+	LOG_WRN("Received ATT chan %p code 0x%02x len %zu", att_chan, hdr->code,
 		net_buf_frags_len(buf));
 
 	if (conn->state != BT_CONN_CONNECTED) {

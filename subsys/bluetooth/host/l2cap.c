@@ -316,8 +316,9 @@ static void l2cap_rx_process(struct k_work *work)
 	struct net_buf *buf;
 
 	while ((buf = k_fifo_get(&ch->rx_queue, K_NO_WAIT))) {
-		LOG_DBG("ch %p buf %p", ch, buf);
+		LOG_WRN("ch %p buf %p", ch, buf);
 		l2cap_chan_le_recv(ch, buf);
+		LOG_INF("L2CAP net_buf_unref, conn: %p", (void *)ch->chan.conn);
 		net_buf_unref(buf);
 	}
 }
@@ -2492,7 +2493,7 @@ static void l2cap_chan_le_recv_seg(struct bt_l2cap_le_chan *chan,
 	/* Store received segments in user_data */
 	memcpy(net_buf_user_data(chan->_sdu), &seg, sizeof(seg));
 
-	LOG_DBG("chan %p seg %d len %zu", chan, seg, buf->len);
+	LOG_WRN("chan %p seg %d len %zu", chan, seg, buf->len);
 
 	/* Append received segment to SDU */
 	len = net_buf_append_bytes(chan->_sdu, buf->len, buf->data, K_NO_WAIT,
@@ -2504,6 +2505,7 @@ static void l2cap_chan_le_recv_seg(struct bt_l2cap_le_chan *chan,
 	}
 
 	if (chan->_sdu->len < chan->_sdu_len) {
+		LOG_WRN("SDU incomplete: %u/%u", chan->_sdu->len, chan->_sdu_len);
 		/* Give more credits if remote has run out of them, this
 		 * should only happen if the remote cannot fully utilize the
 		 * MPS for some reason.
@@ -2613,7 +2615,7 @@ static void l2cap_chan_le_recv(struct bt_l2cap_le_chan *chan,
 
 	sdu_len = net_buf_pull_le16(buf);
 
-	LOG_DBG("chan %p len %u sdu_len %u", chan, buf->len, sdu_len);
+	LOG_WRN("chan %p len %u sdu_len %u", chan, buf->len, sdu_len);
 
 	if (sdu_len > chan->rx.mtu) {
 		LOG_ERR("Invalid SDU length");
@@ -2746,7 +2748,7 @@ void bt_l2cap_recv(struct bt_conn *conn, struct net_buf *buf, bool complete)
 	hdr = net_buf_pull_mem(buf, sizeof(*hdr));
 	cid = sys_le16_to_cpu(hdr->cid);
 
-	LOG_DBG("Packet for CID %u len %u", cid, buf->len);
+	LOG_WRN("Packet for CID %u len %u", cid, buf->len);
 
 	chan = bt_l2cap_le_lookup_rx_cid(conn, cid);
 	if (!chan) {
