@@ -168,6 +168,8 @@ static void test_main_server(void)
 {
 	setup();
 
+	k_sleep(K_SECONDS(5));
+
 	for (int i = 0; i < NOTIFICATION_COUNT; i++) {
 		notify();
 	}
