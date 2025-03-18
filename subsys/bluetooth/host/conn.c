@@ -402,9 +402,8 @@ static void complete_acl_rx_process(struct k_work *work)
 		goto acl_rx_reschedule;
 	}
 
-	/* L2CAP frame complete. */
-	buf = conn->rx;
-	conn->rx = NULL;
+	/* For last segment, keep HNCP until host is done processing. */
+	bt_acl_set_ncp_sent(buf, false);
 
 	__ASSERT(buf->ref == 1, "buf->ref %d", buf->ref);
 
@@ -430,7 +429,8 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 	switch (flags) {
 	case BT_ACL_START:
 		if (conn->rx) {
-			LOG_ERR("Unexpected first L2CAP frame");
+			LOG_ERR("Unexpected first L2CAP frame, conn %p", (void *)conn);
+			__ASSERT_NO_MSG(false);
 			bt_conn_reset_rx_state(conn);
 		}
 
@@ -506,6 +506,8 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 
 	// TODO: Hold HNCP until L2CAP is done
 	LOG_INF("Unreferencing last segment, conn: %p, handle: %d", (void *)conn, conn->handle);
+	/* Mark the buffer as HNCP is sent. Keep it until `conn->rx` is unreferenced. */
+	bt_acl_set_ncp_sent(buf, true);
 	net_buf_unref(buf);
 
 	LOG_WRN("L2CAP frame complete, conn %p", (void *)conn);
@@ -518,6 +520,8 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 
 
 	net_buf_slist_put(&acl_rx_queue, conn->rx);
+	conn->rx = NULL;
+
 	(void)bt_rx_workq_submit(&complete_acl_rx_work);
 }
 
