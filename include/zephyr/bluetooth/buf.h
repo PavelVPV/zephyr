@@ -121,7 +121,8 @@ BUILD_ASSERT(BT_BUF_ACL_RX_COUNT <= BT_BUF_ACL_RX_COUNT_MAX,
  * Packets events.
  */
 BUILD_ASSERT(CONFIG_BT_BUF_EVT_RX_COUNT > CONFIG_BT_BUF_ACL_TX_COUNT,
-	     "Increase Event RX buffer count to be greater than ACL TX buffer count");
+	     "Increase Event RX buffer count to be greater than ACL TX buffer count: "
+	     STRINGIFY(CONFIG_BT_BUF_EVT_RX_COUNT) " > " STRINGIFY(CONFIG_BT_BUF_ACL_TX_COUNT));
 
 /** Buffer count needed for HCI ACL or HCI ISO plus Event RX buffers */
 #define BT_BUF_RX_COUNT (CONFIG_BT_BUF_EVT_RX_COUNT + \
