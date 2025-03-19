@@ -11,10 +11,7 @@ if(NOT("${SB_CONFIG_NET_CORE_BOARD}" STREQUAL ""))
 		BOARD       ${SB_CONFIG_NET_CORE_BOARD}
 	)
 
-	set(${NET_APP}_CONF_FILE
-	 ${ZEPHYR_BASE}/tests/bsim/bluetooth/host/l2cap/stress/nrf5340_cpunet-bt_ll_sw_split.conf
-	 CACHE INTERNAL ""
-	)
+	set(${NET_APP}_CONF_FILE ${APP_DIR}/nrf5340_cpunet-bt_ll_sw_split.conf CACHE INTERNAL "")
 
 	native_simulator_set_primary_mcu_index(${DEFAULT_IMAGE} ${NET_APP})
 

@@ -1,6 +1,7 @@
 tests:
   bluetooth.host.mics.hfc:
     build_only: true
+    sysbuild: true
     tags:
       - bluetooth
     platform_allow:
