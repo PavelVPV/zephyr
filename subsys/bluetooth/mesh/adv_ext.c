@@ -346,7 +346,7 @@ static void send_pending_adv(struct k_work *work)
 	ext_adv = CONTAINER_OF(work, struct bt_mesh_ext_adv, work);
 
 	if (atomic_test_bit(ext_adv->flags, ADV_FLAG_SUSPENDING)) {
-		LOG_DBG("Advertiser is suspending");
+		LOG_WRN("Advertiser is suspending");
 		return;
 	}
 
@@ -579,6 +579,11 @@ int bt_mesh_adv_disable(void)
 		advs[i].instance = NULL;
 
 		atomic_clear_bit(advs[i].flags, ADV_FLAG_SUSPENDING);
+
+		atomic_set_bit(advs[i].flags, ADV_FLAG_SENT);
+
+		bt_mesh_wq_submit(&advs[i].work);
+
 	}
 
 	return 0;

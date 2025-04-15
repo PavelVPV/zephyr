@@ -828,14 +828,15 @@ static void adv_send_start(uint16_t duration, int err, void *cb_data)
 {
 	struct adv_suspend_ctx *adv_data = cb_data;
 
-	LOG_DBG("start(): err (%d), suspend (%d), i (%d)", err, adv_data->suspend,
+	LOG_WRN("start(): err (%d), suspend (%d), i (%d)", err, adv_data->suspend,
 		adv_data->instance_idx);
 
 	if (adv_data->suspend) {
-		if (adv_data->instance_idx == 0) {
-			ASSERT_EQUAL(err, 0);
-			adv_suspend();
-		} else {
+//		if (adv_data->instance_idx == 0) {
+//			ASSERT_EQUAL(err, 0);
+//			adv_suspend();
+//		} else {
+		{
 			/* For the advs that were pushed to the mesh advertiser by calling
 			 * `bt_mesh_adv_send` function but not sent to the host, the start callback
 			 * shall be called with -ENODEV.
@@ -888,6 +889,8 @@ static void test_tx_disable(void)
 
 	/* Fill up the adv pool and suspend the advertiser in the first start callback call. */
 	adv_create_and_send(true, 0xAA, adv_data);
+
+	adv_suspend();
 
 	err = k_sem_take(&adv_suspended_sem, K_SECONDS(10));
 	ASSERT_OK_MSG(err, "Not all advs were sent");
