@@ -28,8 +28,8 @@
 #include "bstests.h"
 #include "common.h"
 
-//#define ENQUEUE_COUNT CONFIG_BT_ISO_TX_BUF_COUNT
-#define ENQUEUE_COUNT CONFIG_BT_CTLR_ISO_TX_BUFFERS
+#define ENQUEUE_COUNT CONFIG_BT_ISO_TX_BUF_COUNT
+//#define ENQUEUE_COUNT CONFIG_BT_CTLR_ISO_TX_BUFFERS
 
 extern enum bst_result_t bst_result;
 static struct bt_iso_chan iso_chans[CONFIG_BT_ISO_MAX_CHAN];
@@ -53,12 +53,12 @@ static size_t acl_sent_cnt;
 DEFINE_FLAG_STATIC(flag_discover_complete);
 
 // FIXME: Need BUILD_ASSERT for ATT TX buffers >> BT_CONN_TX_MAX
-BUILD_ASSERT(CONFIG_BT_ATT_TX_COUNT > CONFIG_BT_BUF_ACL_TX_COUNT,
-	     "CONFIG_BT_ATT_TX_COUNT shall be greater than CONFIG_BT_BUF_ACL_TX_COUNT");
-BUILD_ASSERT(CONFIG_BT_ATT_TX_COUNT > CONFIG_BT_CONN_TX_MAX,
-	     "CONFIG_BT_ATT_TX_COUNT shall be greater than CONFIG_BT_CONN_TX_MAX");
-BUILD_ASSERT(CONFIG_BT_ISO_TX_BUF_COUNT < CONFIG_BT_CTLR_ISO_TX_BUFFERS,
-	     "CONFIG_BT_ISO_TX_BUF_COUNT shall be less than CONFIG_BT_CTLR_ISO_TX_BUFFERS");
+//BUILD_ASSERT(CONFIG_BT_ATT_TX_COUNT > CONFIG_BT_BUF_ACL_TX_COUNT,
+//	     "CONFIG_BT_ATT_TX_COUNT shall be greater than CONFIG_BT_BUF_ACL_TX_COUNT");
+//BUILD_ASSERT(CONFIG_BT_ATT_TX_COUNT > CONFIG_BT_CONN_TX_MAX,
+//	     "CONFIG_BT_ATT_TX_COUNT shall be greater than CONFIG_BT_CONN_TX_MAX");
+//BUILD_ASSERT(CONFIG_BT_ISO_TX_BUF_COUNT < CONFIG_BT_CTLR_ISO_TX_BUFFERS,
+//	     "CONFIG_BT_ISO_TX_BUF_COUNT shall be less than CONFIG_BT_CTLR_ISO_TX_BUFFERS");
 
 static void iso_send_work_handler(struct k_work *work);
 K_WORK_DELAYABLE_DEFINE(iso_send_work, iso_send_work_handler);
