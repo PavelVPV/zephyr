@@ -929,14 +929,14 @@ struct bt_conn *get_conn_ready(void)
 
 		if (cannot_send_to_controller(conn)) {
 			/* When buffers are full, try next connection. */
-			LOG_DBG("no LL bufs for %p", conn);
+			LOG_WRN("no LL bufs for %p [%d]", conn, conn->type);
 			prev = &conn->_conn_ready;
 			continue;
 		}
 
 		if (dont_have_tx_context(conn)) {
 			/* When TX contexts are not available, try next connection. */
-			LOG_DBG("no TX contexts for %p", conn);
+			LOG_ERR("no TX contexts for %p [%d]", conn, conn->type);
 			prev = &conn->_conn_ready;
 			continue;
 		}
