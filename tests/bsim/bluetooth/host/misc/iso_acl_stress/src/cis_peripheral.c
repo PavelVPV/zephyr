@@ -47,6 +47,7 @@ static ssize_t write_test_chrc(struct bt_conn *conn, const struct bt_gatt_attr *
 
 	int64_t delta = k_uptime_delta(&uptime);
 
+	write_count++;
 	printk("Write request %d received, len %u, delta: %ld\n", write_count, len, delta);
 
 	return len;
