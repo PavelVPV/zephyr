@@ -32,7 +32,11 @@
 
 extern enum bst_result_t bst_result;
 
-DEFINE_FLAG_STATIC(flag_data_received);
+static size_t iso_req_count = 0;
+static size_t acl_req_count = 0;
+
+DEFINE_FLAG_STATIC(flag_iso_connected);
+//DEFINE_FLAG_STATIC(flag_data_received);
 
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
@@ -43,12 +47,11 @@ static ssize_t write_test_chrc(struct bt_conn *conn, const struct bt_gatt_attr *
 			       const void *buf, uint16_t len, uint16_t offset, uint8_t flags)
 {
 	static int64_t uptime;
-	static size_t write_count = 0;
 
 	int64_t delta = k_uptime_delta(&uptime);
 
-	write_count++;
-	printk("Write request %d received, len %u, delta: %ld\n", write_count, len, delta);
+	acl_req_count++;
+	printk("Write request %d received, len %u, delta: %ld\n", acl_req_count, len, delta);
 
 	return len;
 }
@@ -98,9 +101,17 @@ static void iso_recv(struct bt_iso_chan *chan, const struct bt_iso_recv_info *in
 		     struct net_buf *buf)
 {
 	if (info->flags & BT_ISO_FLAGS_VALID) {
-		printk("Incoming data channel %p len %u\n", chan, buf->len);
+		static int64_t uptime;
+
+		int64_t delta = k_uptime_delta(&uptime);
+
+		iso_req_count++;
+
+		printk("Incoming data channel %p len %u num %u delta %u\n", chan, buf->len,
+		       iso_req_count, delta);
+
 		iso_print_data(buf->data, buf->len);
-		SET_FLAG(flag_data_received);
+//		SET_FLAG(flag_data_received);
 	}
 }
 
@@ -121,6 +132,8 @@ static void iso_connected(struct bt_iso_chan *chan)
 static void iso_disconnected(struct bt_iso_chan *chan, uint8_t reason)
 {
 	printk("ISO Channel %p disconnected (reason 0x%02x)\n", chan, reason);
+
+	UNSET_FLAG(flag_iso_connected);
 }
 
 static int iso_accept(const struct bt_iso_accept_info *info, struct bt_iso_chan **chan)
@@ -197,18 +210,53 @@ static void adv_connect(void)
 	WAIT_FOR_FLAG(flag_connected);
 }
 
+static void disconnect_cis(void)
+{
+	int err;
+
+	err = bt_iso_chan_disconnect(&iso_chan);
+	if (err) {
+		TEST_FAIL("Failed to disconnect ISO (err %d)", err);
+
+		return;
+	}
+
+	WAIT_FOR_FLAG_UNSET(flag_iso_connected);
+}
+
+static void disconnect_acl(void)
+{
+	int err;
+
+	err = bt_conn_disconnect(default_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+	if (err) {
+		TEST_FAIL("Failed to disconnect ACL (err %d)", err);
+
+		return;
+	}
+
+	WAIT_FOR_FLAG_UNSET(flag_connected);
+}
+
 static void test_main(void)
 {
 	init();
 
-	while (true) {
-		adv_connect();
-		bt_testlib_conn_wait_free();
+	adv_connect();
+//	bt_testlib_conn_wait_free();
 
-		if (IS_FLAG_SET(flag_data_received)) {
-			TEST_PASS("Test passed");
-		}
+	//	if (IS_FLAG_SET(flag_data_received)) {
+	//	}
+
+	while (iso_req_count < ISO_COUNT || acl_req_count < COMMAND_COUNT) {
+		k_sleep(K_MSEC(1000));
+		printk("ISO count: %zu, ACL count: %zu\n", iso_req_count, acl_req_count);
 	}
+
+	disconnect_cis();
+	disconnect_acl();
+
+	TEST_PASS("Test passed");
 }
 
 static const struct bst_test_instance test_def[] = {

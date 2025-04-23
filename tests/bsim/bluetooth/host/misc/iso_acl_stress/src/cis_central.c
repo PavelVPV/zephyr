@@ -172,6 +172,11 @@ static void sdu_sent_cb(struct bt_iso_chan *chan)
 
 	enqueue_cnt++;
 
+	if (seq_num >= ISO_COUNT) {
+		/* We are done with sending data */
+		return;
+	}
+
 	if (!IS_FLAG_SET(flag_iso_connected)) {
 		/* TX has been aborted */
 		return;
@@ -535,6 +540,7 @@ static void connect_cis(void)
 	WAIT_FOR_FLAG(flag_iso_connected);
 }
 
+#if 0
 static void disconnect_cis(void)
 {
 	int err;
@@ -562,6 +568,7 @@ static void disconnect_acl(void)
 
 	WAIT_FOR_FLAG_UNSET(flag_connected);
 }
+#endif
 
 static void terminate_cig(void)
 {
@@ -590,12 +597,18 @@ static void test_main(void)
 	start_acl_send();
 	start_iso_send();
 
-	while (seq_num < 100U && acl_sent_cnt < COMMAND_COUNT) {
-		k_sleep(K_USEC(interval_us));
-	}
+//	while (seq_num < ENQUEUE_COUNT || acl_sent_cnt < COMMAND_COUNT) {
+//		k_sleep(K_USEC(interval_us));
+//	}
 
+#if 0
 	disconnect_cis();
 	disconnect_acl();
+#endif
+
+	WAIT_FOR_FLAG_UNSET(flag_iso_connected);
+	WAIT_FOR_FLAG_UNSET(flag_connected);
+
 	terminate_cig();
 
 	TEST_PASS("Test passed");
