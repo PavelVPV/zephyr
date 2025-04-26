@@ -19,7 +19,8 @@
 			    0x07, 0x08, 0x09, 0xFF, 0x11)
 
 #define COMMAND_COUNT 30
-#define ISO_COUNT (CONFIG_BT_ISO_TX_BUF_COUNT * 10)
+//#define ISO_COUNT (CONFIG_BT_ISO_TX_BUF_COUNT * 10)
+#define ISO_COUNT (CONFIG_BT_CTLR_ISO_TX_BUFFERS * 10)
 
 extern struct bt_conn *default_conn;
 extern atomic_t flag_connected;

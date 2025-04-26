@@ -143,6 +143,7 @@ void frag_destroy(struct net_buf *frag)
 	LOG_DBG("");
 
 	/* Kick the TX processor to send the rest of the frags. */
+	LOG_INF("Kicking TX processor from %s", __func__);
 	bt_tx_irq_raise();
 }
 
@@ -312,6 +313,7 @@ static void tx_notify_process(struct bt_conn *conn)
 		}
 
 		LOG_DBG("raise TX IRQ");
+		LOG_INF("Kicking TX processor from %s", __func__);
 		bt_tx_irq_raise();
 	}
 }
@@ -873,6 +875,7 @@ void bt_conn_data_ready(struct bt_conn *conn)
 	}
 
 	/* Kick the TX processor */
+	LOG_INF("Kicking TX processor from %s", __func__);
 	bt_tx_irq_raise();
 }
 

@@ -28,8 +28,8 @@
 #include "bstests.h"
 #include "common.h"
 
-#define ENQUEUE_COUNT CONFIG_BT_ISO_TX_BUF_COUNT
-//#define ENQUEUE_COUNT CONFIG_BT_CTLR_ISO_TX_BUFFERS
+//#define ENQUEUE_COUNT CONFIG_BT_ISO_TX_BUF_COUNT
+#define ENQUEUE_COUNT CONFIG_BT_CTLR_ISO_TX_BUFFERS
 
 extern enum bst_result_t bst_result;
 static struct bt_iso_chan iso_chans[CONFIG_BT_ISO_MAX_CHAN];
@@ -126,7 +126,9 @@ static void start_iso_send(void)
 			   K_PRIO_COOP(1), NULL);
 	k_thread_name_set(&iso_send_work_q.thread, "ISO send workq");
 
+#if 0
 	k_work_schedule_for_queue(&iso_send_work_q, &iso_send_work, K_NO_WAIT);
+#endif
 }
 
 static void iso_connected(struct bt_iso_chan *chan)
@@ -445,8 +447,6 @@ static void gatt_write_without_rsp_complete(struct bt_conn *conn, void *user_dat
 {
 	k_sem_give(&gatt_write_sem);
 
-	acl_sent_cnt++;
-
 	if (acl_sent_cnt < COMMAND_COUNT) {
 		k_work_submit_to_queue(&acl_send_work_q, &acl_send_work);
 	}
@@ -473,6 +473,7 @@ static void acl_send_work_handler(struct k_work *work)
 	 * Otherwise, TX processor will wake up on every k_sem_take.
 	 */
 	while ((err = k_sem_take(&gatt_write_sem, K_NO_WAIT)) == 0) {
+		acl_sent_cnt++;
 		gatt_write_without_rsp();
 	}
 }
@@ -484,7 +485,9 @@ static void start_acl_send(void)
 			   K_PRIO_COOP(1), NULL);
 	k_thread_name_set(&acl_send_work_q.thread, "ACL send workq");
 
+#if 1
 	k_work_submit_to_queue(&acl_send_work_q, &acl_send_work);
+#endif
 }
 
 static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,

@@ -248,7 +248,9 @@ static void test_main(void)
 	//	if (IS_FLAG_SET(flag_data_received)) {
 	//	}
 
-	while (iso_req_count < ISO_COUNT || acl_req_count < COMMAND_COUNT) {
+//	while (iso_req_count < ISO_COUNT || acl_req_count < COMMAND_COUNT) {
+//	while (iso_req_count < ISO_COUNT) {
+	while (acl_req_count < COMMAND_COUNT) {
 		k_sleep(K_MSEC(1000));
 		printk("ISO count: %zu, ACL count: %zu\n", iso_req_count, acl_req_count);
 	}
