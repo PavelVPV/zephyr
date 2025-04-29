@@ -597,3 +597,9 @@ void bt_conn_tx_processor(void);
  * - unref the conn when popping the conn from the slist
  */
 void bt_conn_data_ready(struct bt_conn *conn);
+
+/* Returns the number of bt_conn_tx objects allocated for ACL data packets. */
+size_t bt_conn_tx_acl_count(void);
+
+/* Returns the number of bt_conn_tx objects allocated for ISO data packets. */
+size_t bt_conn_tx_iso_count(void);

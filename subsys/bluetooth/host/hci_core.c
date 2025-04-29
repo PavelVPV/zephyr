@@ -3126,6 +3126,32 @@ static void read_buffer_size_complete(struct net_buf *buf)
 #endif /* !defined(CONFIG_BT_CLASSIC) */
 #endif /* CONFIG_BT_CONN */
 
+static void check_num_of_acl_iso_pkts(uint8_t num_acl_pkts, uint8_t num_iso_pkts)
+{
+	/** This check is added to warn if the number of ACL or ISO packets in the controller is not
+	 * equal to the number of bt_conn_tx contexts allocated by the host. The inequality of these
+	 * two values can lead to inefficient resources usage either on the host's or controller's
+	 * side.
+	 */
+#if defined(CONFIG_BT_CONN)
+	CHECKIF(bt_conn_tx_acl_count() != num_acl_pkts) {
+		LOG_WRN("Num of Controller's ACL packets != ACL bt_conn_tx contexts (%u != %u)",
+			num_acl_pkts, bt_conn_tx_acl_count());
+	}
+#else
+	ARG_UNUSED(num_acl_pkts);
+#endif
+
+#if defined(CONFIG_BT_ISO)
+	CHECKIF(bt_conn_tx_iso_count() != num_iso_pkts) {
+		LOG_WRN("Num of Controller's ISO packets != ISO bt_conn_tx contexts (%u != %u)",
+			num_iso_pkts, bt_conn_tx_iso_count());
+	}
+#else
+	ARG_UNUSED(num_iso_pkts);
+#endif
+}
+
 static void le_read_buffer_size_complete(struct net_buf *buf)
 {
 	struct bt_hci_rp_le_read_buffer_size *rp = (void *)buf->data;
@@ -3142,6 +3168,7 @@ static void le_read_buffer_size_complete(struct net_buf *buf)
 	bt_dev.le.acl_mtu = acl_mtu;
 
 	LOG_DBG("ACL LE buffers: pkts %u mtu %u", rp->le_max_num, bt_dev.le.acl_mtu);
+	check_num_of_acl_iso_pkts(rp->le_max_num, 0);
 
 	k_sem_init(&bt_dev.le.acl_pkts, rp->le_max_num, rp->le_max_num);
 #endif /* CONFIG_BT_CONN */
@@ -3175,6 +3202,8 @@ static void read_buffer_size_v2_complete(struct net_buf *buf)
 	bt_dev.le.iso_mtu = iso_mtu;
 
 	LOG_ERR("ISO buffers: pkts %u mtu %u", rp->iso_max_num, bt_dev.le.iso_mtu);
+
+	check_num_of_acl_iso_pkts(rp->acl_max_num, rp->iso_max_num);
 
 	k_sem_init(&bt_dev.le.iso_pkts, rp->iso_max_num, rp->iso_max_num);
 	bt_dev.le.iso_limit = rp->iso_max_num;

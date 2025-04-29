@@ -186,6 +186,11 @@ extern struct bt_conn iso_conns[CONFIG_BT_ISO_MAX_CHAN];
 /* Callback TX buffers for ISO */
 static struct bt_conn_tx iso_tx[CONFIG_BT_ISO_TX_BUF_COUNT];
 
+size_t bt_conn_tx_iso_count(void)
+{
+	return ARRAY_SIZE(iso_tx);
+}
+
 int bt_conn_iso_init(void)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(iso_tx); i++) {
@@ -4146,6 +4151,11 @@ struct bt_conn *bt_conn_lookup_index(uint8_t index)
 	}
 
 	return bt_conn_ref(&acl_conns[index]);
+}
+
+size_t bt_conn_tx_acl_count(void)
+{
+	return ARRAY_SIZE(conn_tx);
 }
 
 int bt_conn_init(void)
