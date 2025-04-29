@@ -89,6 +89,8 @@ Deprecated APIs and options
 * ``esp32c6_devkitc`` board target has been deprecated and renamed to
   ``esp32c6_devkitc/esp32c6/hpcore``.
 
+* :kconfig:option:`CONFIG_BT_CONN_TX_MAX`
+
 New APIs and options
 ====================
 
