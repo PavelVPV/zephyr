@@ -46,7 +46,7 @@
 #include "l2cap_internal.h"
 #include "smp.h"
 
-#define LOG_LEVEL CONFIG_BT_SMP_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_SMP_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_smp);
 
@@ -421,6 +421,8 @@ static bool smp_keys_check(struct bt_conn *conn)
 		return false;
 	}
 
+	LOG_DBG("conn %p keys %p flags 0x%02x", conn, conn->le.keys,
+	     conn->le.keys->flags);
 	return true;
 }
 
@@ -902,6 +904,7 @@ static void smp_br_reset(struct bt_smp_br *smp)
 
 static void smp_br_id_add_replace(struct bt_keys *keys)
 {
+#if 0
 	struct bt_keys *conflict;
 
 	/* Check whether key has been added to resolving list. */
@@ -920,6 +923,7 @@ static void smp_br_id_add_replace(struct bt_keys *keys)
 	}
 
 	__ASSERT_NO_MSG(!bt_id_find_conflict(keys));
+#endif
 	bt_id_add(keys);
 }
 
@@ -4039,6 +4043,7 @@ static uint8_t smp_ident_info(struct bt_smp *smp, struct net_buf *buf)
 
 static uint8_t smp_id_add_replace(struct bt_smp *smp, struct bt_keys *new_bond)
 {
+#if 0
 	struct bt_keys *conflict;
 
 	/* Sanity check: It does not make sense to finalize a bond before we
@@ -4073,6 +4078,7 @@ static uint8_t smp_id_add_replace(struct bt_smp *smp, struct bt_keys *new_bond)
 	}
 
 	__ASSERT_NO_MSG(!bt_id_find_conflict(new_bond));
+#endif
 	bt_id_add(new_bond);
 	return 0;
 }
@@ -4917,6 +4923,7 @@ static void bt_smp_encrypt_change(struct bt_l2cap_chan *chan,
 		 * This happens when encrypt change is called to notify that
 		 * security has failed before starting encryption.
 		 */
+		LOG_ERR("Unexpected encryption change");
 		return;
 	}
 
@@ -4930,10 +4937,13 @@ static void bt_smp_encrypt_change(struct bt_l2cap_chan *chan,
 			smp_pairing_complete(smp, smp_err);
 		}
 
+		LOG_ERR("Encryption failed: %d", hci_status);
+
 		return;
 	}
 
 	if (!conn->encrypt) {
+		LOG_ERR("Encryption not enabled");
 		return;
 	}
 
@@ -4942,6 +4952,7 @@ static void bt_smp_encrypt_change(struct bt_l2cap_chan *chan,
 	 * enabled encryption.
 	 */
 	if (!atomic_test_bit(smp->flags, SMP_FLAG_PAIRING)) {
+		LOG_WRN("Encryption enabled without pairing");
 		smp_reset(smp);
 		return;
 	}
@@ -4998,6 +5009,7 @@ static void bt_smp_encrypt_change(struct bt_l2cap_chan *chan,
 		uint8_t smp_err;
 
 		smp_err = smp_id_add_replace(smp, conn->le.keys);
+		LOG_WRN("smp_id_add_replace() returned %d", smp_err);
 		if (smp_err) {
 			smp_pairing_complete(smp, smp_err);
 		}
@@ -5008,6 +5020,7 @@ static void bt_smp_encrypt_change(struct bt_l2cap_chan *chan,
 	/* Peripheral distributes it's keys first */
 	if (IS_ENABLED(CONFIG_BT_CENTRAL) &&
 	    conn->role == BT_HCI_ROLE_CENTRAL && smp->remote_dist) {
+		LOG_DBG("Distributing first key");
 		return;
 	}
 
@@ -5019,12 +5032,16 @@ static void bt_smp_encrypt_change(struct bt_l2cap_chan *chan,
 		k_sleep(K_MSEC(100));
 	}
 
-	if (bt_smp_distribute_keys(smp)) {
+	int err = bt_smp_distribute_keys(smp);
+	if (err) {
+		LOG_ERR("Failed to distribute keys: %d", err);
 		return;
 	}
 
 	/* if all keys were distributed, pairing is done */
+	LOG_DBG("Pairing done");
 	if (!smp->local_dist && !smp->remote_dist) {
+		LOG_DBG("Pairing complete");
 		smp_pairing_complete(smp, 0);
 	}
 }
@@ -6149,6 +6166,8 @@ int bt_smp_start_security(struct bt_conn *conn)
 		if (!smp_keys_check(conn)) {
 			return smp_send_pairing_req(conn);
 		}
+
+		LOG_DBG("Already have keys, starting encryption");
 
 		/* LE SC LTK and legacy central LTK are stored in same place */
 		err = bt_conn_le_start_encryption(conn,

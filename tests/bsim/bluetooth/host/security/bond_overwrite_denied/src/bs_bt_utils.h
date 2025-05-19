@@ -29,6 +29,7 @@
 
 DECLARE_FLAG(flag_pairing_complete);
 DECLARE_FLAG(flag_pairing_failed);
+DECLARE_FLAG(security_changed_flag);
 
 extern struct bt_conn *g_conn;
 void wait_connected(void);

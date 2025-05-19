@@ -2139,6 +2139,7 @@ enum bt_security_err bt_security_err_get(uint8_t hci_err)
 	case BT_HCI_ERR_INVALID_PARAM:
 		return BT_SECURITY_ERR_INVALID_PARAM;
 	default:
+		LOG_WRN("Unknown HCI error 0x%02x", hci_err);
 		return BT_SECURITY_ERR_UNSPECIFIED;
 	}
 }

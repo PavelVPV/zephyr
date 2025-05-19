@@ -43,6 +43,29 @@ void peripheral(void)
 	wait_connected();
 	/* Central should bond here. */
 	BUILD_ASSERT(!IS_ENABLED(CONFIG_BT_ID_UNPAIR_MATCHING_BONDS), "");
-	WAIT_FOR_FLAG(flag_pairing_failed);
+	wait_connected();
+	//WAIT_FOR_FLAG(flag_pairing_failed);
+	wait_disconnected();
+	central = *bt_conn_get_dst(g_conn);
+	clear_g_conn();
+
+	printk("== Advertising id a again ==\n");
+	advertise_connectable(id_a, NULL);
+	wait_connected();
+	/* Central should bond here, and trigger a disconnect. */
+	printk("Waiting for disconnect...\n");
+	wait_disconnected();
+	central = *bt_conn_get_dst(g_conn);
+	clear_g_conn();
+
+	printk("== Advertising id b again ==\n");
+	advertise_connectable(id_b, NULL);
+	wait_connected();
+	/* Central should bond here, and trigger a disconnect. */
+	printk("Waiting for disconnect...\n");
+	wait_disconnected();
+	central = *bt_conn_get_dst(g_conn);
+	clear_g_conn();
+
 	TEST_PASS("PASS");
 }

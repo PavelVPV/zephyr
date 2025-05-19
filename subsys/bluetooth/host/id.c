@@ -43,7 +43,7 @@
 #include "settings.h"
 #include "smp.h"
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_HCI_CORE_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_id);
 
@@ -1019,6 +1019,7 @@ void bt_id_add(struct bt_keys *keys)
 
 	/* Nothing to be done if host-side resolving is used */
 	if (!bt_dev.le.rl_size || bt_dev.le.rl_entries > bt_dev.le.rl_size) {
+		LOG_WRN("Adding key to Host Resolving list");
 		bt_dev.le.rl_entries++;
 		keys->state |= BT_KEYS_ID_ADDED;
 		return;
@@ -1088,7 +1089,7 @@ void bt_id_add(struct bt_keys *keys)
 
 	err = hci_id_add(keys->id, &keys->addr, keys->irk.val);
 	if (err) {
-		LOG_ERR("Failed to add IRK to controller");
+		LOG_ERR("Failed to add IRK to controller: %d", err);
 		goto done;
 	}
 
@@ -1113,8 +1114,8 @@ void bt_id_add(struct bt_keys *keys)
 		goto done;
 	}
 
-done:
 	addr_res_enable(BT_HCI_ADDR_RES_ENABLE);
+done:
 
 #if defined(CONFIG_BT_OBSERVER)
 	if (scan_enabled) {
@@ -1161,10 +1162,11 @@ void bt_id_del(struct bt_keys *keys)
 		return;
 	}
 
-	LOG_DBG("addr %s", bt_addr_le_str(&keys->addr));
+	LOG_ERR("addr %s", bt_addr_le_str(&keys->addr));
 
 	if (!bt_dev.le.rl_size ||
 	    bt_dev.le.rl_entries > bt_dev.le.rl_size + 1) {
+		LOG_WRN("Removing key from Host Resolving list");
 		__ASSERT_NO_MSG(bt_dev.le.rl_entries > 0);
 		if (bt_dev.le.rl_entries > 0) {
 			bt_dev.le.rl_entries--;
@@ -1218,6 +1220,7 @@ void bt_id_del(struct bt_keys *keys)
 
 	/* We checked size + 1 earlier, so here we know we can fit again */
 	if (bt_dev.le.rl_entries > bt_dev.le.rl_size) {
+		LOG_WRN("Resloving list again in Controller");
 		bt_dev.le.rl_entries--;
 		keys->state &= ~BT_KEYS_ID_ADDED;
 		if (IS_ENABLED(CONFIG_BT_CENTRAL) &&
@@ -1241,6 +1244,7 @@ void bt_id_del(struct bt_keys *keys)
 done:
 	/* Only re-enable if there are entries to do resolving with */
 	if (bt_dev.le.rl_entries) {
+		LOG_WRN("Re-enabling address resolution in Controller");
 		addr_res_enable(BT_HCI_ADDR_RES_ENABLE);
 	}
 
