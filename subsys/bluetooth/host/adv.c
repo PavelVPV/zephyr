@@ -1021,6 +1021,8 @@ int bt_le_adv_start_legacy(struct bt_le_ext_adv *adv,
 	adv->id = param->id;
 	bt_dev.adv_conn_id = adv->id;
 
+	bt_id_re_add_removed_keys(adv->id);
+
 	err = bt_id_set_adv_own_addr(adv, param->options, dir_adv,
 				     &set_param.own_addr_type);
 	if (err) {
@@ -1336,6 +1338,9 @@ int bt_le_adv_start_ext(struct bt_le_ext_adv *adv,
 	}
 
 	adv->id = param->id;
+
+	bt_id_re_add_removed_keys(adv->id);
+
 	err = le_ext_adv_param_set(adv, param, sd != NULL);
 	if (err) {
 		return err;

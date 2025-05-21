@@ -32,6 +32,36 @@ void central(void)
 	scan_connect_to_first_result();
 	wait_connected();
 	set_security(BT_SECURITY_L2);
+	TAKE_FLAG(flag_pairing_complete);
+	disconnect();
 	wait_disconnected();
+	clear_g_conn();
+
+	printk("== Connect to id a again ==\n");
+	scan_connect_to_first_result();
+	printk("Scan started\n");
+	wait_connected();
+	printk("Connected\n");
+	set_security(BT_SECURITY_L2);
+	printk("Set security\n");
+	WAIT_FOR_FLAG(security_changed_flag);
+//	TAKE_FLAG(flag_pairing_complete);
+	disconnect();
+	wait_disconnected();
+	clear_g_conn();
+
+	printk("== Connect to id b again ==\n");
+	scan_connect_to_first_result();
+	printk("Scan started\n");
+	wait_connected();
+	printk("Connected\n");
+	set_security(BT_SECURITY_L2);
+	printk("Set security\n");
+	WAIT_FOR_FLAG(security_changed_flag);
+//	TAKE_FLAG(flag_pairing_complete);
+	disconnect();
+	wait_disconnected();
+	clear_g_conn();
+
 	TEST_PASS("PASS");
 }

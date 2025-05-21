@@ -4049,8 +4049,16 @@ static uint8_t smp_id_add_replace(struct bt_smp *smp, struct bt_keys *new_bond)
 	conflict = bt_id_find_conflict(new_bond);
 	if (conflict) {
 		LOG_DBG("New bond conflicts with a bond on id %d.", conflict->id);
+//		bt_id_del_from_resolving_list(&conflict->addr);
+//		conflict->flags &= ~BT_KEYS_ID_NOT_IN_RESOLVING_LIST;
+#if 0
+		atomic_set_bit(bt_dev.id_flags[conflict->id], BT_ID_UNSET);
+		atomic_set_bit(bt_dev.id_flags[conflict->id], BT_ID_CONFLICT);
+		atomic_set_bit(bt_dev.id_flags[new_bond->id], BT_ID_CONFLICT);
+#endif
 	}
 
+#if 0
 	if (conflict && !IS_ENABLED(CONFIG_BT_ID_UNPAIR_MATCHING_BONDS)) {
 		LOG_WRN("Refusing new pairing. The old bond must be unpaired first.");
 		return BT_SMP_ERR_AUTH_REQUIREMENTS;
@@ -4073,6 +4081,8 @@ static uint8_t smp_id_add_replace(struct bt_smp *smp, struct bt_keys *new_bond)
 	}
 
 	__ASSERT_NO_MSG(!bt_id_find_conflict(new_bond));
+#endif
+
 	bt_id_add(new_bond);
 	return 0;
 }

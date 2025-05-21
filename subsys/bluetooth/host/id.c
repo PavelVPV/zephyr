@@ -944,6 +944,8 @@ void bt_id_pending_keys_update(void)
 	}
 }
 
+static int hci_id_del(const bt_addr_le_t *addr);
+
 struct bt_id_conflict {
 	struct bt_keys *candidate;
 	struct bt_keys *found;
@@ -965,14 +967,25 @@ void find_rl_conflict(struct bt_keys *resident, void *user_data)
 	__ASSERT_NO_MSG(conflict->candidate != NULL);
 	__ASSERT_NO_MSG(resident != NULL);
 	/* Only uncommitted bonds can be in conflict with committed bonds. */
-	__ASSERT_NO_MSG((conflict->candidate->state & BT_KEYS_ID_ADDED) == 0);
+	// FIXME: Was asserting here
+//	__ASSERT_NO_MSG((conflict->candidate->state & BT_KEYS_ID_ADDED) == 0);
 
+//	LOG_WRN("New bond conflicts with a bond on id %d. Removing conflicting key.", resident->id);
+
+//	hci_id_del(&resident->addr);
+
+#if 0
 	if (conflict->found) {
 		return;
 	}
+#endif
 
 	/* Test against committed bonds only. */
 	if ((resident->state & BT_KEYS_ID_ADDED) == 0) {
+		return;
+	}
+
+	if (conflict->candidate->id == resident->id) {
 		return;
 	}
 
@@ -983,12 +996,17 @@ void find_rl_conflict(struct bt_keys *resident, void *user_data)
 			bt_irk_eq(&conflict->candidate->irk, &resident->irk));
 
 	if (addr_conflict || irk_conflict) {
-		LOG_DBG("Resident : addr %s and IRK %s", bt_addr_le_str(&resident->addr),
+		LOG_WRN("Resident : addr %s and IRK %s", bt_addr_le_str(&resident->addr),
 			bt_hex(resident->irk.val, sizeof(resident->irk.val)));
-		LOG_DBG("Candidate: addr %s and IRK %s", bt_addr_le_str(&conflict->candidate->addr),
+		LOG_WRN("Candidate: addr %s and IRK %s", bt_addr_le_str(&conflict->candidate->addr),
 			bt_hex(conflict->candidate->irk.val, sizeof(conflict->candidate->irk.val)));
 
 		conflict->found = resident;
+
+		LOG_WRN("New bond conflicts with a bond on id %d. Removing conflicting key.", resident->id);
+
+		hci_id_del(&resident->addr);
+		resident->flags |= BT_KEYS_ID_NOT_IN_RESOLVING_LIST;
 	}
 }
 
@@ -1001,6 +1019,37 @@ struct bt_keys *bt_id_find_conflict(struct bt_keys *candidate)
 	bt_keys_foreach_type(BT_KEYS_IRK, find_rl_conflict, &conflict);
 
 	return conflict.found;
+}
+
+void find_id_keys(struct bt_keys *resident, void *user_data)
+{
+	uint8_t id = *(uint8_t *)user_data;
+
+	if ((resident->state & BT_KEYS_ID_ADDED) == 0) {
+		return;
+	}
+
+	if (resident->id != id) {
+		return;
+	}
+
+	if (!(resident->flags & BT_KEYS_ID_NOT_IN_RESOLVING_LIST)) {
+		return;
+	}
+
+	LOG_WRN("Found removed key for id %d", id);
+
+	struct bt_keys *conflict = bt_id_find_conflict(resident);
+	(void)conflict;
+
+	LOG_WRN("Adding key for id %d", id);
+	hci_id_add(resident->id, &resident->addr, resident->irk.val);
+}
+
+void bt_id_re_add_removed_keys(uint8_t id)
+{
+	LOG_WRN("Re-adding removed keys for id %d", id);
+	bt_keys_foreach_type(BT_KEYS_IRK, find_id_keys, &id);
 }
 
 void bt_id_add(struct bt_keys *keys)

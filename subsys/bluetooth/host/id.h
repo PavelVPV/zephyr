@@ -60,3 +60,5 @@ void bt_id_pending_keys_update(void);
 void bt_id_pending_keys_update_set(struct bt_keys *keys, uint8_t flag);
 
 void bt_id_adv_limited_stopped(struct bt_le_ext_adv *adv);
+
+void bt_id_re_add_removed_keys(uint8_t id);

@@ -338,11 +338,19 @@ struct bt_dev_br {
 #define BT_DEV_VS_FEAT_MAX  1
 #define BT_DEV_VS_CMDS_MAX  2
 
+//enum {
+//	BT_ID_UNSET = 0,
+//	BT_ID_CONFLICT = 1,
+//	BT_ID_NUM_FLAGS,
+//};
+
 /* State tracking for the local Bluetooth controller */
 struct bt_dev {
 	/* Local Identity Address(es) */
 	bt_addr_le_t            id_addr[CONFIG_BT_ID_MAX];
-	uint8_t                    id_count;
+	uint8_t                 id_count;
+//	ATOMIC_DEFINE(id_flags, BT_ID_NUM_FLAGS)[CONFIG_BT_ID_MAX];
+//	uint8_t                 id_flags[CONFIG_BT_ID_MAX];
 
 	struct bt_conn_le_create_param create_param;
 

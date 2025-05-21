@@ -14,6 +14,7 @@ struct bt_conn *g_conn;
 
 void wait_connected(void)
 {
+	printk("Waiting for connection...\n");
 	WAIT_FOR_FLAG(flag_is_connected);
 }
 
@@ -24,6 +25,8 @@ void wait_disconnected(void)
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
+	printk("Disconnected from %p (reason %d)\n", conn, reason);
+
 	UNSET_FLAG(flag_is_connected);
 }
 
@@ -31,6 +34,10 @@ BUILD_ASSERT(CONFIG_BT_MAX_CONN == 1, "This test assumes a single link.");
 static void connected(struct bt_conn *conn, uint8_t err)
 {
 	TEST_ASSERT((!g_conn || (conn == g_conn)), "Unexpected new connection.");
+
+	UNSET_FLAG(security_changed_flag);
+
+	printk("Connected to %p, err %d\n", conn, err);
 
 	if (!g_conn) {
 		g_conn = bt_conn_ref(conn);
@@ -41,12 +48,26 @@ static void connected(struct bt_conn *conn, uint8_t err)
 		return;
 	}
 
+	printk("Set flag_is_connected\n");
 	SET_FLAG(flag_is_connected);
+}
+
+DEFINE_FLAG(security_changed_flag);
+
+static void security_changed(struct bt_conn *conn, bt_security_t level,
+			     enum bt_security_err err)
+{
+	printk("Security changed for %p, level %d, err %d\n", conn, level, err);
+
+	if (!err && level == BT_SECURITY_L2) {
+		SET_FLAG(security_changed_flag);
+	}
 }
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
 	.connected = connected,
 	.disconnected = disconnected,
+	.security_changed = security_changed,
 };
 
 void clear_g_conn(void)
@@ -65,11 +86,15 @@ DEFINE_FLAG(flag_pairing_failed);
 
 static void pairing_failed(struct bt_conn *conn, enum bt_security_err reason)
 {
+	printk("Pairing failed with %p (reason %d)\n", conn, reason);
+
 	SET_FLAG(flag_pairing_failed);
 }
 
 static void pairing_complete(struct bt_conn *conn, bool bonded)
 {
+	printk("Pairing complete with %p (bonded %d)\n", conn, bonded);
+
 	SET_FLAG(flag_pairing_complete);
 }
 
@@ -95,6 +120,7 @@ static void scan_connect_to_first_result__device_found(const bt_addr_le_t *addr,
 	int err;
 
 	if (g_conn != NULL) {
+		printk("Already connected, ignoring advertisement.");
 		return;
 	}
 
@@ -104,7 +130,7 @@ static void scan_connect_to_first_result__device_found(const bt_addr_le_t *addr,
 	}
 
 	bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
-	printk("Got scan result, connecting.. dst %s, RSSI %d", addr_str, rssi);
+	printk("Got scan result, connecting.. dst %s, RSSI %d\n", addr_str, rssi);
 
 	err = bt_le_scan_stop();
 	TEST_ASSERT(!err, "Err bt_le_scan_stop %d", err);
