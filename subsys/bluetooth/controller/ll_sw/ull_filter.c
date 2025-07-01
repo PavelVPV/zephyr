@@ -49,6 +49,8 @@
 
 #include "hal/debug.h"
 
+#include "common/bt_str.h"
+
 #define LOG_LEVEL CONFIG_BT_HCI_DRIVER_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_ctlr_ull_filter);
@@ -295,6 +297,8 @@ uint8_t ll_rl_clear(void)
 		return BT_HCI_ERR_CMD_DISALLOWED;
 	}
 
+	LOG_INF("Clearing resolving list");
+
 	rl_clear();
 
 	return 0;
@@ -308,6 +312,10 @@ uint8_t ll_rl_add(bt_addr_le_t *id_addr, const uint8_t pirk[IRK_SIZE],
 	if (!rl_access_check(false)) {
 		return BT_HCI_ERR_CMD_DISALLOWED;
 	}
+
+	LOG_INF("Adding resolving list entry: %s", bt_addr_le_str(id_addr));
+	LOG_HEXDUMP_INF(pirk, IRK_SIZE, "Peer IRK");
+	LOG_HEXDUMP_INF(lirk, IRK_SIZE, "Local IRK");
 
 	i = ull_filter_rl_find(id_addr->type, id_addr->a.val, &j);
 
@@ -380,6 +388,8 @@ uint8_t ll_rl_remove(bt_addr_le_t *id_addr)
 	if (!rl_access_check(false)) {
 		return BT_HCI_ERR_CMD_DISALLOWED;
 	}
+
+	LOG_INF("Removing resolving list entry: %s", bt_addr_le_str(id_addr));
 
 	/* find the device and mark it as empty */
 	i = ull_filter_rl_find(id_addr->type, id_addr->a.val, NULL);
@@ -485,6 +495,8 @@ uint8_t ll_rl_enable(uint8_t enable)
 	if (!rl_access_check(false)) {
 		return BT_HCI_ERR_CMD_DISALLOWED;
 	}
+
+	LOG_INF("Resolving list %sabled", enable ? "en" : "dis");
 
 	switch (enable) {
 	case BT_HCI_ADDR_RES_DISABLE:
@@ -1276,6 +1288,9 @@ static int rl_access_check(bool check_ar)
 	/* NOTE: Allowed when passive scanning, otherwise deny if advertising,
 	 *       active scanning, initiating or periodic sync create is active.
 	 */
+	LOG_ERR("ull_adv_is_enabled: %d, ull_scan_is_enabled: %d",
+		ull_adv_is_enabled(0), (ull_scan_is_enabled(0) & ~ULL_SCAN_IS_PASSIVE));
+
 	return ((IS_ENABLED(CONFIG_BT_BROADCASTER) && ull_adv_is_enabled(0)) ||
 		(IS_ENABLED(CONFIG_BT_OBSERVER) &&
 		 (ull_scan_is_enabled(0) & ~ULL_SCAN_IS_PASSIVE)))

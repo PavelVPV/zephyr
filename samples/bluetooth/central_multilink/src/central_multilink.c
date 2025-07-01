@@ -186,6 +186,28 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 
 	printk("Disconnected: %s, reason 0x%02x %s\n", addr, reason, bt_hci_err_to_str(reason));
 
+#if 0//defined(CONFIG_BT_SMP)
+	struct bt_conn_info info;
+	int err;
+
+	err = bt_conn_get_info(conn, &info);
+	if (err) {
+		printk("Failed to get connection info (%d)\n", err);
+		return;
+	}
+
+	err = bt_unpair(info.id, info.le.dst);
+	if (err) {
+		printk("Failed to unpair (%d)\n", err);
+		return;
+	}
+
+	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+	printk("Unpaired %s\n", addr);
+#endif /* CONFIG_BT_SMP */
+
+
 	bt_conn_unref(conn);
 
 	if ((conn_count == 1U) && (is_disconnecting || (reason == BT_HCI_ERR_CONN_FAIL_TO_ESTAB))) {
@@ -290,13 +312,13 @@ static void remote_info(struct bt_conn *conn, void *data)
 
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
-	printk("Get remote info %s...\n", addr);
+//	printk("Get remote info %s...\n", addr);
 	err = bt_conn_get_remote_info(conn, &remote_info);
 	if (err) {
-		printk("Failed remote info %s.\n", addr);
+//		printk("Failed remote info %s.: err: %d\n", addr, err);
 		return;
 	}
-	printk("success.\n");
+	printk("remote info success.\n");
 
 	uint8_t *actual_count = (void *)data;
 
@@ -311,12 +333,28 @@ static void disconnect(struct bt_conn *conn, void *data)
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
 	printk("Disconnecting %s...\n", addr);
+#if 0//defined(CONFIG_BT_SMP)
+	struct bt_conn_info info;
+
+	err = bt_conn_get_info(conn, &info);
+	if (err) {
+		printk("Failed to get connection info (%d)\n", err);
+		return;
+	}
+
+	err = bt_unpair(info.id, info.le.dst);
+	if (err) {
+		printk("Failed to unpair (%d)\n", err);
+		return;
+	}
+#else
 	err = bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 	if (err) {
 		printk("Failed disconnection %s.\n", addr);
 		return;
 	}
-	printk("success.\n");
+#endif
+	printk("disconnect success.\n");
 }
 
 int init_central(uint8_t max_conn, uint8_t iterations)
@@ -335,11 +373,17 @@ int init_central(uint8_t max_conn, uint8_t iterations)
 
 	bt_conn_cb_register(&conn_callbacks);
 
+	k_sleep(K_SECONDS(5));
+
 	start_scan();
 
 	while (true) {
-		while (conn_count < conn_count_max) {
-			k_sleep(K_MSEC(10));
+		if (conn_count < conn_count_max) {
+			printk("Waiting for connections...\n");
+
+			while (conn_count < conn_count_max) {
+				k_sleep(K_MSEC(10));
+			}
 		}
 
 		is_disconnecting = true;
@@ -348,6 +392,8 @@ int init_central(uint8_t max_conn, uint8_t iterations)
 		 * there is actual communication.
 		 */
 		uint8_t actual_count = 0U;
+
+		//printk("Performing remote info exchange on all connections...\n");
 
 		bt_conn_foreach(BT_CONN_TYPE_LE, remote_info, &actual_count);
 		if (actual_count < conn_count_max) {
@@ -359,6 +405,7 @@ int init_central(uint8_t max_conn, uint8_t iterations)
 		/* Lets wait sufficiently to ensure a stable connection
 		 * before starting to disconnect for next iteration.
 		 */
+		printk("Waiting for stable connections...\n");
 		k_sleep(K_SECONDS(60));
 
 		if (!iterations) {

@@ -766,10 +766,15 @@ int bt_le_create_conn_ext(const struct bt_conn *conn)
 		use_filter = atomic_test_bit(conn->flags, BT_CONN_AUTO_CONNECT);
 	}
 
+	LOG_WRN("Creating extended connection for %s",
+		bt_addr_le_str(&conn->le.dst));
 	err = bt_id_set_create_conn_own_addr(use_filter, &own_addr_type);
 	if (err) {
 		return err;
 	}
+
+	LOG_WRN("Filter policy %d, own_addr_type %d",
+		use_filter, own_addr_type);
 
 	num_phys = (!(bt_dev.create_param.options &
 		      BT_CONN_LE_OPT_NO_1M) ? 1 : 0) +
@@ -795,6 +800,8 @@ int bt_le_create_conn_ext(const struct bt_conn *conn)
 		if (bt_dev.le.rl_entries > bt_dev.le.rl_size) {
 			/* Host resolving is used, use the RPA directly. */
 			peer_addr = &conn->le.resp_addr;
+			LOG_WRN("Using Host resolving address %s",
+				bt_addr_le_str(peer_addr));
 		}
 #endif
 		bt_addr_le_copy(&cp->peer_addr, peer_addr);
@@ -896,6 +903,11 @@ static int bt_le_create_conn_legacy(const struct bt_conn *conn)
 		return err;
 	}
 
+	LOG_WRN("Creating legacy connection for %s",
+		bt_addr_le_str(&conn->le.dst));
+	LOG_WRN("Filter policy %d, own_addr_type %d",
+		use_filter, own_addr_type);
+
 	buf = bt_hci_cmd_alloc(K_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
@@ -916,6 +928,8 @@ static int bt_le_create_conn_legacy(const struct bt_conn *conn)
 		if (bt_dev.le.rl_entries > bt_dev.le.rl_size) {
 			/* Host resolving is used, use the RPA directly. */
 			peer_addr = &conn->le.resp_addr;
+			LOG_WRN("Using Host resolving address %s",
+				bt_addr_le_str(peer_addr));
 		}
 #endif
 		bt_addr_le_copy(&cp->peer_addr, peer_addr);
@@ -1411,10 +1425,10 @@ void bt_hci_le_enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 	struct bt_conn *conn;
 	uint8_t id;
 
-	LOG_DBG("status 0x%02x %s handle %u role %u peer %s peer RPA %s",
+	LOG_WRN("status 0x%02x %s handle %u role %u peer %s peer RPA %s",
 		evt->status, bt_hci_err_to_str(evt->status), handle,
 		evt->role, bt_addr_le_str(&evt->peer_addr), bt_addr_str(&evt->peer_rpa));
-	LOG_DBG("local RPA %s", bt_addr_str(&evt->local_rpa));
+	LOG_WRN("local RPA %s", bt_addr_str(&evt->local_rpa));
 
 #if defined(CONFIG_BT_SMP)
 	bt_id_pending_keys_update();
@@ -1689,6 +1703,7 @@ static void le_enh_conn_complete(struct net_buf *buf)
 		return;
 	}
 
+	LOG_INF("enh conn complete");
 	enh_conn_complete(evt);
 }
 
@@ -1747,7 +1762,7 @@ static void le_legacy_conn_complete(struct net_buf *buf)
 		return;
 	}
 
-	LOG_DBG("status 0x%02x %s role %u %s",
+	LOG_WRN("legacy status 0x%02x %s role %u %s",
 		evt->status, bt_hci_err_to_str(evt->status), evt->role,
 		bt_addr_le_str(&evt->peer_addr));
 
@@ -2105,6 +2120,8 @@ static void unpair(uint8_t id, const bt_addr_le_t *addr)
 		if (!keys) {
 			keys = bt_keys_find_addr(id, addr);
 		}
+
+		LOG_WRN("Unpairing %s with id %u, keys: %p", bt_addr_le_str(addr), id, keys);
 
 		if (keys) {
 			bt_keys_clear(keys);
@@ -2475,7 +2492,7 @@ static void hci_cmd_done(uint16_t opcode, uint8_t status, struct net_buf *evt_bu
 	/* Original command buffer. */
 	struct net_buf *buf = NULL;
 
-	LOG_DBG("opcode 0x%04x status 0x%02x %s buf %p", opcode,
+	LOG_INF("opcode 0x%04x status 0x%02x %s buf %p", opcode,
 		status, bt_hci_err_to_str(status), evt_buf);
 
 	/* Unsolicited cmd complete. This does not complete a command.
@@ -2512,6 +2529,8 @@ static void hci_cmd_done(uint16_t opcode, uint8_t status, struct net_buf *evt_bu
 	if (cmd(buf)->state && !status) {
 		struct bt_hci_cmd_state_set *update = cmd(buf)->state;
 
+		LOG_INF("Setting bit %u to %u in target %p",
+			update->bit, update->val, update->target);
 		atomic_set_bit_to(update->target, update->bit, update->val);
 	}
 

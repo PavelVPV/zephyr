@@ -48,6 +48,11 @@
 /* Maximum primary Advertising Radio Channels to scan */
 #define ADV_CHAN_MAX 3U
 
+#define LOG_LEVEL 4//CONFIG_BT_HCI_DRIVER_LOG_LEVEL
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(bt_ctlr_lll_scan);
+
+
 static int init_reset(void);
 static int prepare_cb(struct lll_prepare_param *p);
 static int resume_prepare_cb(struct lll_prepare_param *p);
@@ -800,8 +805,16 @@ static void isr_tx(void *param)
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 		radio_ar_configure(count, irks, (lll->phy << 2));
 #else
+//		LOG_INF("1 radio_ar_configure: count: %d", count);
+
+		for (size_t i = 0; i < count; i++) {
+//			LOG_HEXDUMP_DBG(&irks[i], 16, "IRK");
+		}
+
 		radio_ar_configure(count, irks, 0);
 #endif
+	} else {
+//		LOG_WRN("No radio_ar_configure, count: 0");
 	}
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
@@ -872,7 +885,15 @@ static void isr_common_done(void *param)
 #else
 		ARG_UNUSED(lll);
 		radio_ar_configure(count, irks, 0);
+
+//		LOG_INF("2 radio_ar_configure: count: %d", count);
+
+		for (size_t i = 0; i < count; i++) {
+//			LOG_HEXDUMP_DBG(&irks[i], 16, "IRK");
+		}
 #endif
+	} else {
+//		LOG_WRN("2 No radio_ar_configure, count: 0");
 	}
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 

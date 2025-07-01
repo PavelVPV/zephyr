@@ -67,6 +67,10 @@
 
 #include "hal/debug.h"
 
+#define LOG_LEVEL CONFIG_BT_HCI_DRIVER_LOG_LEVEL
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(bt_ctlr_ull_adv);
+
 inline struct ll_adv_set *ull_adv_set_get(uint8_t handle);
 inline uint16_t ull_adv_handle_get(struct ll_adv_set *adv);
 
@@ -838,6 +842,7 @@ uint8_t ll_adv_enable(uint8_t enable)
 
 	adv = is_disabled_get(handle);
 	if (!adv) {
+		LOG_ERR("Advertiser not disabled");
 		/* Bluetooth Specification v5.0 Vol 2 Part E Section 7.8.9
 		 * Enabling advertising when it is already enabled can cause the
 		 * random address to change. As the current implementation does
@@ -998,6 +1003,7 @@ uint8_t ll_adv_enable(uint8_t enable)
 		int err;
 
 		if (lll->conn) {
+			LOG_ERR("Advertiser already connected");
 			return BT_HCI_ERR_CMD_DISALLOWED;
 		}
 

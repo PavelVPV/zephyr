@@ -116,9 +116,15 @@ static void adv_is_limited_enabled(struct bt_le_ext_adv *adv, void *data)
 
 static void adv_pause_enabled(struct bt_le_ext_adv *adv, void *data)
 {
+	LOG_INF("adv_pause_enabled: adv %p, enabled: %d",
+		adv, atomic_test_bit(adv->flags, BT_ADV_ENABLED));
 	if (atomic_test_bit(adv->flags, BT_ADV_ENABLED)) {
+		LOG_INF("Pausing advertising set %p", adv);
 		atomic_set_bit(adv->flags, BT_ADV_PAUSED);
-		bt_le_adv_set_enable(adv, false);
+		int err = bt_le_adv_set_enable(adv, false);
+		if (err) {
+			LOG_WRN("Failed to pause advertising set %p (err %d)", adv, err);
+		}
 	}
 }
 
@@ -981,10 +987,10 @@ void find_rl_conflict(struct bt_keys *resident, void *user_data)
 			bt_irk_eq(&conflict->candidate->irk, &resident->irk));
 
 	if (addr_conflict || irk_conflict) {
-		LOG_DBG("Resident : addr %s and IRK %s", bt_addr_le_str(&resident->addr),
-			bt_hex(resident->irk.val, sizeof(resident->irk.val)));
-		LOG_DBG("Candidate: addr %s and IRK %s", bt_addr_le_str(&conflict->candidate->addr),
-			bt_hex(conflict->candidate->irk.val, sizeof(conflict->candidate->irk.val)));
+		LOG_WRN("Resident : addr %s and IRK %s, id: %d", bt_addr_le_str(&resident->addr),
+			bt_hex(resident->irk.val, sizeof(resident->irk.val)), resident->id);
+		LOG_WRN("Candidate: addr %s and IRK %s, id: %d", bt_addr_le_str(&conflict->candidate->addr),
+			bt_hex(conflict->candidate->irk.val, sizeof(conflict->candidate->irk.val)), conflict->candidate->id);
 
 		conflict->found = resident;
 	}
@@ -1305,6 +1311,8 @@ static int id_create(uint8_t id, bt_addr_le_t *addr, uint8_t *irk)
 				return err;
 			}
 			/* Make sure we didn't generate a duplicate */
+			LOG_WRN("Generated address %s, checking for duplicates",
+				bt_addr_le_str(&new_addr));
 		} while (id_find(&new_addr) >= 0);
 
 		bt_addr_le_copy(&bt_dev.id_addr[id], &new_addr);
@@ -1347,6 +1355,9 @@ static int id_create(uint8_t id, bt_addr_le_t *addr, uint8_t *irk)
 		(void)bt_settings_store_id();
 		(void)bt_settings_store_irk();
 	}
+
+	LOG_INF("ID created: %d", id);
+	LOG_HEXDUMP_INF(&bt_dev.irk[id], 16, "IRK");
 
 	return 0;
 }

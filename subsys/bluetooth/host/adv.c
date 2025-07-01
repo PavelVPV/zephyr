@@ -346,6 +346,8 @@ int bt_le_adv_set_enable_legacy(struct bt_le_ext_adv *adv, bool enable)
 		net_buf_add_u8(buf, BT_HCI_LE_ADV_DISABLE);
 	}
 
+	LOG_WRN("Legacy advertiser %sabling",
+		enable ? "en" : "dis");
 	bt_hci_cmd_state_set_init(buf, &state, adv->flags, BT_ADV_ENABLED, enable);
 
 	err = bt_hci_cmd_send_sync(BT_HCI_OP_LE_SET_ADV_ENABLE, buf, NULL);

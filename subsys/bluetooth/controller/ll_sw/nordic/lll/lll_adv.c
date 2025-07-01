@@ -52,6 +52,10 @@
 
 #define PDU_FREE_TIMEOUT K_SECONDS(5)
 
+#define LOG_LEVEL 4//CONFIG_BT_HCI_DRIVER_LOG_LEVEL
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(bt_ctlr_lll_adv);
+
 static int init_reset(void);
 static void pdu_free_sem_give(void);
 
@@ -1190,6 +1194,14 @@ static void isr_tx(void *param)
 		uint8_t count, *irks = ull_filter_lll_irks_get(&count);
 
 		radio_ar_configure(count, irks, 0);
+
+//		LOG_INF("radio_ar_configure: count: %d", count);
+
+		for (size_t i = 0; i < count; i++) {
+//			LOG_HEXDUMP_DBG(&irks[i], 16, "IRK");
+		}
+	} else {
+//		LOG_WRN("No radio_ar_configure, count: 0");
 	}
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 

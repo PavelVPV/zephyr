@@ -8420,6 +8420,7 @@ static void le_conn_complete(struct pdu_data *pdu_data, uint16_t handle,
 	}
 
 #if defined(CONFIG_BT_CTLR_PRIVACY) || defined(CONFIG_BT_CTLR_ADV_EXT)
+	LOG_INF("le_conn_complete");
 	if (le_event_mask & BT_EVT_MASK_LE_ENH_CONN_COMPLETE) {
 		struct bt_hci_evt_le_enh_conn_complete *leecc;
 

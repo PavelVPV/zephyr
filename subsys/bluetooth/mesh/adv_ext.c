@@ -22,7 +22,7 @@
 #include "proxy.h"
 #include "solicitation.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_ADV_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_ADV_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_adv_ext);
 
@@ -515,6 +515,19 @@ static void ext_adv_set_sent(struct bt_le_ext_adv *instance, struct bt_le_ext_ad
 		LOG_WRN("Unexpected adv instance");
 		return;
 	}
+
+	static const char * const adv_tag_to_str[] = {
+		[BT_MESH_ADV_TAG_LOCAL]  = "local",
+		[BT_MESH_ADV_TAG_RELAY]  = "relay",
+		[BT_MESH_ADV_TAG_PROXY]  = "proxy",
+		[BT_MESH_ADV_TAG_FRIEND] = "friend",
+		[BT_MESH_ADV_TAG_PROV]   = "prov",
+	};
+
+	LOG_DBG("Advertising stopped after %u ms for %s adv",
+		k_uptime_get_32() - ext_adv->timestamp,
+		ext_adv->adv ? adv_tag_to_str[ext_adv->adv->ctx.tag]
+		     : adv_tag_to_str[BT_MESH_ADV_TAG_PROXY]);
 
 	if (!atomic_test_bit(ext_adv->flags, ADV_FLAG_ACTIVE)) {
 		LOG_DBG("Advertiser %p ADV_FLAG_ACTIVE not set", ext_adv);

@@ -66,6 +66,12 @@
 
 #include "hal/debug.h"
 
+#include <zephyr/logging/log.h>
+
+#define LOG_LEVEL 4
+LOG_MODULE_REGISTER(ull_central);
+
+
 static void ticker_op_stop_scan_cb(uint32_t status, void *param);
 #if defined(CONFIG_BT_CTLR_ADV_EXT) && defined(CONFIG_BT_CTLR_PHY_CODED)
 static void ticker_op_stop_scan_other_cb(uint32_t status, void *param);
@@ -112,6 +118,11 @@ uint8_t ll_create_connection(uint16_t scan_interval, uint16_t scan_window,
 	if (own_id_addr_type && !mem_nz((void *)own_id_addr, BDADDR_SIZE)) {
 		return BT_HCI_ERR_INVALID_PARAM;
 	}
+
+	LOG_INF("type: %d, own_id_addr: %02X:%02X:%02X:%02X:%02X:%02X", own_id_addr_type,
+			own_id_addr[5], own_id_addr[4], own_id_addr[3],
+			own_id_addr[2], own_id_addr[1], own_id_addr[0]);
+
 
 #if defined(CONFIG_BT_CTLR_CHECK_SAME_PEER_CONN)
 	/* Do not connect twice to the same peer */
@@ -323,6 +334,15 @@ uint8_t ll_create_connection(uint16_t scan_interval, uint16_t scan_window,
 	conn->own_id_addr_type = own_id_addr_type;
 	(void)memcpy(conn->own_id_addr, own_id_addr, sizeof(conn->own_id_addr));
 #endif /* CONFIG_BT_CTLR_CHECK_SAME_PEER_CONN */
+
+	LOG_INF("peer_addr_type: %d, peer_addr: %02X:%02X:%02X:%02X:%02X:%02X",
+			peer_addr_type,
+			peer_addr[5], peer_addr[4], peer_addr[3],
+			peer_addr[2], peer_addr[1], peer_addr[0]);
+	LOG_INF("own_addr_type: %d, own_id_addr: %02X:%02X:%02X:%02X:%02X:%02X",
+			own_addr_type,
+			own_id_addr[5], own_id_addr[4], own_id_addr[3],
+			own_id_addr[2], own_id_addr[1], own_id_addr[0]);
 
 	lll->conn = conn_lll;
 

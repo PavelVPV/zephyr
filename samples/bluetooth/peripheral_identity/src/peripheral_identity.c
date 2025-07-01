@@ -118,11 +118,38 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 
 	printk("Disconnected %s, reason %s(0x%02x)\n", addr, bt_hci_err_to_str(reason), reason);
 
+#if 0//defined(CONFIG_BT_SMP)
+	struct bt_conn_info info;
+	int err;
+
+	err = bt_conn_get_info(conn, &info);
+	if (err) {
+		printk("Failed to get connection info (%d)\n", err);
+		return;
+	}
+
+//	bt_addr_le_to_str(, addr, sizeof(addr));
+//	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+	err = bt_unpair(info.id, info.le.dst);
+	if (err) {
+		printk("Failed to unpair (%d)\n", err);
+		return;
+	}
+
+	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+	printk("Unpaired %s\n", addr);
+#endif /* CONFIG_BT_SMP */
+
 	if ((conn_count == 1U) && is_disconnecting) {
 		is_disconnecting = false;
 		k_work_submit(&work_adv_start);
 	}
 	conn_count--;
+
+#if defined(CONFIG_BT_SMP)
+#endif
 }
 
 static bool le_param_req(struct bt_conn *conn, struct bt_le_conn_param *param)
@@ -232,6 +259,7 @@ static struct bt_conn_cb conn_callbacks = {
 				 BT_GAP_SCAN_FAST_INTERVAL, \
 				 BT_GAP_SCAN_FAST_INTERVAL)
 
+#if 0
 static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 			 struct net_buf_simple *ad)
 {
@@ -240,6 +268,7 @@ static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 	bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
 	printk("Device found: %s (RSSI %d)\n", addr_str, rssi);
 }
+#endif
 #endif /* CONFIG_BT_OBSERVER */
 
 static void disconnect(struct bt_conn *conn, void *data)
@@ -250,11 +279,27 @@ static void disconnect(struct bt_conn *conn, void *data)
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
 	printk("Disconnecting %s...\n", addr);
+#if 0//defined(CONFIG_BT_SMP)
+	struct bt_conn_info info;
+
+	err = bt_conn_get_info(conn, &info);
+	if (err) {
+		printk("Failed to get connection info (%d)\n", err);
+		return;
+	}
+
+	err = bt_unpair(info.id, info.le.dst);
+	if (err) {
+		printk("Failed to unpair (%d)\n", err);
+		return;
+	}
+#else
 	err = bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 	if (err) {
 		printk("Failed disconnection %s.\n", addr);
 		return;
 	}
+#endif
 	printk("success.\n");
 }
 
@@ -279,7 +324,7 @@ int init_peripheral(uint8_t max_conn, uint8_t iterations)
 
 	printk("Bluetooth initialized\n");
 
-#if defined(CONFIG_BT_OBSERVER)
+#if 0 // defined(CONFIG_BT_OBSERVER)
 	printk("Start continuous passive scanning...");
 	err = bt_le_scan_start(BT_LE_SCAN_PASSIVE_ALLOW_DUPILCATES,
 			       device_found);
@@ -290,7 +335,7 @@ int init_peripheral(uint8_t max_conn, uint8_t iterations)
 
 	scanning = true;
 
-	printk("success.\n");
+	printk("Scanning start success.\n");
 #endif /* CONFIG_BT_OBSERVER */
 
 	k_work_init(&work_adv_start, adv_start);
@@ -317,6 +362,7 @@ int init_peripheral(uint8_t max_conn, uint8_t iterations)
 			/* Lets wait sufficiently to ensure a stable connection
 			 * before starting to disconnect for next iteration.
 			 */
+			printk("Waiting for stable connections...\n");
 			k_sleep(K_SECONDS(60));
 
 			if (!iterations) {
@@ -347,6 +393,8 @@ int init_peripheral(uint8_t max_conn, uint8_t iterations)
 		 * rotation in this loop is not needed.
 		 */
 		if (prev_count != conn_count) {
+			printk("Connection count changed (%u -> %u)\n",
+			       prev_count, conn_count);
 			prev_count = conn_count;
 
 			continue;
@@ -357,9 +405,13 @@ int init_peripheral(uint8_t max_conn, uint8_t iterations)
 			 * central waiting before disconnecting all its
 			 * connections plus few seconds of margin.
 			 */
+			bool once = false;
 			while ((prev_count == conn_count) && wait) {
-				printk("Waiting connections (%u/%u) %u...\n",
-				       prev_count, conn_count, wait);
+				if (!once) {
+					printk("Waiting connections (%u/%u) %u...\n",
+					       prev_count, conn_count, wait);
+					once = true;
+				}
 
 				wait--;
 
