@@ -333,7 +333,7 @@ static void disconnect(struct bt_conn *conn, void *data)
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
 	printk("Disconnecting %s...\n", addr);
-#if 0//defined(CONFIG_BT_SMP)
+#if defined(CONFIG_BT_SMP)
 	struct bt_conn_info info;
 
 	err = bt_conn_get_info(conn, &info);
