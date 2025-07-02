@@ -1322,6 +1322,7 @@ static void le_conn_complete_adv_timeout(void)
 		 */
 
 		atomic_clear_bit(adv->flags, BT_ADV_ENABLED);
+		atomic_clear_bit(adv->flags, BT_ADV_PAUSED);
 
 		if (IS_ENABLED(CONFIG_BT_EXT_ADV) &&
 		    !BT_DEV_FEAT_LE_EXT_ADV(bt_dev.le.features)) {
@@ -1448,6 +1449,7 @@ void bt_hci_le_enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 		 * object to keep host in sync with controller state.
 		 */
 		atomic_clear_bit(adv->flags, BT_ADV_ENABLED);
+		atomic_clear_bit(adv->flags, BT_ADV_PAUSED);
 		(void)bt_le_lim_adv_cancel_timeout(adv);
 	}
 
@@ -2976,7 +2978,7 @@ static void hci_le_meta_event(struct net_buf *buf)
 
 	evt = net_buf_pull_mem(buf, sizeof(*evt));
 
-	LOG_DBG("subevent 0x%02x", evt->subevent);
+	LOG_INF("subevent 0x%02x", evt->subevent);
 
 	handle_event(evt->subevent, buf, meta_events, ARRAY_SIZE(meta_events));
 }
@@ -3099,7 +3101,7 @@ static void hci_event(struct net_buf *buf)
 	}
 
 	hdr = net_buf_pull_mem(buf, sizeof(*hdr));
-	LOG_DBG("event 0x%02x", hdr->evt);
+	LOG_INF("event 0x%02x", hdr->evt);
 	BT_ASSERT(bt_hci_evt_get_flags(hdr->evt) & BT_HCI_EVT_FLAG_RECV);
 
 	handle_event(hdr->evt, buf, normal_events, ARRAY_SIZE(normal_events));
@@ -4165,6 +4167,9 @@ void hci_event_prio(struct net_buf *buf)
 	}
 
 	hdr = net_buf_pull_mem(buf, sizeof(*hdr));
+
+	LOG_INF("evt_prio: 0x%02x len %u", hdr->evt, buf->len - sizeof(*hdr));
+
 	evt_flags = bt_hci_evt_get_flags(hdr->evt);
 	BT_ASSERT(evt_flags & BT_HCI_EVT_FLAG_RECV_PRIO);
 
