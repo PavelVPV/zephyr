@@ -231,6 +231,7 @@ isoal_status_t sink_sdu_write_hci(void *dbuf,
 #endif /* CONFIG_BT_CTLR_ISO */
 
 #if defined(CONFIG_BT_CTLR_RX_PRIO_STACK_SIZE)
+#error "asdfA"
 struct k_thread prio_recv_thread_data;
 static K_KERNEL_STACK_DEFINE(prio_recv_thread_stack,
 			     CONFIG_BT_CTLR_RX_PRIO_STACK_SIZE);

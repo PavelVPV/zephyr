@@ -2814,8 +2814,8 @@ static const struct event_handler meta_events[] = {
 		      sizeof(struct bt_hci_evt_le_advertising_report)),
 #endif /* CONFIG_BT_OBSERVER */
 #if defined(CONFIG_BT_CONN)
-//	EVENT_HANDLER(BT_HCI_EVT_LE_CONN_COMPLETE, le_legacy_conn_complete,
-//		      sizeof(struct bt_hci_evt_le_conn_complete)),
+	EVENT_HANDLER(BT_HCI_EVT_LE_CONN_COMPLETE, le_legacy_conn_complete,
+		      sizeof(struct bt_hci_evt_le_conn_complete)),
 	EVENT_HANDLER(BT_HCI_EVT_LE_ENH_CONN_COMPLETE, le_enh_conn_complete,
 		      sizeof(struct bt_hci_evt_le_enh_conn_complete)),
 	EVENT_HANDLER(BT_HCI_EVT_LE_CONN_UPDATE_COMPLETE,
@@ -4163,8 +4163,6 @@ static const struct event_handler prio_events[] = {
 		      sizeof(struct bt_hci_evt_data_buf_overflow)),
 	EVENT_HANDLER(BT_HCI_EVT_DISCONN_COMPLETE, hci_disconn_complete_prio,
 		      sizeof(struct bt_hci_evt_disconn_complete)),
-	EVENT_HANDLER(BT_HCI_EVT_LE_CONN_COMPLETE, le_legacy_conn_complete,
-		      sizeof(struct bt_hci_evt_le_conn_complete)),
 #endif /* CONFIG_BT_CONN */
 #if defined(CONFIG_BT_CONN_TX)
 	EVENT_HANDLER(BT_HCI_EVT_NUM_COMPLETED_PACKETS,
@@ -4239,6 +4237,9 @@ static int bt_recv_unsafe(struct net_buf *buf)
 	{
 		struct bt_hci_evt_hdr *hdr = (void *)(buf->data + 1);
 		uint8_t evt_flags = bt_hci_evt_get_flags(hdr->evt);
+
+		LOG_INF("evt: 0x%02x len %u, flags: %x", hdr->evt, buf->len - sizeof(*hdr),
+			evt_flags);
 
 		if (evt_flags & BT_HCI_EVT_FLAG_RECV_PRIO) {
 			hci_event_prio(buf);

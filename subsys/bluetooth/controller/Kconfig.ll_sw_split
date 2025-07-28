@@ -123,20 +123,21 @@ config BT_CTLR_RX_POLL
 	select POLL
 	default y
 
-config BT_CTLR_RX_PRIO_STACK_SIZE
-	# Hidden
-	int
-	depends on !BT_HCI_RAW
-	default 448
-	help
-	  Controller's Co-Operative high priority Rx thread stack size.
-
-	  Rx priority thread is used in Combined Host plus Controller builds to
-	  prioritize Number of Completed Packets event and Disconnect Event
-	  towards the Host while already enqueued ACL and ISO Data are blocked
-	  in the normal Rx thread waiting for free Tx buffer be available.
-
-	  Rx priority thread is redundant in a Controller-only build.
+#config BT_CTLR_RX_PRIO_STACK_SIZE
+#	# Hidden
+#	int
+#	depends on !BT_HCI_RAW
+#	default 0
+#	#default 448
+#	help
+#	  Controller's Co-Operative high priority Rx thread stack size.
+#
+#	  Rx priority thread is used in Combined Host plus Controller builds to
+#	  prioritize Number of Completed Packets event and Disconnect Event
+#	  towards the Host while already enqueued ACL and ISO Data are blocked
+#	  in the normal Rx thread waiting for free Tx buffer be available.
+#
+#	  Rx priority thread is redundant in a Controller-only build.
 
 config BT_CTLR_RX_STACK_SIZE
 	# Hidden, Controller's Co-Operative Rx thread stack size.
