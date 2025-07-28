@@ -455,7 +455,7 @@ int bt_hci_cmd_send_sync(uint16_t opcode, struct net_buf *buf,
 		}
 	}
 
-	LOG_DBG("buf %p opcode 0x%04x len %u", buf, opcode, buf->len);
+	LOG_INF("buf %p opcode 0x%04x len %u", buf, opcode, buf->len);
 
 	/* This local sem is just for suspending the current thread until the
 	 * command is processed by the LL. It is given (and we are awaken) by
@@ -1448,6 +1448,8 @@ void bt_hci_le_enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 		/* Clear advertising even if we are not able to add connection
 		 * object to keep host in sync with controller state.
 		 */
+		LOG_WRN("Clearing advertising set %u after connection complete",
+			adv->handle);
 		atomic_clear_bit(adv->flags, BT_ADV_ENABLED);
 		atomic_clear_bit(adv->flags, BT_ADV_PAUSED);
 		(void)bt_le_lim_adv_cancel_timeout(adv);
@@ -2812,8 +2814,8 @@ static const struct event_handler meta_events[] = {
 		      sizeof(struct bt_hci_evt_le_advertising_report)),
 #endif /* CONFIG_BT_OBSERVER */
 #if defined(CONFIG_BT_CONN)
-	EVENT_HANDLER(BT_HCI_EVT_LE_CONN_COMPLETE, le_legacy_conn_complete,
-		      sizeof(struct bt_hci_evt_le_conn_complete)),
+//	EVENT_HANDLER(BT_HCI_EVT_LE_CONN_COMPLETE, le_legacy_conn_complete,
+//		      sizeof(struct bt_hci_evt_le_conn_complete)),
 	EVENT_HANDLER(BT_HCI_EVT_LE_ENH_CONN_COMPLETE, le_enh_conn_complete,
 		      sizeof(struct bt_hci_evt_le_enh_conn_complete)),
 	EVENT_HANDLER(BT_HCI_EVT_LE_CONN_UPDATE_COMPLETE,
@@ -4130,6 +4132,26 @@ int bt_send(struct net_buf *buf)
 	return bt_hci_send(bt_dev.hci, buf);
 }
 
+#if 0
+static const struct event_handler meta_prio_events[] = {
+#if defined(CONFIG_BT_CONN)
+	EVENT_HANDLER(BT_HCI_EVT_LE_CONN_COMPLETE, le_legacy_conn_complete,
+		      sizeof(struct bt_hci_evt_le_conn_complete)),
+#endif /* CONFIG_BT_CONN */
+};
+
+static void hci_le_meta_prio_event(struct net_buf *buf)
+{
+	struct bt_hci_evt_le_meta_event *evt;
+
+	evt = net_buf_pull_mem(buf, sizeof(*evt));
+
+	LOG_INF("subevent 0x%02x", evt->subevent);
+
+	handle_event(evt->subevent, buf, meta_events, ARRAY_SIZE(meta_events));
+}
+#endif
+
 static const struct event_handler prio_events[] = {
 	EVENT_HANDLER(BT_HCI_EVT_CMD_COMPLETE, hci_cmd_complete,
 		      sizeof(struct bt_hci_evt_cmd_complete)),
@@ -4141,6 +4163,8 @@ static const struct event_handler prio_events[] = {
 		      sizeof(struct bt_hci_evt_data_buf_overflow)),
 	EVENT_HANDLER(BT_HCI_EVT_DISCONN_COMPLETE, hci_disconn_complete_prio,
 		      sizeof(struct bt_hci_evt_disconn_complete)),
+	EVENT_HANDLER(BT_HCI_EVT_LE_CONN_COMPLETE, le_legacy_conn_complete,
+		      sizeof(struct bt_hci_evt_le_conn_complete)),
 #endif /* CONFIG_BT_CONN */
 #if defined(CONFIG_BT_CONN_TX)
 	EVENT_HANDLER(BT_HCI_EVT_NUM_COMPLETED_PACKETS,

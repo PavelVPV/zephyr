@@ -1281,6 +1281,7 @@ static int rl_access_check(bool check_ar)
 	if (check_ar) {
 		/* If address resolution is disabled, allow immediately */
 		if (!rl_enable) {
+			LOG_DBG("Address resolution already disabled");
 			return -1;
 		}
 	}

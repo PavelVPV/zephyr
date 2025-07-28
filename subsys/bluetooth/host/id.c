@@ -131,7 +131,14 @@ static void adv_pause_enabled(struct bt_le_ext_adv *adv, void *data)
 static void adv_unpause_enabled(struct bt_le_ext_adv *adv, void *data)
 {
 	if (atomic_test_and_clear_bit(adv->flags, BT_ADV_PAUSED)) {
-		bt_le_adv_set_enable(adv, true);
+		int err;
+
+		err = bt_le_adv_set_enable(adv, true);
+		if (err) {
+			LOG_WRN("Failed to unpause advertising set %p (err %d)", adv, err);
+			__ASSERT_NO_MSG(err == 0);
+		}
+		LOG_INF("Unpaused advertising set %p", adv);
 	}
 }
 #endif /* defined(CONFIG_BT_SMP) */
@@ -165,6 +172,7 @@ static int set_random_address(const bt_addr_t *addr)
 			 * See Core Spec @ Vol 4, Part E 7.8.4
 			 */
 			LOG_WRN("cmd disallowed");
+			__ASSERT_NO_MSG(err == 0);
 		}
 		return err;
 	}
@@ -563,6 +571,7 @@ static void adv_pause_rpa(struct bt_le_ext_adv *adv, void *data)
 		err = bt_le_adv_set_enable_ext(adv, false, NULL);
 		if (err) {
 			LOG_ERR("Failed to disable advertising (err %d)", err);
+			__ASSERT_NO_MSG(err == 0);
 		}
 
 		atomic_set_bit(adv->flags, BT_ADV_RPA_UPDATE);
@@ -1072,6 +1081,7 @@ void bt_id_add(struct bt_keys *keys)
 		err = addr_res_enable(BT_HCI_ADDR_RES_DISABLE);
 		if (err) {
 			LOG_WRN("Failed to disable address resolution");
+			__ASSERT_NO_MSG(err == 0);
 			/* If it fails to disable, it should already be enabled,
 			 * don't need to enable again.
 			 */
@@ -1228,6 +1238,7 @@ void bt_id_del(struct bt_keys *keys)
 	err = addr_res_enable(BT_HCI_ADDR_RES_DISABLE);
 	if (err) {
 		LOG_ERR("Disabling address resolution failed (err %d)", err);
+		__ASSERT_NO_MSG(err == 0);
 		goto done;
 	}
 

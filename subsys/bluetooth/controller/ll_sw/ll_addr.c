@@ -35,6 +35,10 @@
 
 #include "ll.h"
 
+#define LOG_LEVEL CONFIG_BT_HCI_DRIVER_LOG_LEVEL
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(bt_ctlr_ll_addr);
+
 static uint8_t pub_addr[BDADDR_SIZE];
 static uint8_t rnd_addr[BDADDR_SIZE];
 
@@ -46,6 +50,7 @@ uint8_t ll_addr_set(uint8_t addr_type, uint8_t const *const bdaddr)
 #else /* !CONFIG_BT_CTLR_ADV_EXT */
 		if (ull_adv_is_enabled(0)) {
 #endif /* !CONFIG_BT_CTLR_ADV_EXT */
+			LOG_ERR("Address cannot be set while advertising is enabled");
 			return BT_HCI_ERR_CMD_DISALLOWED;
 		}
 	}

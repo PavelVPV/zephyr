@@ -243,6 +243,7 @@ static K_KERNEL_STACK_DEFINE(prio_recv_thread_stack,
 static inline uint8_t bt_hci_evt_get_flags(uint8_t evt)
 {
 	switch (evt) {
+	case BT_HCI_EVT_LE_META_EVENT:
 	case BT_HCI_EVT_DISCONN_COMPLETE:
 		return BT_HCI_EVT_FLAG_RECV | BT_HCI_EVT_FLAG_RECV_PRIO;
 		/* fallthrough */

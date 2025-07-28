@@ -373,7 +373,7 @@ int init_central(uint8_t max_conn, uint8_t iterations)
 
 	bt_conn_cb_register(&conn_callbacks);
 
-	k_sleep(K_SECONDS(5));
+//	k_sleep(K_SECONDS(5));
 
 	start_scan();
 
