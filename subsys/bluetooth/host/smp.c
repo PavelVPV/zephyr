@@ -4216,9 +4216,11 @@ static uint8_t smp_ident_addr_info(struct bt_smp *smp, struct net_buf *buf)
 			}
 		}
 
-		err = smp_id_add_replace(smp, keys);
-		if (err) {
-			return err;
+		if (IS_ENABLED(CONFIG_BT_PRIVACY)) {
+			err = smp_id_add_replace(smp, keys);
+			if (err) {
+				return err;
+			}
 		}
 	}
 
