@@ -47,7 +47,7 @@
 #include "l2cap_internal.h"
 #include "smp.h"
 
-#define LOG_LEVEL CONFIG_BT_SMP_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_SMP_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_smp);
 
@@ -1956,6 +1956,8 @@ static void smp_pairing_complete(struct bt_smp *smp, uint8_t status)
 		}
 #endif /* CONFIG_BT_CLASSIC */
 		bool bond_flag = atomic_test_bit(smp->flags, SMP_FLAG_BOND);
+		LOG_WRN("bond_flag: %s",
+			bond_flag ? "true" : "false");
 		struct bt_conn_auth_info_cb *listener, *next;
 
 		if (IS_ENABLED(CONFIG_BT_LOG_SNIFFER_INFO)) {
@@ -2077,7 +2079,7 @@ static int smp_error(struct bt_smp *smp, uint8_t reason)
 		 * The SMP protocol states that the pairing process is completed the moment the
 		 * peripheral link-layer confirmed the reception of the PDU with the last key.
 		 */
-		bt_conn_disconnect(smp->chan.chan.conn, BT_HCI_ERR_AUTH_FAIL);
+//		bt_conn_disconnect(smp->chan.chan.conn, BT_HCI_ERR_AUTH_FAIL);
 		return 0;
 	}
 
@@ -3218,6 +3220,13 @@ static uint8_t smp_pairing_req(struct bt_smp *smp, struct net_buf *buf)
 
 	if ((rsp->auth_req & BT_SMP_AUTH_BONDING) &&
 	    (req->auth_req & BT_SMP_AUTH_BONDING)) {
+		LOG_WRN("Bonding requested");
+	} else {
+		LOG_DBG("Bonding not requested");
+	}
+
+	if ((rsp->auth_req & BT_SMP_AUTH_BONDING) &&
+	    (req->auth_req & BT_SMP_AUTH_BONDING)) {
 		atomic_set_bit(smp->flags, SMP_FLAG_BOND);
 	} else if (IS_ENABLED(CONFIG_BT_BONDING_REQUIRED)) {
 		/* Reject pairing req if not both intend to bond */
@@ -3447,6 +3456,13 @@ static uint8_t smp_pairing_rsp(struct bt_smp *smp, struct net_buf *buf)
 	if ((rsp->auth_req & BT_SMP_AUTH_CT2) &&
 	    (req->auth_req & BT_SMP_AUTH_CT2)) {
 		atomic_set_bit(smp->flags, SMP_FLAG_CT2);
+	}
+
+	if ((rsp->auth_req & BT_SMP_AUTH_BONDING) &&
+	    (req->auth_req & BT_SMP_AUTH_BONDING)) {
+		LOG_WRN("Bonding requested, rsp");
+	} else {
+		LOG_DBG("Bonding not requested, rsp");
 	}
 
 	if ((rsp->auth_req & BT_SMP_AUTH_BONDING) &&
@@ -4091,6 +4107,9 @@ static uint8_t smp_id_add_replace(struct bt_smp *smp, struct bt_keys *new_bond)
 {
 	struct bt_keys *conflict;
 
+	LOG_ERR("Finalizing bond with id %d, addr %s",
+		new_bond->id, bt_addr_le_str(&new_bond->addr));
+#if 0
 	/* Sanity check: It does not make sense to finalize a bond before we
 	 * have the remote identity.
 	 */
@@ -4098,7 +4117,7 @@ static uint8_t smp_id_add_replace(struct bt_smp *smp, struct bt_keys *new_bond)
 
 	conflict = bt_id_find_conflict(new_bond);
 	if (conflict) {
-		LOG_DBG("New bond conflicts with a bond on id %d.", conflict->id);
+		LOG_WRN("New bond conflicts with a bond on id %d.", conflict->id);
 	}
 
 	if (conflict && !IS_ENABLED(CONFIG_BT_ID_UNPAIR_MATCHING_BONDS)) {
@@ -4123,6 +4142,7 @@ static uint8_t smp_id_add_replace(struct bt_smp *smp, struct bt_keys *new_bond)
 	}
 
 	__ASSERT_NO_MSG(!bt_id_find_conflict(new_bond));
+#endif
 	bt_id_add(new_bond);
 	return 0;
 }
@@ -4168,6 +4188,8 @@ static uint8_t smp_ident_addr_info(struct bt_smp *smp, struct net_buf *buf)
 			bt_keys_clear(keys);
 		}
 	}
+
+	LOG_WRN("SMP_FLAG_BOND: %d", atomic_test_bit(smp->flags, SMP_FLAG_BOND));
 
 	if (atomic_test_bit(smp->flags, SMP_FLAG_BOND)) {
 		const bt_addr_le_t *dst;
@@ -4216,12 +4238,12 @@ static uint8_t smp_ident_addr_info(struct bt_smp *smp, struct net_buf *buf)
 			}
 		}
 
-		if (IS_ENABLED(CONFIG_BT_PRIVACY)) {
+//		if (IS_ENABLED(CONFIG_BT_PRIVACY)) {
 			err = smp_id_add_replace(smp, keys);
 			if (err) {
 				return err;
 			}
-		}
+//		}
 	}
 
 	if (smp->remote_dist & BT_SMP_DIST_SIGN) {

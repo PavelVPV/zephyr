@@ -83,11 +83,12 @@ static void connected(struct bt_conn *conn, uint8_t err)
 		printk("Connection failed, err 0x%02x %s\n", err, bt_hci_err_to_str(err));
 		return;
 	}
-
+#if 0
 	conn_count++;
 	if (conn_count < conn_count_max) {
 		k_work_submit(&work_adv_start);
 	}
+#endif
 
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
@@ -102,11 +103,11 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 
 	printk("Disconnected %s, reason %s(0x%02x)\n", addr, bt_hci_err_to_str(reason), reason);
 
-	if ((conn_count == 1U) && is_disconnecting) {
-		is_disconnecting = false;
+//	if ((conn_count == 1U) && is_disconnecting) {
+//		is_disconnecting = false;
 		k_work_submit(&work_adv_start);
-	}
-	conn_count--;
+//	}
+//	conn_count--;
 }
 
 static bool le_param_req(struct bt_conn *conn, struct bt_le_conn_param *param)
@@ -281,10 +282,15 @@ int init_peripheral(uint8_t max_conn, uint8_t iterations)
 	do {
 		k_sleep(K_MSEC(10));
 
+#if 0
 		id_count = 0xFF;
 		bt_id_get(NULL, &id_count);
 	} while (id_count != conn_count_max);
+#else
+	} while (1);
+#endif
 
+#if 0
 	/* rotate identities so reconnections are attempted in case of any
 	 * disconnections
 	 */
@@ -292,6 +298,7 @@ int init_peripheral(uint8_t max_conn, uint8_t iterations)
 	while (1) {
 		/* If maximum connections is reached, wait for disconnections
 		 */
+#if 0
 		if (conn_count == conn_count_max) {
 			is_disconnecting = true;
 
@@ -323,7 +330,7 @@ int init_peripheral(uint8_t max_conn, uint8_t iterations)
 
 			continue;
 		}
-
+#endif
 		/* As long as there is connection count changes, identity
 		 * rotation in this loop is not needed.
 		 */
@@ -363,6 +370,7 @@ int init_peripheral(uint8_t max_conn, uint8_t iterations)
 
 		k_work_submit(&work_adv_start);
 	}
+#endif
 
 	return 0;
 }

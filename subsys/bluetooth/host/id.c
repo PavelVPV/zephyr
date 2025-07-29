@@ -998,6 +998,12 @@ struct bt_keys *bt_id_find_conflict(struct bt_keys *candidate)
 
 	bt_keys_foreach_type(BT_KEYS_IRK, find_rl_conflict, &conflict);
 
+	if (conflict.found) {
+		LOG_ERR("Identity %s conflicts with %s",
+			bt_addr_le_str(&candidate->addr),
+			bt_addr_le_str(&conflict.found->addr));
+	}
+
 	return conflict.found;
 }
 
