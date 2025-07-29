@@ -4180,7 +4180,7 @@ void hci_event_prio(struct net_buf *buf)
 	net_buf_simple_save(&buf->b, &state);
 
 	/* Remove buffer type byte */
-	net_buf_pull(buf, 1);
+//	net_buf_pull(buf, 1);
 
 	if (buf->len < sizeof(*hdr)) {
 		LOG_ERR("Invalid HCI event size (%u)", buf->len);
@@ -4241,13 +4241,13 @@ static int bt_recv_unsafe(struct net_buf *buf)
 		LOG_INF("evt: 0x%02x len %u, flags: %x", hdr->evt, buf->len - sizeof(*hdr),
 			evt_flags);
 
-		if (evt_flags & BT_HCI_EVT_FLAG_RECV_PRIO) {
-			hci_event_prio(buf);
-		}
+//		if (evt_flags & BT_HCI_EVT_FLAG_RECV_PRIO) {
+//			hci_event_prio(buf);
+//		}
 
-		if (evt_flags & BT_HCI_EVT_FLAG_RECV) {
+//		if (evt_flags & BT_HCI_EVT_FLAG_RECV) {
 			rx_queue_put(buf);
-		}
+//		}
 
 		return 0;
 	}
@@ -4361,7 +4361,21 @@ static void rx_work_handler(struct k_work *work)
 		break;
 #endif /* CONFIG_BT_ISO */
 	case BT_HCI_H4_EVT:
-		hci_event(buf);
+//		hci_event(buf);
+		struct bt_hci_evt_hdr *hdr = (void *)(buf->data);
+		uint8_t evt_flags = bt_hci_evt_get_flags(hdr->evt);
+
+		LOG_INF("evt: 0x%02x len %u, flags: %x", hdr->evt, buf->len - sizeof(*hdr),
+			evt_flags);
+
+		if (evt_flags & BT_HCI_EVT_FLAG_RECV_PRIO) {
+			hci_event_prio(buf);
+		}
+
+		if (evt_flags & BT_HCI_EVT_FLAG_RECV) {
+			hci_event(buf);
+		}
+
 		break;
 	default:
 		LOG_ERR("Unknown buf type %u", type);
