@@ -241,7 +241,7 @@ static K_KERNEL_STACK_DEFINE(prio_recv_thread_stack,
  *
  * @return HCI event flags for the specified event.
  */
-static inline uint8_t bt_hci_evt_get_flags(uint8_t evt)
+static inline uint8_t bt_hci_evt_get_flags(uint8_t evt, struct net_buf *buf)
 {
 	switch (evt) {
 	case BT_HCI_EVT_LE_META_EVENT:
@@ -249,6 +249,23 @@ static inline uint8_t bt_hci_evt_get_flags(uint8_t evt)
 		return BT_HCI_EVT_FLAG_RECV | BT_HCI_EVT_FLAG_RECV_PRIO;
 		/* fallthrough */
 #if defined(CONFIG_BT_CONN) || defined(CONFIG_BT_ISO)
+	case BT_HCI_EVT_LE_META_EVENT: {
+		struct bt_hci_evt_le_meta_event *le_evt;
+
+		LOG_WRN("LE meta event 0x%02x", buf->data[0]);
+
+		le_evt = (struct bt_hci_evt_le_meta_event *)buf->data;
+		switch (le_evt->subevent) {
+		case BT_HCI_EVT_LE_ENH_CONN_COMPLETE:
+		case BT_HCI_EVT_LE_CONN_COMPLETE:
+			LOG_ERR("Should be priority event");
+			return BT_HCI_EVT_FLAG_RECV | BT_HCI_EVT_FLAG_RECV_PRIO;
+		}
+
+		LOG_ERR("Normal priority event 0x%02x",
+			le_evt->subevent);
+		return BT_HCI_EVT_FLAG_RECV;
+	}
 	case BT_HCI_EVT_NUM_COMPLETED_PACKETS:
 #if defined(CONFIG_BT_CONN)
 	case BT_HCI_EVT_DATA_BUF_OVERFLOW:
@@ -275,7 +292,15 @@ static int bt_recv_prio(const struct device *dev, struct net_buf *buf)
 
 	if (buf->data[0] == BT_HCI_H4_EVT) {
 		struct bt_hci_evt_hdr *hdr = (void *)(buf->data + 1);
-		uint8_t evt_flags = bt_hci_evt_get_flags(hdr->evt);
+
+		struct net_buf_simple_state state;
+
+		net_buf_simple_save(&buf->b, &state);
+		net_buf_pull(buf, sizeof(*hdr));
+
+		uint8_t evt_flags = bt_hci_evt_get_flags(hdr->evt, buf);
+
+		net_buf_simple_restore(&buf->b, &state);
 
 		if ((evt_flags & BT_HCI_EVT_FLAG_RECV_PRIO) &&
 		    (evt_flags & BT_HCI_EVT_FLAG_RECV)) {

@@ -1440,6 +1440,7 @@ void bt_hci_le_enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 
 	conn = find_pending_connect(evt->role, &id_addr);
 
+#if 0
 	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) &&
 	    evt->role == BT_HCI_ROLE_PERIPHERAL &&
 	    !(IS_ENABLED(CONFIG_BT_EXT_ADV) &&
@@ -1454,6 +1455,7 @@ void bt_hci_le_enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 		atomic_clear_bit(adv->flags, BT_ADV_PAUSED);
 		(void)bt_le_lim_adv_cancel_timeout(adv);
 	}
+#endif
 
 	if (IS_ENABLED(CONFIG_BT_CENTRAL) &&
 	    evt->role == BT_HCI_ROLE_CENTRAL) {
@@ -3071,13 +3073,32 @@ static const struct event_handler normal_events[] = {
  *
  * @return HCI event flags for the specified event.
  */
-static inline uint8_t bt_hci_evt_get_flags(uint8_t evt)
+static inline uint8_t bt_hci_evt_get_flags(uint8_t evt, struct net_buf *buf)
 {
+	LOG_WRN("Getting HCI event flags for event 0x%02x", evt);
+
 	switch (evt) {
 	case BT_HCI_EVT_DISCONN_COMPLETE:
 		return BT_HCI_EVT_FLAG_RECV | BT_HCI_EVT_FLAG_RECV_PRIO;
 		/* fallthrough */
 #if defined(CONFIG_BT_CONN) || defined(CONFIG_BT_ISO)
+	case BT_HCI_EVT_LE_META_EVENT: {
+		struct bt_hci_evt_le_meta_event *le_evt;
+
+		LOG_WRN("LE meta event 0x%02x", buf->data[0]);
+
+		le_evt = (struct bt_hci_evt_le_meta_event *)buf->data;
+		switch (le_evt->subevent) {
+		case BT_HCI_EVT_LE_ENH_CONN_COMPLETE:
+		case BT_HCI_EVT_LE_CONN_COMPLETE:
+			LOG_ERR("Should be priority event");
+			return BT_HCI_EVT_FLAG_RECV | BT_HCI_EVT_FLAG_RECV_PRIO;
+		}
+
+		LOG_ERR("Normal priority event 0x%02x",
+			le_evt->subevent);
+		return BT_HCI_EVT_FLAG_RECV;
+	}
 	case BT_HCI_EVT_NUM_COMPLETED_PACKETS:
 #if defined(CONFIG_BT_CONN)
 	case BT_HCI_EVT_DATA_BUF_OVERFLOW:
@@ -3104,7 +3125,7 @@ static void hci_event(struct net_buf *buf)
 
 	hdr = net_buf_pull_mem(buf, sizeof(*hdr));
 	LOG_INF("event 0x%02x", hdr->evt);
-	BT_ASSERT(bt_hci_evt_get_flags(hdr->evt) & BT_HCI_EVT_FLAG_RECV);
+	BT_ASSERT(bt_hci_evt_get_flags(hdr->evt, buf) & BT_HCI_EVT_FLAG_RECV);
 
 	handle_event(hdr->evt, buf, normal_events, ARRAY_SIZE(normal_events));
 
@@ -4132,10 +4153,45 @@ int bt_send(struct net_buf *buf)
 	return bt_hci_send(bt_dev.hci, buf);
 }
 
+static void le_conn_complete_prio(uint8_t role)
+{
+	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) &&
+	    role == BT_HCI_ROLE_PERIPHERAL &&
+	    !(IS_ENABLED(CONFIG_BT_EXT_ADV) &&
+	      BT_DEV_FEAT_LE_EXT_ADV(bt_dev.le.features))) {
+		struct bt_le_ext_adv *adv = bt_le_adv_lookup_legacy();
+		/* Clear advertising even if we are not able to add connection
+		 * object to keep host in sync with controller state.
+		 */
+		LOG_WRN("Clearing advertising set %u after connection complete",
+			adv->handle);
+		atomic_clear_bit(adv->flags, BT_ADV_ENABLED);
+		atomic_clear_bit(adv->flags, BT_ADV_PAUSED);
+		(void)bt_le_lim_adv_cancel_timeout(adv);
+	}
+}
+
+static void le_legacy_conn_complete_prio(struct net_buf *buf)
+{
+	struct bt_hci_evt_le_conn_complete *evt = (void *)buf->data;
+
+	le_conn_complete_prio(evt->role);
+}
+
+static void le_enh_conn_complete_prio(struct net_buf *buf)
+{
+	struct bt_hci_evt_le_enh_conn_complete *evt =
+		(struct bt_hci_evt_le_enh_conn_complete *)buf->data;
+
+	le_conn_complete_prio(evt->role);
+}
+
 static const struct event_handler meta_prio_events[] = {
 #if defined(CONFIG_BT_CONN)
-	EVENT_HANDLER(BT_HCI_EVT_LE_CONN_COMPLETE, le_legacy_conn_complete,
+	EVENT_HANDLER(BT_HCI_EVT_LE_CONN_COMPLETE, le_legacy_conn_complete_prio,
 		      sizeof(struct bt_hci_evt_le_conn_complete)),
+	EVENT_HANDLER(BT_HCI_EVT_LE_ENH_CONN_COMPLETE, le_enh_conn_complete_prio,
+		      sizeof(struct bt_hci_evt_le_enh_conn_complete)),
 #endif /* CONFIG_BT_CONN */
 };
 
@@ -4147,7 +4203,7 @@ static void hci_le_meta_prio_event(struct net_buf *buf)
 
 	LOG_INF("subevent 0x%02x", evt->subevent);
 
-	handle_event(evt->subevent, buf, meta_events, ARRAY_SIZE(meta_events));
+	handle_event(evt->subevent, buf, meta_prio_events, ARRAY_SIZE(meta_prio_events));
 }
 
 static const struct event_handler prio_events[] = {
@@ -4192,7 +4248,7 @@ void hci_event_prio(struct net_buf *buf)
 
 	LOG_INF("evt_prio: 0x%02x len %u", hdr->evt, buf->len - sizeof(*hdr));
 
-	evt_flags = bt_hci_evt_get_flags(hdr->evt);
+	evt_flags = bt_hci_evt_get_flags(hdr->evt, buf);
 	BT_ASSERT(evt_flags & BT_HCI_EVT_FLAG_RECV_PRIO);
 
 	handle_event(hdr->evt, buf, prio_events, ARRAY_SIZE(prio_events));
@@ -4225,7 +4281,7 @@ static int bt_recv_unsafe(struct net_buf *buf)
 
 	bt_monitor_send(bt_monitor_opcode(type, BT_MONITOR_RX), buf->data + 1, buf->len - 1);
 
-	LOG_DBG("buf %p len %u", buf, buf->len);
+	LOG_INF("buf %p len %u", buf, buf->len);
 
 	switch (type) {
 #if defined(CONFIG_BT_CONN)
@@ -4236,7 +4292,13 @@ static int bt_recv_unsafe(struct net_buf *buf)
 	case BT_HCI_H4_EVT:
 	{
 		struct bt_hci_evt_hdr *hdr = (void *)(buf->data + 1);
-		uint8_t evt_flags = bt_hci_evt_get_flags(hdr->evt);
+		struct net_buf_simple_state state;
+
+		net_buf_simple_save(&buf->b, &state);
+		net_buf_pull(buf, 1 + sizeof(*hdr));
+
+		uint8_t evt_flags = bt_hci_evt_get_flags(hdr->evt, buf);
+		net_buf_simple_restore(&buf->b, &state);
 
 		LOG_INF("evt: 0x%02x len %u, flags: %x", hdr->evt, buf->len - sizeof(*hdr),
 			evt_flags);
