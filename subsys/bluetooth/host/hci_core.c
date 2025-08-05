@@ -712,7 +712,7 @@ static void hci_acl(struct net_buf *buf)
 	acl(buf)->handle = bt_acl_handle(handle);
 	acl(buf)->index = BT_CONN_INDEX_INVALID;
 
-	LOG_DBG("handle %u len %u flags %u", acl(buf)->handle, len, flags);
+	LOG_INF("handle %u len %u flags %u", acl(buf)->handle, len, flags);
 
 	if (buf->len != len) {
 		LOG_ERR("ACL data length mismatch (%u != %u)", buf->len, len);
@@ -1026,7 +1026,7 @@ static void hci_disconn_complete_prio(struct net_buf *buf)
 	uint16_t handle = sys_le16_to_cpu(evt->handle);
 	struct bt_conn *conn;
 
-	LOG_DBG("status 0x%02x %s handle %u reason 0x%02x",
+	LOG_INF("status 0x%02x %s handle %u reason 0x%02x",
 		evt->status, bt_hci_err_to_str(evt->status), handle, evt->reason);
 
 	if (evt->status) {
@@ -1054,7 +1054,7 @@ static void hci_disconn_complete(struct net_buf *buf)
 	uint16_t handle = sys_le16_to_cpu(evt->handle);
 	struct bt_conn *conn;
 
-	LOG_DBG("status 0x%02x %s handle %u reason 0x%02x",
+	LOG_INF("status 0x%02x %s handle %u reason 0x%02x",
 		evt->status, bt_hci_err_to_str(evt->status), handle, evt->reason);
 
 	if (evt->status) {
@@ -1431,7 +1431,7 @@ void bt_hci_le_enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 	struct bt_conn *conn;
 	uint8_t id;
 
-	LOG_DBG("status 0x%02x %s handle %u role %u peer %s peer RPA %s",
+	LOG_INF("status 0x%02x %s handle %u role %u peer %s peer RPA %s",
 		evt->status, bt_hci_err_to_str(evt->status), handle,
 		evt->role, bt_addr_le_str(&evt->peer_addr), bt_addr_str(&evt->peer_rpa));
 	LOG_DBG("local RPA %s", bt_addr_str(&evt->local_rpa));

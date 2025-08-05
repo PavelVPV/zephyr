@@ -17,7 +17,7 @@ cd ${BSIM_OUT_PATH}/bin
 #Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_ll_multiple_id_prj_conf -RealEncryption=1 \
 #  -v=${verbosity_level} -s=${simulation_id} -d=1 -testid=peripheral -rs=6
 
-Execute ./bs_2G4_phy_v1 -v=${verbosity_level} -s=${simulation_id} \
+Execute ./bs_2G4_phy_v1 -dump -v=${verbosity_level} -s=${simulation_id} \
   -D=2 -sim_length=1800e6 $@ -argschannel -at=40
 
 wait_for_background_jobs
