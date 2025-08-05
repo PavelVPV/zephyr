@@ -97,6 +97,7 @@ static void connected(struct bt_conn *conn, uint8_t err)
 
 	if (err) {
 		printk("Connection failed, err 0x%02x %s\n", err, bt_hci_err_to_str(err));
+//		k_work_submit(&work_adv_start);
 		return;
 	}
 
@@ -117,6 +118,10 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
 	printk("Disconnected %s, reason %s(0x%02x)\n", addr, bt_hci_err_to_str(reason), reason);
+
+	if (reason == BT_HCI_ERR_CONN_TIMEOUT && conn_count < conn_count_max && !is_disconnecting) {
+		k_work_submit(&work_adv_start);
+	}
 
 	if ((conn_count == 1U) && is_disconnecting) {
 		is_disconnecting = false;
@@ -238,7 +243,7 @@ static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 	char addr_str[BT_ADDR_LE_STR_LEN];
 
 	bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
-	printk("Device found: %s (RSSI %d)\n", addr_str, rssi);
+//	printk("Device found: %s (RSSI %d)\n", addr_str, rssi);
 }
 #endif /* CONFIG_BT_OBSERVER */
 
@@ -361,8 +366,10 @@ int init_peripheral(uint8_t max_conn, uint8_t iterations)
 			 * connections plus few seconds of margin.
 			 */
 			while ((prev_count == conn_count) && wait) {
-				printk("Waiting connections (%u/%u) %u...\n",
-				       prev_count, conn_count, wait);
+				if (wait % 1000 == 0) {
+					printk("Waiting for connections (%u/%u) %u...\n",
+					       prev_count, conn_count, wait);
+				}
 
 				wait--;
 

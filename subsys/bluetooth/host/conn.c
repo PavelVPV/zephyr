@@ -108,9 +108,15 @@ static void deferred_work(struct k_work *work);
 static void notify_connected(struct bt_conn *conn);
 
 static struct bt_conn acl_conns[CONFIG_BT_MAX_CONN];
+
+static void acl_tx_buf_destroy(struct net_buf *buf)
+{
+	LOG_INF("Destroying ACL TX buf %p", buf);
+	net_buf_destroy(buf);
+}
 NET_BUF_POOL_DEFINE(acl_tx_pool, CONFIG_BT_L2CAP_TX_BUF_COUNT,
 		    BT_L2CAP_BUF_SIZE(CONFIG_BT_L2CAP_TX_MTU),
-		    CONFIG_BT_CONN_TX_USER_DATA_SIZE, NULL);
+		    CONFIG_BT_CONN_TX_USER_DATA_SIZE, acl_tx_buf_destroy);
 
 #if defined(CONFIG_BT_SMP) || defined(CONFIG_BT_CLASSIC)
 const struct bt_conn_auth_cb *bt_auth;

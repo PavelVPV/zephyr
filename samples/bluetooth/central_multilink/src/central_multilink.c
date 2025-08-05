@@ -131,9 +131,9 @@ static int mtu_exchange(struct bt_conn *conn)
 
 	err = bt_gatt_exchange_mtu(conn, &mtu_exchange_params[conn_index]);
 	if (err) {
-		printk("MTU exchange failed (err %d)", err);
+		printk("MTU exchange failed (err %d)\n", err);
 	} else {
-		printk("Exchange pending...");
+		printk("Exchange pending...\n");
 	}
 
 	return err;
@@ -188,7 +188,9 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 
 	bt_conn_unref(conn);
 
-	if ((conn_count == 1U) && (is_disconnecting || (reason == BT_HCI_ERR_CONN_FAIL_TO_ESTAB))) {
+	if ((conn_count == 1U) && (is_disconnecting || (reason == BT_HCI_ERR_CONN_FAIL_TO_ESTAB)
+				  )) {
+		//|| (reason == BT_HCI_ERR_LL_RESP_TIMEOUT))) {
 		is_disconnecting = false;
 		start_scan();
 	}
@@ -290,10 +292,10 @@ static void remote_info(struct bt_conn *conn, void *data)
 
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
-	printk("Get remote info %s...\n", addr);
+//	printk("Get remote info %s...\n", addr);
 	err = bt_conn_get_remote_info(conn, &remote_info);
 	if (err) {
-		printk("Failed remote info %s (err: %d)\n", addr, err);
+//		printk("Failed remote info %s (err: %d)\n", addr, err);
 		return;
 	}
 	printk("Successfully got remote info %s\n", addr);

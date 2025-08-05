@@ -501,9 +501,11 @@ int bt_hci_cmd_send_sync(uint16_t opcode, struct net_buf *buf,
 
 	/* Now that we have sent the command, suspend until the LL replies */
 	err = k_sem_take(&sync_sem, HCI_CMD_TIMEOUT);
+	if (err) {
 	BT_ASSERT_MSG(err == 0,
 		      "Controller unresponsive, command opcode 0x%04x timeout with err %d",
 		      opcode, err);
+	}
 
 	status = cmd(buf)->status;
 	if (status) {
@@ -2132,6 +2134,8 @@ static void unpair(uint8_t id, const bt_addr_le_t *addr)
 		 */
 		if (conn->type == BT_CONN_TYPE_LE) {
 			keys = conn->le.keys;
+			LOG_ERR("Unpairing LE conn %p addr %s keys %p",
+				conn, bt_addr_le_str(addr), keys);
 			conn->le.keys = NULL;
 		}
 

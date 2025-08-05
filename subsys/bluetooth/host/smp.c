@@ -47,7 +47,7 @@
 #include "l2cap_internal.h"
 #include "smp.h"
 
-#define LOG_LEVEL CONFIG_BT_SMP_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_SMP_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_smp);
 
@@ -403,6 +403,7 @@ static bool smp_keys_check(struct bt_conn *conn)
 						     conn->id,
 						     &conn->le.dst);
 		}
+		LOG_WRN("7 Assigned keys: %p", conn->le.keys);
 	}
 
 	if (!conn->le.keys ||
@@ -591,15 +592,21 @@ static struct net_buf *smp_create_pdu(struct bt_smp *smp, uint8_t op, size_t len
 		timeout = SMP_TIMEOUT;
 	}
 
+	LOG_WRN("Creating PDU: op 0x%02x len %zu", op, len);
+
 	/* Use smaller timeout if returning an error since that could be
 	 * caused by lack of buffers.
 	 */
 	buf = bt_l2cap_create_pdu_timeout(NULL, 0, timeout);
 	if (!buf) {
+		__ASSERT_NO_MSG(!buf);
+		__ASSERT_NO_MSG(buf);
 		/* If it was not possible to allocate a buffer within the
 		 * timeout marked it as timed out.
 		 */
 		atomic_set_bit(smp->flags, SMP_FLAG_TIMEOUT);
+		LOG_ERR("Failed to allocate SMP PDU buffer (op 0x%02x len %zu)",
+			op, len);
 		return NULL;
 	}
 
@@ -678,6 +685,7 @@ static bool update_debug_keys_check(struct bt_smp *smp)
 
 	if (!conn->le.keys) {
 		conn->le.keys = bt_keys_get_addr(conn->id, &conn->le.dst);
+		LOG_WRN("8 Assigned keys: %p", conn->le.keys);
 	}
 
 	if (!conn->le.keys ||
@@ -1530,6 +1538,7 @@ static void convert_to_id_on_irk_match(struct bt_conn *conn, void *data)
 		}
 
 		conn->le.keys = keys;
+		LOG_WRN("9 Assigned keys: %p", conn->le.keys);
 		/* always update last use RPA */
 		bt_addr_copy(&keys->irk.rpa, &conn->le.dst.a);
 		bt_addr_le_copy(&conn->le.dst, &keys->addr);
@@ -2020,7 +2029,7 @@ static void smp_timeout(struct k_work *work)
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 	struct bt_smp *smp = CONTAINER_OF(dwork, struct bt_smp, work);
 
-	LOG_ERR("SMP Timeout");
+	LOG_ERR("SMP Timeout, conn %p, keys: %p", smp->chan.chan.conn, smp->chan.chan.conn->le.keys);
 
 	smp_pairing_complete(smp, BT_SMP_ERR_UNSPECIFIED);
 
@@ -3032,6 +3041,7 @@ bool bt_smp_request_ltk(struct bt_conn *conn, uint64_t rand, uint16_t ediv, uint
 			conn->le.keys = bt_keys_find(BT_KEYS_PERIPH_LTK,
 						     conn->id, &conn->le.dst);
 		}
+		LOG_WRN("Assigned keys: %p", conn->le.keys);
 	}
 
 	if (ediv == 0U && rand == 0U &&
@@ -3115,6 +3125,7 @@ static int smp_send_security_req(struct bt_conn *conn)
 		if (!conn->le.keys) {
 			return -ENOMEM;
 		}
+		LOG_WRN("2 Assigned keys: %p", conn->le.keys);
 	}
 
 	if (smp_init(smp) != 0) {
@@ -3168,6 +3179,7 @@ static uint8_t smp_pairing_req(struct bt_smp *smp, struct net_buf *buf)
 			LOG_DBG("Unable to get keys for %s", bt_addr_le_str(&conn->le.dst));
 			return BT_SMP_ERR_UNSPECIFIED;
 		}
+		LOG_WRN("3 Assigned keys: %p", conn->le.keys);
 	}
 
 	/* If we already sent a security request then the SMP context
@@ -3361,6 +3373,7 @@ static int smp_send_pairing_req(struct bt_conn *conn)
 		if (!conn->le.keys) {
 			return -ENOMEM;
 		}
+		LOG_WRN("4 Assigned keys: %p", conn->le.keys);
 	}
 
 	if (smp_init(smp)) {
@@ -3539,7 +3552,7 @@ static uint8_t smp_pairing_confirm(struct bt_smp *smp, struct net_buf *buf)
 {
 	struct bt_smp_pairing_confirm *req = (void *)buf->data;
 
-	LOG_DBG("");
+	LOG_ERR("conn %p, keys: %p", smp->chan.chan.conn, smp->chan.chan.conn->le.keys);
 
 	atomic_clear_bit(smp->flags, SMP_FLAG_DISPLAY);
 
@@ -4118,11 +4131,19 @@ static uint8_t smp_id_add_replace(struct bt_smp *smp, struct bt_keys *new_bond)
 
 		LOG_DBG("Un-pairing old conflicting bond and finalizing new.");
 
+		LOG_ERR("New bond keys: %p, conflicting: %p",
+			new_bond, conflict);
 		unpair_err = bt_unpair(conflict->id, &conflict->addr);
 		__ASSERT_NO_MSG(!unpair_err);
 	}
 
-	__ASSERT_NO_MSG(!bt_id_find_conflict(new_bond));
+//	__ASSERT_NO_MSG(!bt_id_find_conflict(new_bond));
+
+	struct bt_keys *c = bt_id_find_conflict(new_bond);
+	if (c) {
+		__ASSERT_NO_MSG(!c);
+	}
+
 	bt_id_add(new_bond);
 	return 0;
 }
@@ -4345,6 +4366,7 @@ static uint8_t smp_security_request(struct bt_smp *smp, struct net_buf *buf)
 			conn->le.keys = bt_keys_find(BT_KEYS_LTK, conn->id,
 						     &conn->le.dst);
 		}
+		LOG_WRN("5 Assigned keys: %p", conn->le.keys);
 	}
 
 	if (!conn->le.keys) {
@@ -4508,7 +4530,7 @@ static uint8_t smp_public_key(struct bt_smp *smp, struct net_buf *buf)
 	struct bt_smp_public_key *req = (void *)buf->data;
 	uint8_t err;
 
-	LOG_DBG("");
+	LOG_DBG("conn %p, keys: %p", smp->chan.chan.conn, smp->chan.chan.conn->le.keys);
 
 	memcpy(smp->pkey, req->x, BT_PUB_KEY_COORD_LEN);
 	memcpy(&smp->pkey[BT_PUB_KEY_COORD_LEN], req->y, BT_PUB_KEY_COORD_LEN);
@@ -6246,6 +6268,7 @@ void bt_smp_update_keys(struct bt_conn *conn)
 	}
 
 	conn->le.keys = bt_keys_get_addr(conn->id, &conn->le.dst);
+	LOG_WRN("6 Assigned keys: %p", conn->le.keys);
 	if (!conn->le.keys) {
 		LOG_ERR("Unable to get keys for %s", bt_addr_le_str(&conn->le.dst));
 		smp_error(smp, BT_SMP_ERR_UNSPECIFIED);

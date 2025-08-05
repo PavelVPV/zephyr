@@ -749,7 +749,7 @@ int bt_l2cap_send_pdu(struct bt_l2cap_le_chan *le_chan, struct net_buf *pdu,
 	}
 
 	make_closure(pdu->user_data, cb, user_data);
-	LOG_DBG("push: pdu %p len %d cb %p userdata %p", pdu, pdu->len, cb, user_data);
+	LOG_INF("push: chan %p pdu %p len %d cb %p userdata %p", le_chan, pdu, pdu->len, cb, user_data);
 
 	k_fifo_put(&le_chan->tx_queue, pdu);
 
