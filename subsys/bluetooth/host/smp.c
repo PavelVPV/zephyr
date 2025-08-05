@@ -4817,6 +4817,11 @@ static int bt_smp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 		return 0;
 	}
 
+	err = k_work_cancel_delayable(&smp->work);
+	if (err) {
+		LOG_WRN("Failed to cancel SMP timeout work (%d)", err);
+	}
+
 	if (!handlers[hdr->code].func) {
 		LOG_WRN("Unhandled SMP code 0x%02x", hdr->code);
 		smp_error(smp, BT_SMP_ERR_CMD_NOTSUPP);
