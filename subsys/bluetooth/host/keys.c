@@ -89,7 +89,7 @@ void bt_keys_reset(void)
 {
 	memset(key_pool, 0, sizeof(key_pool));
 	for (size_t i = 0; i < ARRAY_SIZE(key_pool); i++) {
-		key_pool[i].id = 0xFF;
+//		key_pool[i].id = 0xFF;
 	}
 }
 
@@ -332,7 +332,7 @@ void bt_keys_clear(struct bt_keys *keys)
 	}
 
 	(void)memset(keys, 0, sizeof(*keys));
-	keys->id = 0xFF;
+//	keys->id = 0xFF;
 }
 
 #if defined(CONFIG_BT_SETTINGS)
