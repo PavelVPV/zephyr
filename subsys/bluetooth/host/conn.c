@@ -477,7 +477,7 @@ static void bt_acl_recv(struct bt_conn *conn, struct net_buf *buf,
 	buf = conn->rx;
 	conn->rx = NULL;
 
-	LOG_DBG("Successfully parsed %u byte L2CAP packet", buf->len);
+	LOG_INF("Successfully parsed %u byte L2CAP packet", buf->len);
 	if (IS_ENABLED(CONFIG_BT_CLASSIC) && (conn->type == BT_CONN_TYPE_BR)) {
 		bt_br_acl_recv(conn, buf, true);
 	} else {

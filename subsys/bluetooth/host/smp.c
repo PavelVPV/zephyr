@@ -220,6 +220,9 @@ struct bt_smp {
 
 	/* Bondable flag */
 	atomic_t			bondable;
+
+	struct net_buf *pending_buf;
+	uint8_t sent_op;
 };
 
 static unsigned int fixed_passkey = BT_PASSKEY_INVALID;
@@ -1904,6 +1907,9 @@ static void smp_reset(struct bt_smp *smp)
 	smp->method = JUST_WORKS;
 	atomic_set(smp->allowed_cmds, 0);
 
+	smp->pending_buf = NULL;
+	smp->sent_op = 0U;
+
 	if (IS_ENABLED(CONFIG_BT_CENTRAL) &&
 	    conn->role == BT_HCI_ROLE_CENTRAL) {
 		atomic_set_bit(smp->allowed_cmds, BT_SMP_CMD_SECURITY_REQUEST);
@@ -2029,7 +2035,7 @@ static void smp_timeout(struct k_work *work)
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 	struct bt_smp *smp = CONTAINER_OF(dwork, struct bt_smp, work);
 
-	LOG_ERR("SMP Timeout, conn %p, keys: %p", smp->chan.chan.conn, smp->chan.chan.conn->le.keys);
+	LOG_ERR("SMP Timeout,  smp %p, op: %d, conn %p, keys: %p, buf: %p", smp, smp->sent_op, smp->chan.chan.conn, smp->chan.chan.conn->le.keys, smp->pending_buf);
 
 	smp_pairing_complete(smp, BT_SMP_ERR_UNSPECIFIED);
 
@@ -2044,9 +2050,13 @@ static void smp_send(struct bt_smp *smp, struct net_buf *buf,
 {
 	__ASSERT_NO_MSG(user_data == NULL);
 
+	smp->pending_buf = buf;
+	smp->sent_op = ((struct bt_smp_hdr *)buf->data)->code;
+
 	int err = bt_l2cap_send_pdu(&smp->chan, buf, cb, NULL);
 
 	if (err) {
+		LOG_ERR("Failed to send SMP PDU (err %d)", err);
 		if (err == -ENOBUFS) {
 			LOG_ERR("Ran out of TX buffers or contexts.");
 		}
@@ -2055,6 +2065,8 @@ static void smp_send(struct bt_smp *smp, struct net_buf *buf,
 		return;
 	}
 
+	LOG_INF("SMP %p PDU %p sent (code 0x%02x len %u)", smp, buf,
+		((struct bt_smp_hdr *)buf->data)->code, buf->len);
 	k_work_reschedule(&smp->work, SMP_TIMEOUT);
 }
 
@@ -4817,7 +4829,7 @@ static int bt_smp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 	}
 
 	hdr = net_buf_pull_mem(buf, sizeof(*hdr));
-	LOG_DBG("Received SMP code 0x%02x len %u", hdr->code, buf->len);
+	LOG_DBG("Received SMP %p code 0x%02x len %u", smp, hdr->code, buf->len);
 
 	/*
 	 * If SMP timeout occurred "no further SMP commands shall be sent over
@@ -4837,6 +4849,11 @@ static int bt_smp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 	if (hdr->code >= ARRAY_SIZE(handlers)) {
 		LOG_WRN("Received reserved SMP code 0x%02x", hdr->code);
 		return 0;
+	}
+
+	err = k_work_cancel_delayable(&smp->work);
+	if (err) {
+		LOG_WRN("Failed to cancel SMP timeout work (%d)", err);
 	}
 
 	if (!handlers[hdr->code].func) {
@@ -6354,6 +6371,8 @@ static int bt_smp_accept(struct bt_conn *conn, struct bt_l2cap_chan **chan)
 		smp->chan.chan.ops = &ops;
 
 		*chan = &smp->chan.chan;
+
+		LOG_INF("SMP %p channel %p accepted for conn %p", smp, *chan, conn);
 
 		return 0;
 	}
