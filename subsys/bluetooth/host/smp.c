@@ -1948,7 +1948,7 @@ static void smp_pairing_complete(struct bt_smp *smp, uint8_t status)
 {
 	struct bt_conn *conn = smp->chan.chan.conn;
 
-	LOG_DBG("got status 0x%x", status);
+	LOG_DBG("got status 0x%x, keys: %p", status, conn->le.keys);
 
 	if (conn->le.keys == NULL) {
 		/* We can get here if the application calls `bt_unpair` in the
@@ -4091,7 +4091,7 @@ static uint8_t smp_pairing_failed(struct bt_smp *smp, struct net_buf *buf)
 
 static uint8_t smp_ident_info(struct bt_smp *smp, struct net_buf *buf)
 {
-	LOG_DBG("");
+	LOG_INF("SMP Ident Info %p, conn %p", smp, smp->chan.chan.conn);
 
 	if (atomic_test_bit(smp->flags, SMP_FLAG_BOND)) {
 		struct bt_smp_ident_info *req = (void *)buf->data;
@@ -4110,6 +4110,13 @@ static uint8_t smp_ident_info(struct bt_smp *smp, struct net_buf *buf)
 	atomic_set_bit(smp->allowed_cmds, BT_SMP_CMD_IDENT_ADDR_INFO);
 
 	return 0;
+}
+
+static void print_all_conns(struct bt_conn *conn, void *data)
+{
+	LOG_INF("Connection %p: %s, id %d, type %d, keys: %p",
+		(void *)conn, bt_addr_le_str(&conn->le.dst), conn->id,
+		conn->type, conn->le.keys);
 }
 
 static uint8_t smp_id_add_replace(struct bt_smp *smp, struct bt_keys *new_bond)
@@ -4145,6 +4152,10 @@ static uint8_t smp_id_add_replace(struct bt_smp *smp, struct bt_keys *new_bond)
 
 		LOG_ERR("New bond keys: %p, conflicting: %p",
 			new_bond, conflict);
+		bt_conn_foreach(BT_CONN_TYPE_LE, print_all_conns, NULL);
+
+		struct bt_keys *check_keys = bt_keys_get_type(BT_KEYS_IRK, conflict->id, &conflict->addr);
+		__ASSERT_NO_MSG(check_keys == conflict);
 		unpair_err = bt_unpair(conflict->id, &conflict->addr);
 		__ASSERT_NO_MSG(!unpair_err);
 	}
@@ -4249,6 +4260,7 @@ static uint8_t smp_ident_addr_info(struct bt_smp *smp, struct net_buf *buf)
 			}
 		}
 
+		LOG_INF("Keys: %p, conn: %p", keys, conn);
 		err = smp_id_add_replace(smp, keys);
 		if (err) {
 			return err;

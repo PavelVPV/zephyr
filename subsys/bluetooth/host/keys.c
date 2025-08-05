@@ -88,6 +88,9 @@ static bool key_is_in_use(uint8_t id)
 void bt_keys_reset(void)
 {
 	memset(key_pool, 0, sizeof(key_pool));
+	for (size_t i = 0; i < ARRAY_SIZE(key_pool); i++) {
+		key_pool[i].id = 0xFF;
+	}
 }
 
 struct bt_keys *bt_keys_get_addr(uint8_t id, const bt_addr_le_t *addr)
@@ -104,6 +107,7 @@ struct bt_keys *bt_keys_get_addr(uint8_t id, const bt_addr_le_t *addr)
 		keys = &key_pool[i];
 
 		if (keys->id == id && bt_addr_le_eq(&keys->addr, addr)) {
+			LOG_INF("Found existing keys %p for %s", keys, bt_addr_le_str(addr));
 			return keys;
 		}
 		if (first_free_slot == ARRAY_SIZE(key_pool) &&
@@ -152,7 +156,7 @@ struct bt_keys *bt_keys_get_addr(uint8_t id, const bt_addr_le_t *addr)
 		keys->aging_counter = ++aging_counter_val;
 		last_keys_updated = keys;
 #endif  /* CONFIG_BT_KEYS_OVERWRITE_OLDEST */
-		LOG_DBG("created %p for %s", keys, bt_addr_le_str(addr));
+		LOG_INF("created %p for %s", keys, bt_addr_le_str(addr));
 		return keys;
 	}
 
@@ -328,6 +332,7 @@ void bt_keys_clear(struct bt_keys *keys)
 	}
 
 	(void)memset(keys, 0, sizeof(*keys));
+	keys->id = 0xFF;
 }
 
 #if defined(CONFIG_BT_SETTINGS)

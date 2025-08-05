@@ -2144,13 +2144,17 @@ static void unpair(uint8_t id, const bt_addr_le_t *addr)
 	}
 
 	if (IS_ENABLED(CONFIG_BT_SMP)) {
-		if (!keys) {
-			keys = bt_keys_find_addr(id, addr);
-		}
-
-		if (keys) {
+		while ((keys = bt_keys_find_addr(id, addr)) != NULL) {
+			LOG_DBG("Unpairing keys %p addr %s", keys, bt_addr_le_str(addr));
 			bt_keys_clear(keys);
 		}
+//		if (!keys) {
+//			keys = bt_keys_find_addr(id, addr);
+//		}
+
+//		if (keys) {
+//			bt_keys_clear(keys);
+//		}
 	}
 
 	bt_gatt_clear(id, addr);
