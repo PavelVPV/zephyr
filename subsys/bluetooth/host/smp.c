@@ -1542,6 +1542,10 @@ static void convert_to_id_on_irk_match(struct bt_conn *conn, void *data)
 
 		conn->le.keys = keys;
 		LOG_WRN("9 Assigned keys: %p", conn->le.keys);
+		LOG_INF("Identity resolved for %p from %s to %s, id %d", conn,
+			bt_addr_le_str(&conn->le.dst), bt_addr_le_str(addr_match->id_addr),
+			conn->id);
+
 		/* always update last use RPA */
 		bt_addr_copy(&keys->irk.rpa, &conn->le.dst.a);
 		bt_addr_le_copy(&conn->le.dst, &keys->addr);
@@ -2053,6 +2057,11 @@ static void smp_send(struct bt_smp *smp, struct net_buf *buf,
 	smp->pending_buf = buf;
 	smp->sent_op = ((struct bt_smp_hdr *)buf->data)->code;
 
+//	if (buf->len != 0) {
+		LOG_INF("SMP %p PDU %p sent (code 0x%02x len %u)", smp, buf,
+			((struct bt_smp_hdr *)buf->data)->code, buf->len);
+//	}
+
 	int err = bt_l2cap_send_pdu(&smp->chan, buf, cb, NULL);
 
 	if (err) {
@@ -2065,8 +2074,6 @@ static void smp_send(struct bt_smp *smp, struct net_buf *buf,
 		return;
 	}
 
-	LOG_INF("SMP %p PDU %p sent (code 0x%02x len %u)", smp, buf,
-		((struct bt_smp_hdr *)buf->data)->code, buf->len);
 	k_work_reschedule(&smp->work, SMP_TIMEOUT);
 }
 
@@ -4119,6 +4126,11 @@ static void print_all_conns(struct bt_conn *conn, void *data)
 		conn->type, conn->le.keys);
 }
 
+static void print_all_keys(struct bt_keys *keys, void *data)
+{
+	LOG_INF("Keys: %p, id: %d, addr: %s", (void *)keys, keys->id, bt_addr_le_str(&keys->addr));
+}
+
 static uint8_t smp_id_add_replace(struct bt_smp *smp, struct bt_keys *new_bond)
 {
 	struct bt_keys *conflict;
@@ -4150,9 +4162,11 @@ static uint8_t smp_id_add_replace(struct bt_smp *smp, struct bt_keys *new_bond)
 
 		LOG_DBG("Un-pairing old conflicting bond and finalizing new.");
 
-		LOG_ERR("New bond keys: %p, conflicting: %p",
-			new_bond, conflict);
+		LOG_ERR("New bond keys: %p, conflicting: %p, confl id: %d",
+			new_bond, conflict, conflict->id);
 		bt_conn_foreach(BT_CONN_TYPE_LE, print_all_conns, NULL);
+
+		bt_keys_foreach_type(BT_KEYS_ALL, print_all_keys, NULL);
 
 		struct bt_keys *check_keys = bt_keys_get_type(BT_KEYS_IRK, conflict->id, &conflict->addr);
 		__ASSERT_NO_MSG(check_keys == conflict);
@@ -4174,14 +4188,29 @@ static uint8_t smp_id_add_replace(struct bt_smp *smp, struct bt_keys *new_bond)
 struct addr_match {
 	const bt_addr_le_t *rpa;
 	const bt_addr_le_t *id_addr;
+	struct bt_keys *keys;
 };
 
 static void convert_to_id_on_match(struct bt_conn *conn, void *data)
 {
 	struct addr_match *addr_match = data;
+	uint8_t src[BT_ADDR_LE_STR_LEN];
+	uint8_t dst[BT_ADDR_LE_STR_LEN];
 
+	memcpy(src, bt_addr_le_str(&conn->le.dst), BT_ADDR_LE_STR_LEN);
+	memcpy(dst, bt_addr_le_str(addr_match->id_addr), BT_ADDR_LE_STR_LEN);
+
+	LOG_INF("Checking %p id %d, %s -> %s", conn, conn->id, src, dst);
+
+//	if (bt_addr_le_eq(&conn->le.dst, addr_match->rpa) && conn->le.keys == addr_match->keys) {
 	if (bt_addr_le_eq(&conn->le.dst, addr_match->rpa)) {
+		LOG_INF("Identity resolved for %p from %s to %s, id %d", conn,
+			src, dst, conn->id);
 		bt_addr_le_copy(&conn->le.dst, addr_match->id_addr);
+
+//		if (conn->le.keys != NULL && conn->le.keys != addr_match->keys) {
+//			bt_addr_le_copy(&conn->le.keys->addr, addr_match->id_addr);
+//		}
 	}
 }
 
@@ -4191,7 +4220,7 @@ static uint8_t smp_ident_addr_info(struct bt_smp *smp, struct net_buf *buf)
 	struct bt_smp_ident_addr_info *req = (void *)buf->data;
 	uint8_t err;
 
-	LOG_DBG("identity %s", bt_addr_le_str(&req->addr));
+	LOG_INF("identity %s, le.dst %s", bt_addr_le_str(&req->addr), bt_addr_le_str(&conn->le.dst));
 
 	smp->remote_dist &= ~BT_SMP_DIST_ID_KEY;
 
@@ -4202,6 +4231,15 @@ static uint8_t smp_ident_addr_info(struct bt_smp *smp, struct net_buf *buf)
 	}
 
 	if (!bt_addr_le_eq(&conn->le.dst, &req->addr)) {
+		uint8_t src[BT_ADDR_LE_STR_LEN];
+		uint8_t dst[BT_ADDR_LE_STR_LEN];
+
+		memcpy(src, bt_addr_le_str(&conn->le.dst), BT_ADDR_LE_STR_LEN);
+		memcpy(dst, bt_addr_le_str(&req->addr), BT_ADDR_LE_STR_LEN);
+
+		LOG_ERR("Identity address %s does not match connection address %s for conn %p",
+			dst, src, conn);
+
 		struct bt_keys *keys = bt_keys_find_addr(conn->id, &req->addr);
 
 		if (keys) {
@@ -4246,14 +4284,17 @@ static uint8_t smp_ident_addr_info(struct bt_smp *smp, struct net_buf *buf)
 			 * present before ie. due to re-pairing.
 			 */
 			if (!bt_addr_le_is_identity(&conn->le.dst)) {
+				LOG_INF("Destination is not identity address");
 				struct addr_match addr_match = {
 					.rpa = &conn->le.dst,
 					.id_addr = &req->addr,
+					.keys = keys,
 				};
 
 				bt_conn_foreach(BT_CONN_TYPE_LE,
 						convert_to_id_on_match,
 						&addr_match);
+
 				bt_addr_le_copy(&keys->addr, &req->addr);
 
 				bt_conn_identity_resolved(conn);
@@ -5010,7 +5051,7 @@ static void bt_smp_encrypt_change(struct bt_l2cap_chan *chan,
 	struct bt_smp *smp = CONTAINER_OF(chan, struct bt_smp, chan.chan);
 	struct bt_conn *conn = chan->conn;
 
-	LOG_DBG("chan %p conn %p handle %u encrypt 0x%02x hci status 0x%02x %s", chan, conn,
+	LOG_WRN("chan %p conn %p handle %u encrypt 0x%02x hci status 0x%02x %s", chan, conn,
 		conn->handle, conn->encrypt, hci_status, bt_hci_err_to_str(hci_status));
 
 	if (!atomic_test_and_clear_bit(smp->flags, SMP_FLAG_ENC_PENDING)) {

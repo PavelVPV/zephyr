@@ -31,36 +31,53 @@ void central(void)
 	LOG_INF("wait conn");
 	wait_connected(&conn_a);
 
+	printk("%d\n", __LINE__);
+
 	/* Subscribe to battery notifications and wait on the first one. */
 	LOG_INF("subscribe first");
 	bas_subscribe(conn_a);
+	printk("%d\n", __LINE__);
 	wait_bas_notification();
+	printk("%d\n", __LINE__);
 
 	/* Connect to the second identity of the peripheral. */
 	LOG_INF("scan 2nd id");
 	scan_connect_to_first_result();
+	printk("%d\n", __LINE__);
 	wait_connected(&conn_b);
+	printk("%d\n", __LINE__);
 
 	/* Establish security with the second identity and resolve identity address. */
 	LOG_INF("set sec");
 	set_security(conn_b, BT_SECURITY_L2);
+	printk("%d\n", __LINE__);
 	wait_pairing_completed();
+	printk("%d\n", __LINE__);
 
 	/* Wait for notification from the first connection after identity address resolution. */
 	LOG_INF("wait notif");
 	wait_bas_notification();
+	printk("%d\n", __LINE__);
 
 	/* Disconnect the first identity of the peripheral. */
 	LOG_INF("discon id first");
 	disconnect(conn_a);
+	printk("%d\n", __LINE__);
 	wait_disconnected();
+	printk("%d\n", __LINE__);
 	clear_conn(conn_a);
+	printk("%d\n", __LINE__);
 
 	/* Disconnect the second identity of the peripheral. */
 	LOG_INF("discon id second");
 	disconnect(conn_b);
+	printk("%d\n", __LINE__);
 	wait_disconnected();
+	printk("%d\n", __LINE__);
 	clear_conn(conn_b);
+	printk("%d\n", __LINE__);
+
+	printk("Here");
 
 	TEST_PASS("PASS");
 }

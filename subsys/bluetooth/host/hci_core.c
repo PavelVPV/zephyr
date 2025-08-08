@@ -1401,6 +1401,8 @@ static void translate_addrs(bt_addr_le_t *peer_addr, bt_addr_le_t *id_addr,
 static void update_conn(struct bt_conn *conn, const bt_addr_le_t *id_addr,
 			const struct bt_hci_evt_le_enh_conn_complete *evt)
 {
+	LOG_WRN("Updating connection %p with handle %u old_addr %s new_addr %s", conn, evt->handle,
+		bt_addr_le_str(&conn->le.dst), bt_addr_le_str(id_addr));
 	conn->handle = sys_le16_to_cpu(evt->handle);
 	bt_addr_le_copy(&conn->le.dst, id_addr);
 	conn->le.interval = sys_le16_to_cpu(evt->interval);
@@ -1431,9 +1433,6 @@ void bt_hci_le_enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 	struct bt_conn *conn;
 	uint8_t id;
 
-	LOG_INF("status 0x%02x %s handle %u role %u peer %s peer RPA %s",
-		evt->status, bt_hci_err_to_str(evt->status), handle,
-		evt->role, bt_addr_le_str(&evt->peer_addr), bt_addr_str(&evt->peer_rpa));
 	LOG_DBG("local RPA %s", bt_addr_str(&evt->local_rpa));
 
 #if defined(CONFIG_BT_SMP)
@@ -1441,6 +1440,11 @@ void bt_hci_le_enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 #endif
 
 	id = evt->role == BT_HCI_ROLE_PERIPHERAL ? bt_dev.adv_conn_id : BT_ID_DEFAULT;
+
+	LOG_INF("status 0x%02x %s handle %u role %u peer %s peer RPA %s id %d",
+		evt->status, bt_hci_err_to_str(evt->status), handle,
+		evt->role, bt_addr_le_str(&evt->peer_addr), bt_addr_str(&evt->peer_rpa), id);
+
 	translate_addrs(&peer_addr, &id_addr, evt, id);
 
 	conn = find_pending_connect(evt->role, &id_addr);
@@ -2144,21 +2148,21 @@ static void unpair(uint8_t id, const bt_addr_le_t *addr)
 	}
 
 	if (IS_ENABLED(CONFIG_BT_SMP)) {
-		bt_addr_le_t keys_addr;
+//		bt_addr_le_t keys_addr;
 
-		bt_addr_le_copy(&keys_addr, addr);
+//		bt_addr_le_copy(&keys_addr, addr);
 
-		while ((keys = bt_keys_find_addr(id, &keys_addr)) != NULL) {
-			LOG_INF("Unpairing keys %p addr %s", keys, bt_addr_le_str(&keys_addr));
-			bt_keys_clear(keys);
-		}
-//		if (!keys) {
-//			keys = bt_keys_find_addr(id, addr);
-//		}
-
-//		if (keys) {
+//		while ((keys = bt_keys_find_addr(id, &keys_addr)) != NULL) {
+//			LOG_INF("Unpairing keys %p addr %s", keys, bt_addr_le_str(&keys_addr));
 //			bt_keys_clear(keys);
 //		}
+		if (!keys) {
+			keys = bt_keys_find_addr(id, addr);
+		}
+
+		if (keys) {
+			bt_keys_clear(keys);
+		}
 	}
 
 	bt_gatt_clear(id, addr);
@@ -2291,6 +2295,8 @@ static void hci_encrypt_change(struct net_buf *buf)
 		 * are updated on HCI 'Link Key Notification Event'
 		 */
 		if (conn->encrypt) {
+			LOG_INF("Calling bt_smp_update_keys() for conn %p, le.dst %s",
+				conn, bt_addr_le_str(&conn->le.dst));
 			bt_smp_update_keys(conn);
 		}
 

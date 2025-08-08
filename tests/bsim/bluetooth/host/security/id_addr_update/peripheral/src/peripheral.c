@@ -55,34 +55,49 @@ void peripheral(void)
 	/* Connect with the first identity. */
 	LOG_INF("adv");
 	advertise_connectable(id_a);
+	printk("%d\n", __LINE__);
 	LOG_INF("wait conn");
 	wait_connected(&conn_a);
+	printk("%d\n", __LINE__);
 
 	/* Send battery notification on the first connection. */
 	wait_bas_ccc_subscription();
+	printk("%d\n", __LINE__);
 	bas_notify(conn_a);
+	printk("%d\n", __LINE__);
 
 	/* Connect with the second identity. */
 	LOG_INF("adv id 2");
 	advertise_connectable(id_b);
+	printk("%d\n", __LINE__);
 	wait_connected(&conn_b);
+	printk("%d\n", __LINE__);
 
 	/* Wait for the pairing completed callback on the second identity. */
 	wait_pairing_completed();
+	printk("%d\n", __LINE__);
 
 	/* Both connections should relate to the identity address of the same Central peer. */
 	verify_equal_address(conn_a, conn_b);
+	printk("%d\n", __LINE__);
 
 	/* Send notification after identity address resolution to the first connection object. */
 	bas_notify(conn_a);
+	printk("%d\n", __LINE__);
 
 	/* Disconnect the first identity. */
 	wait_disconnected();
+	printk("%d\n", __LINE__);
 	clear_conn(conn_a);
+	printk("%d\n", __LINE__);
 
 	/* Disconnect the second identity. */
 	wait_disconnected();
+	printk("%d\n", __LINE__);
 	clear_conn(conn_b);
+	printk("%d\n", __LINE__);
+
+	printk("Here");
 
 	TEST_PASS("PASS");
 }

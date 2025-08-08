@@ -320,7 +320,11 @@ void bt_keys_clear(struct bt_keys *keys)
 
 	LOG_DBG("%s (keys 0x%04x)", bt_addr_le_str(&keys->addr), keys->keys);
 
-	LOG_ERR("Clearing keys %p for %s", keys, bt_addr_le_str(&keys->addr));
+	if (keys == (void*)0x8252600) {
+//		while(1);
+	}
+
+	LOG_ERR("Clearing keys %p for %s id %d", keys, bt_addr_le_str(&keys->addr), keys->id);
 
 	if (keys->state & BT_KEYS_ID_ADDED) {
 		bt_id_del(keys);

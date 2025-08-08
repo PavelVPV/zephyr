@@ -2716,6 +2716,8 @@ struct bt_conn *bt_conn_add_le(uint8_t id, const bt_addr_le_t *peer)
 	}
 
 	conn->id = id;
+	LOG_WRN("Allocating new connection %p id %u addr %s", conn, id,
+		bt_addr_le_str(peer));
 	bt_addr_le_copy(&conn->le.dst, peer);
 #if defined(CONFIG_BT_SMP)
 	conn->sec_level = BT_SECURITY_L1;
