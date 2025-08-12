@@ -258,7 +258,11 @@ static void att_tx_destroy(struct net_buf *buf)
 	struct bt_att_tx_meta_data *p_meta = bt_att_get_tx_meta_data(buf);
 	struct bt_att_tx_meta_data meta;
 
-	LOG_DBG("%p", buf);
+//	LOG_WRN("Destroyed %p, meta.opcode: %d", buf, p_meta->opcode);
+
+//	if (p_meta->opcode == BT_ATT_OP_NOTIFY) {
+//		while (1);
+//	}
 
 	/* Destroy the buffer first, as the callback may attempt to allocate a
 	 * new one for another operation.
@@ -369,6 +373,7 @@ static int chan_send(struct bt_att_chan *chan, struct net_buf *buf)
 		 * modified so the operation will need to be queued.
 		 */
 		if (atomic_test_bit(chan->flags, ATT_PENDING_SENT)) {
+//			LOG_WRN("ATT channel %p is already pending sent", chan);
 			return -EAGAIN;
 		}
 
@@ -389,6 +394,7 @@ static int chan_send(struct bt_att_chan *chan, struct net_buf *buf)
 		/* bt_l2cap_chan_send does actually return the number of bytes
 		 * that could be sent immediately.
 		 */
+//		LOG_WRN("Using bt_l2cap_chan_send for EATT channel %p", chan);
 		err = bt_l2cap_chan_send(&chan->chan.chan, buf);
 		if (err < 0) {
 			data->att_chan = prev_chan;
@@ -421,6 +427,7 @@ static int chan_send(struct bt_att_chan *chan, struct net_buf *buf)
 
 	data->att_chan = chan;
 
+//	LOG_WRN("Using bt_l2cap_send_pdu for UATT channel %p", chan);
 	err = bt_l2cap_send_pdu(&chan->chan, buf, NULL, NULL);
 	if (err) {
 		if (err == -ENOBUFS) {
@@ -526,6 +533,9 @@ static int process_queue(struct bt_att_chan *chan, struct k_fifo *queue)
 	if (buf) {
 		err = bt_att_chan_send(chan, buf);
 		if (err) {
+			if (err != -EAGAIN) {
+				LOG_ERR("Failed to send ATT PDU %p (err %d)", buf, err);
+			}
 			/* Push it back if it could not be send */
 			k_queue_prepend(&queue->_queue, buf);
 			return err;
@@ -751,6 +761,8 @@ static struct net_buf *bt_att_chan_create_pdu(struct bt_att_chan *chan, uint8_t 
 		LOG_ERR("Unable to allocate buffer for op 0x%02x", op);
 		return NULL;
 	}
+
+	//LOG_WRN("Allocated: %p, len %zu, op 0x%02x", buf, len + sizeof(op), op);
 
 	/* If we got a buf from `att_pool`, then the metadata slot at its index
 	 * is officially ours to use.
@@ -2076,6 +2088,7 @@ static uint8_t write_cb(const struct bt_gatt_attr *attr, uint16_t handle,
 	data->err = bt_gatt_check_perm(data->conn, attr,
 				       BT_GATT_PERM_WRITE_MASK);
 	if (data->err) {
+		LOG_ERR("Write permission check failed: %u", data->err);
 		return BT_GATT_ITER_STOP;
 	}
 
@@ -3421,6 +3434,8 @@ static struct bt_att_chan *att_chan_new(struct bt_att *att, atomic_val_t flags)
 		return NULL;
 	}
 
+	LOG_ERR("Allocated ATT channel %p for conn %p", chan, att->conn);
+
 	(void)memset(chan, 0, sizeof(*chan));
 	chan->chan.chan.ops = &ops;
 	k_fifo_init(&chan->tx_queue);
@@ -3500,6 +3515,8 @@ static int bt_att_accept(struct bt_conn *conn, struct bt_l2cap_chan **ch)
 		LOG_ERR("No available ATT context for conn %p", conn);
 		return -ENOMEM;
 	}
+
+	LOG_ERR("Allocated ATT context %p for conn %p", att, conn);
 
 	att_handle_rsp_thread = k_current_get();
 

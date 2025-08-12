@@ -253,6 +253,7 @@ void bt_buf_destroy_view(struct net_buf *view, struct bt_buf_view_meta *meta)
 	meta->parent->data = meta->backup.data;
 	meta->parent->size = meta->backup.size;
 
+	__ASSERT_NO_MSG(meta->parent->_ref == 1);
 	net_buf_unref(meta->parent);
 
 	memset(meta, 0, sizeof(*meta));

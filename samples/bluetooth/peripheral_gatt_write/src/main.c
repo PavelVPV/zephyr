@@ -10,6 +10,6 @@ extern uint32_t peripheral_gatt_write(uint32_t count);
 
 int main(void)
 {
-	(void)peripheral_gatt_write(0U);
+	(void)peripheral_gatt_write(10U);
 	return 0;
 }

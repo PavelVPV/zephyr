@@ -49,6 +49,57 @@ static struct bt_gatt_cb gatt_callbacks = {
 	.att_mtu_updated = mtu_updated
 };
 
+static void csc_meas_ccc_cfg_changed(const struct bt_gatt_attr *attr,
+				     uint16_t value)
+{
+	printk("CSC Measurement CCCD changed: %s\n",
+	       (value == BT_GATT_CCC_NOTIFY) ? "Notify" : "Indicate");
+}
+
+/* Vendor Primary Service Declaration */
+BT_GATT_SERVICE_DEFINE(csc_svc,
+	BT_GATT_PRIMARY_SERVICE(BT_UUID_CSC),
+	BT_GATT_CHARACTERISTIC(BT_UUID_CSC_MEASUREMENT, BT_GATT_CHRC_NOTIFY,
+			       BT_GATT_PERM_NONE, NULL, NULL, NULL),
+	BT_GATT_CCC(csc_meas_ccc_cfg_changed,
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+);
+
+static int notify(struct bt_conn *conn)
+{
+	static uint8_t data[BT_ATT_MAX_ATTRIBUTE_LEN] = {0, };
+	static uint16_t data_len;
+	uint16_t data_len_max;
+	int err;
+
+#if 0
+	data_len_max = bt_gatt_get_mtu(conn) - 3;
+	if (data_len_max > BT_ATT_MAX_ATTRIBUTE_LEN) {
+		data_len_max = BT_ATT_MAX_ATTRIBUTE_LEN;
+	}
+
+	/* Use fixed length data for every write command */
+	data_len = data_len_max;
+#else
+	data_len = 10;
+#endif
+
+	/* Pass the 16-bit data length value (instead of reference) in
+	 * user_data so that unique value is pass for each write callback.
+	 * Using handle 0x0001, we do not care if it is writable, we just want
+	 * to transmit the data across.
+	 */
+	struct bt_gatt_attr *notify_crch =
+		bt_gatt_find_by_uuid(csc_svc.attrs, 0xffff, BT_UUID_CSC_MEASUREMENT);
+
+	err = bt_gatt_notify(conn, notify_crch, data, data_len);
+	if (err) {
+		printk("%s: Notify failed (%d).\n", __func__, err);
+	}
+
+	return err;
+}
+
 uint32_t peripheral_gatt_write(uint32_t count)
 {
 	int err;
@@ -99,7 +150,18 @@ uint32_t peripheral_gatt_write(uint32_t count)
 		}
 
 		if (conn) {
-			write_cmd(conn);
+			printk("Waiting few seconds...\n");
+			k_sleep(K_SECONDS(5));
+
+			while (bt_eatt_count(conn) < CONFIG_BT_EATT_MAX) {
+				k_sleep(K_MSEC(100));
+			}
+
+			while (true) {
+//				k_sleep(K_MSEC(100));
+				notify(conn);
+			}
+
 			bt_conn_unref(conn);
 
 			if (count) {
