@@ -353,7 +353,6 @@ static void init_le_chan_private(struct bt_l2cap_le_chan *le_chan)
 #endif /* CONFIG_BT_L2CAP_SEG_RECV */
 #endif /* CONFIG_BT_L2CAP_DYNAMIC_CHANNEL */
 	memset(&le_chan->_pdu_ready, 0, sizeof(le_chan->_pdu_ready));
-	le_chan->_pdu_ready_lock = 0;
 	le_chan->_pdu_remaining = 0;
 }
 
@@ -701,14 +700,19 @@ struct net_buf *bt_l2cap_create_pdu_timeout(struct net_buf_pool *pool,
 
 static void raise_data_ready(struct bt_l2cap_le_chan *le_chan)
 {
+	/* This function accesses l2cap_data_ready list and is the only one that can be called from
+	 * a preemptive thread context, therefore requires a critical section to ensure that the
+	 * data ready list is not modified while we are checking and appending to it.
+	 */
 	k_sched_lock();
 
-	if (!atomic_set(&le_chan->_pdu_ready_lock, 1)) {
+	if (!sys_slist_find(&le_chan->chan.conn->l2cap_data_ready,
+				 &le_chan->_pdu_ready, NULL)) {
 		sys_slist_append(&le_chan->chan.conn->l2cap_data_ready,
 				 &le_chan->_pdu_ready);
-		LOG_DBG("data ready raised %p", le_chan);
+		LOG_DBG("L2CAP channel %p added to data ready list", le_chan);
 	} else {
-		LOG_DBG("data ready already %p", le_chan);
+		LOG_DBG("L2CAP channel %p already in data ready list", le_chan);
 	}
 
 	k_sched_unlock();
@@ -724,10 +728,6 @@ static void lower_data_ready(struct bt_l2cap_le_chan *le_chan)
 	LOG_DBG("%p", le_chan);
 
 	__ASSERT_NO_MSG(s == &le_chan->_pdu_ready);
-
-	__maybe_unused atomic_t old = atomic_set(&le_chan->_pdu_ready_lock, 0);
-
-	__ASSERT_NO_MSG(old);
 }
 
 static void cancel_data_ready(struct bt_l2cap_le_chan *le_chan)
@@ -736,9 +736,12 @@ static void cancel_data_ready(struct bt_l2cap_le_chan *le_chan)
 
 	LOG_DBG("%p", le_chan);
 
+	k_sched_lock();
+
 	sys_slist_find_and_remove(&conn->l2cap_data_ready,
 				  &le_chan->_pdu_ready);
-	atomic_set(&le_chan->_pdu_ready_lock, 0);
+
+	k_sched_unlock();
 }
 
 int bt_l2cap_send_pdu(struct bt_l2cap_le_chan *le_chan, struct net_buf *pdu,

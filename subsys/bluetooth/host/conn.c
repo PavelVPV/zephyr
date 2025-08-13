@@ -874,28 +874,25 @@ void bt_conn_data_ready(struct bt_conn *conn)
 {
 	LOG_DBG("DR");
 
-	/* The TX processor will call the `pull_cb` to get the buf */
-	if (!atomic_set(&conn->_conn_ready_lock, 1)) {
-		/* Attach a reference to the `bt_dev.le.conn_ready` list.
-		 *
-		 * This reference will be consumed when the conn is popped off
-		 * the list (in `get_conn_ready`).
-		 *
-		 * The `bt_dev.le.conn_ready` list is accessed by the tx_processor
-		 * which runs in a workqueue, but `bt_conn_data_ready` can be called
-		 * from different threads so we need to make sure that nothing will
-		 * trigger a thread switch while we are manipulating the list since
-		 * sys_slist_*() functions are not thread safe.
+	/* This function accesses conn_ready list and is the only one that can be called from a
+	 * preemptive thread context, therefore requires a critical section to ensure that the
+	 * conn_ready list is not modified while we are checking and appending to it.
+	 */
+	k_sched_lock();
+
+	if (!sys_slist_find(&bt_dev.le.conn_ready, &conn->_conn_ready, NULL)) {
+		/* If the connection is not already in the list of connections
+		 * that have data to send, add it.
 		 */
 		bt_conn_ref(conn);
-		k_sched_lock();
-		sys_slist_append(&bt_dev.le.conn_ready,
-				 &conn->_conn_ready);
-		k_sched_unlock();
-		LOG_DBG("raised");
+		sys_slist_append(&bt_dev.le.conn_ready, &conn->_conn_ready);
+
+		LOG_DBG("Connection %p added to conn_ready list", conn);
 	} else {
-		LOG_DBG("already in list");
+		LOG_DBG("Connection %p already in conn_ready list", conn);
 	}
+
+	k_sched_unlock();
 
 	/* Kick the TX processor */
 	bt_tx_irq_raise();
@@ -977,7 +974,6 @@ struct bt_conn *get_conn_ready(void)
 			/* Move reference off the list */
 			__ASSERT_NO_MSG(prev != &conn->_conn_ready);
 			sys_slist_remove(&bt_dev.le.conn_ready, prev, &conn->_conn_ready);
-			(void)atomic_set(&conn->_conn_ready_lock, 0);
 
 			/* Append connection to list if it is connected and still has data */
 			if (conn->has_data(conn) && (conn->state == BT_CONN_CONNECTED)) {
