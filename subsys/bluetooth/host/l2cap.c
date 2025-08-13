@@ -701,6 +701,8 @@ struct net_buf *bt_l2cap_create_pdu_timeout(struct net_buf_pool *pool,
 
 static void raise_data_ready(struct bt_l2cap_le_chan *le_chan)
 {
+	k_sched_lock();
+
 	if (!atomic_set(&le_chan->_pdu_ready_lock, 1)) {
 		sys_slist_append(&le_chan->chan.conn->l2cap_data_ready,
 				 &le_chan->_pdu_ready);
@@ -708,6 +710,8 @@ static void raise_data_ready(struct bt_l2cap_le_chan *le_chan)
 	} else {
 		LOG_DBG("data ready already %p", le_chan);
 	}
+
+	k_sched_unlock();
 
 	bt_conn_data_ready(le_chan->chan.conn);
 }
