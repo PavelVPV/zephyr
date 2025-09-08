@@ -672,6 +672,21 @@ struct bt_l2cap_chan_ops {
 #endif /* CONFIG_BT_L2CAP_SEG_RECV */
 };
 
+struct bt_l2cap_fixed_chan {
+	uint16_t		cid;
+	int (*accept)(struct bt_conn *conn, struct bt_l2cap_chan **chan);
+	const struct bt_l2cap_chan_ops *ops;
+};
+
+#define BT_L2CAP_CHANNEL_DEFINE(_name, _cid, _accept, _ops)         \
+	const STRUCT_SECTION_ITERABLE(bt_l2cap_fixed_chan, _name) = {   \
+				.cid = _cid,                            \
+				.accept = _accept, \
+				.ops = _ops,                    \
+			}
+
+int bt_l2cap_fixed_send(struct bt_l2cap_chan *chan, struct net_buf *buf);
+
 /**
  *  @brief Headroom needed for outgoing L2CAP PDUs.
  */

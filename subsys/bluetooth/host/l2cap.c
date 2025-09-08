@@ -414,6 +414,8 @@ void bt_l2cap_connected(struct bt_conn *conn)
 			continue;
 		}
 
+		chan->ops = fchan->ops;
+
 		le_chan = BT_L2CAP_LE_CHAN(chan);
 
 		/* Fill up remaining fixed channel context attached in
@@ -2907,14 +2909,15 @@ static void l2cap_disconnected(struct bt_l2cap_chan *chan)
 #endif /* CONFIG_BT_L2CAP_DYNAMIC_CHANNEL */
 }
 
+static const struct bt_l2cap_chan_ops l2cap_ops = {
+	.connected = l2cap_connected,
+	.disconnected = l2cap_disconnected,
+	.recv = l2cap_recv,
+};
+
 static int l2cap_accept(struct bt_conn *conn, struct bt_l2cap_chan **chan)
 {
 	int i;
-	static const struct bt_l2cap_chan_ops ops = {
-		.connected = l2cap_connected,
-		.disconnected = l2cap_disconnected,
-		.recv = l2cap_recv,
-	};
 
 	LOG_DBG("conn %p handle %u", conn, conn->handle);
 
@@ -2925,7 +2928,6 @@ static int l2cap_accept(struct bt_conn *conn, struct bt_l2cap_chan **chan)
 			continue;
 		}
 
-		l2cap->chan.chan.ops = &ops;
 		*chan = &l2cap->chan.chan;
 
 		return 0;
@@ -2936,13 +2938,44 @@ static int l2cap_accept(struct bt_conn *conn, struct bt_l2cap_chan **chan)
 	return -ENOMEM;
 }
 
-BT_L2CAP_CHANNEL_DEFINE(le_fixed_chan, BT_L2CAP_CID_LE_SIG, l2cap_accept, NULL);
+BT_L2CAP_CHANNEL_DEFINE(le_fixed_chan, BT_L2CAP_CID_LE_SIG, l2cap_accept, &l2cap_ops);
 
 void bt_l2cap_init(void)
 {
 	if (IS_ENABLED(CONFIG_BT_CLASSIC)) {
 		bt_l2cap_br_init();
 	}
+}
+
+static void fixed_pdu_sent_callback(struct bt_conn *conn, void *user_data, int err)
+{
+	struct bt_l2cap_chan *ch = user_data;
+	struct bt_l2cap_le_chan *chan = BT_L2CAP_LE_CHAN(ch);
+
+	if (chan->ops->sent) {
+		chan->ops->sent(&ch);
+	}
+}
+
+/**
+ * Regarding net_buf: We can also try to use internal pool (or expose
+ * bt_l2cap_create_pdu_timeout), but I'd think towards forcing app use own pool.
+ */
+int bt_l2cap_fixed_send(struct bt_l2cap_chan *chan, struct net_buf *buf)
+{
+	struct bt_l2cap_le_chan *chan = BT_L2CAP_LE_CHAN(ch);
+
+	k_sched_lock();
+
+	int err = bt_l2cap_send_pdu(chan, buf, fixed_pdu_sent_callback, (void *)chan);
+
+	k_sched_unlock();
+
+	if (err) {
+		net_buf_unref(buf);
+	}
+
+	return err;
 }
 
 #if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL)

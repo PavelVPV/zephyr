@@ -3131,7 +3131,7 @@ static int smp_send_security_req(struct bt_conn *conn)
 	req->auth_req = get_auth(smp, BT_SMP_AUTH_DEFAULT);
 
 	/* SMP timer is not restarted for SecRequest so don't use smp_send */
-	err = bt_l2cap_send_pdu(&smp->chan, req_buf, NULL, NULL);
+	err = bt_l2cap_fixed_send(&smp->chan, req_buf);
 	if (err) {
 		net_buf_unref(req_buf);
 		return err;
@@ -6315,15 +6315,16 @@ void bt_smp_update_keys(struct bt_conn *conn)
 	}
 }
 
+static const struct bt_l2cap_chan_ops smp_ops = {
+	.connected = bt_smp_connected,
+	.disconnected = bt_smp_disconnected,
+	.encrypt_change = bt_smp_encrypt_change,
+	.recv = bt_smp_recv,
+};
+
 static int bt_smp_accept(struct bt_conn *conn, struct bt_l2cap_chan **chan)
 {
 	int i;
-	static const struct bt_l2cap_chan_ops ops = {
-		.connected = bt_smp_connected,
-		.disconnected = bt_smp_disconnected,
-		.encrypt_change = bt_smp_encrypt_change,
-		.recv = bt_smp_recv,
-	};
 
 	LOG_DBG("conn %p handle %u", conn, conn->handle);
 
@@ -6333,8 +6334,6 @@ static int bt_smp_accept(struct bt_conn *conn, struct bt_l2cap_chan **chan)
 		if (smp->chan.chan.conn) {
 			continue;
 		}
-
-		smp->chan.chan.ops = &ops;
 
 		*chan = &smp->chan.chan;
 
@@ -6346,7 +6345,7 @@ static int bt_smp_accept(struct bt_conn *conn, struct bt_l2cap_chan **chan)
 	return -ENOMEM;
 }
 
-BT_L2CAP_CHANNEL_DEFINE(smp_fixed_chan, BT_L2CAP_CID_SMP, bt_smp_accept, NULL);
+BT_L2CAP_CHANNEL_DEFINE(smp_fixed_chan, BT_L2CAP_CID_SMP, bt_smp_accept, smp_ops);
 #if defined(CONFIG_BT_CLASSIC)
 BT_L2CAP_BR_CHANNEL_DEFINE(smp_br_fixed_chan, BT_L2CAP_CID_BR_SMP,
 			bt_smp_br_accept);
