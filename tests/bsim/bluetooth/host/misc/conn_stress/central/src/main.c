@@ -30,6 +30,8 @@ LOG_MODULE_REGISTER(central, LOG_LEVEL_INF);
 #include "bstests.h"
 #include "bs_pc_backchannel.h"
 
+#include "babblekit/testcase.h"
+
 #define DEFAULT_CONN_INTERVAL	   20
 #define PERIPHERAL_DEVICE_NAME	   "Zephyr Peripheral"
 #define PERIPHERAL_DEVICE_NAME_LEN (sizeof(PERIPHERAL_DEVICE_NAME) - 1)
@@ -89,6 +91,7 @@ struct conn_info {
 	struct bt_gatt_discover_params discover_params;
 	struct bt_gatt_subscribe_params subscribe_params;
 	bt_addr_le_t addr;
+	atomic_t conn_count;
 };
 
 static struct conn_info conn_infos[CONFIG_BT_MAX_CONN] = {0};
@@ -295,7 +298,7 @@ retry:
 	/* if we're out of buffers or metadata contexts, continue discovery
 	 * later.
 	 */
-	LOG_INF("out of memory/not connected, continuing sub later");
+	LOG_INF("out of memory/not connected, continuing sub later (err %d)", err);
 	atomic_set_bit(conn_info_ref->flags, CONN_INFO_DISCOVER_PAUSED);
 
 	return BT_GATT_ITER_STOP;
@@ -327,6 +330,18 @@ static bool check_if_peer_connected(const bt_addr_le_t *addr)
 
 	return false;
 }
+
+static bool check_if_completed(void)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(conn_infos); i++) {
+		if (atomic_get(&conn_infos[i].conn_count) < 1) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 
 static bool parse_ad(struct bt_data *data, void *user_data)
 {
@@ -373,6 +388,9 @@ static bool parse_ad(struct bt_data *data, void *user_data)
 static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 			 struct net_buf_simple *ad)
 {
+	LOG_INF("Device found");
+	LOG_HEXDUMP_INF(addr, sizeof(*addr), "Address:");
+	LOG_HEXDUMP_INF(ad->data, ad->len, "Advertisement data:");
 	bt_data_parse(ad, parse_ad, (void *)addr);
 }
 
@@ -382,8 +400,8 @@ static void start_scan(void)
 	struct bt_le_scan_param scan_param = {
 		.type = BT_LE_SCAN_TYPE_ACTIVE,
 		.options = BT_LE_SCAN_OPT_NONE,
-		.interval = BT_GAP_SCAN_FAST_INTERVAL,
-		.window = BT_GAP_SCAN_FAST_WINDOW,
+		.interval = 0x10,//BT_GAP_SCAN_FAST_INTERVAL_MIN,
+		.window = 0x10,//BT_GAP_SCAN_FAST_WINDOW,
 	};
 
 	atomic_set_bit(status_flags, DEVICE_IS_SCANNING);
@@ -451,6 +469,8 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	bt_conn_unref(conn);
 	clear_info(conn_info_ref);
 	atomic_dec(&conn_count);
+
+	atomic_inc(&conn_info_ref->conn_count);
 }
 
 #if defined(CONFIG_BT_SMP)
@@ -669,7 +689,7 @@ void test_central_main(void)
 
 	start_scan();
 
-	while (true) {
+	while (!check_if_completed()) {
 		/* reconnect peripherals when they drop out */
 		if (atomic_get(&conn_count) < CONFIG_BT_MAX_CONN &&
 		    !atomic_test_bit(status_flags, DEVICE_IS_SCANNING) &&
@@ -698,6 +718,8 @@ void test_central_main(void)
 		}
 		k_msleep(10);
 	}
+
+	TEST_PASS("Central tests passed\n");
 }
 
 void test_init(void)
@@ -705,6 +727,7 @@ void test_init(void)
 	extern enum bst_result_t bst_result;
 
 	LOG_INF("Initializing Test");
+	bst_ticker_set_next_tick_absolute(600*1e6);
 	/* The peripherals determines whether the test passed. */
 	bst_result = Passed;
 }
@@ -739,12 +762,23 @@ static void test_args(int argc, char **argv)
 	bs_trace_raw(0, "Notification data size : %d\n", notification_size);
 }
 
+static void test_tick(bs_time_t HW_device_time)
+{
+	if (bst_result != Passed) {
+		TEST_FAIL("Test timeout (not passed after %lu seconds)",
+			  (unsigned long)(HW_device_time / USEC_PER_SEC));
+	}
+
+	bs_trace_silent_exit(0);
+}
+
 static const struct bst_test_instance test_def[] = {
 	{
 		.test_id = "central",
 		.test_descr = "Central Connection Stress",
 		.test_args_f = test_args,
 		.test_pre_init_f = test_init,
+		.test_tick_f = test_tick,
 		.test_main_f = test_central_main
 	},
 	BSTEST_END_MARKER

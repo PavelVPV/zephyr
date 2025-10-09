@@ -5513,6 +5513,7 @@ int bt_gatt_subscribe(struct bt_conn *conn,
 
 	sub = gatt_sub_add(conn);
 	if (!sub) {
+		LOG_ERR("Unable to allocate subscription");
 		return -ENOMEM;
 	}
 
@@ -5550,6 +5551,7 @@ int bt_gatt_subscribe(struct bt_conn *conn,
 		err = gatt_write_ccc(conn, params, gatt_write_ccc_rsp);
 		if (err) {
 			gatt_sub_remove(conn, sub, NULL, NULL);
+			LOG_ERR("Write ccc failed: %d", err);
 			return err;
 		}
 	}

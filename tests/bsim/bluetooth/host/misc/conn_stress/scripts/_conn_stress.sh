@@ -22,7 +22,7 @@ function Execute(){
   echo "Running $@"
 }
 
-test_path="bsim_bluetooth_host_misc_conn_stress"
+test_path="tests_bsim_bluetooth_host_misc_conn_stress"
 bsim_central_exe_name="bs_${BOARD_TS}_${test_path}_central_prj_conf"
 bsim_peripheral_exe_name="bs_${BOARD_TS}_${test_path}_peripheral_prj_conf"
 
@@ -42,26 +42,40 @@ for device in `seq 1 $nr_of_units`; do
     Execute "./${bsim_peripheral_exe_name}" ${bsim_args} \
         -d=$device -rs=$rs -testid=peripheral ${test_args}
 done
+#
+#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=1 -testid=peripheral ${test_args} -rs=42
+#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=2 -testid=peripheral ${test_args} -rs=10
+#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=3 -testid=peripheral ${test_args} -rs=23
+#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=4 -testid=peripheral ${test_args} -rs=7884
+#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=5 -testid=peripheral ${test_args} -rs=230
+#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=6 -testid=peripheral ${test_args} -rs=24
+#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=7 -testid=peripheral ${test_args} -rs=123
+#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=8 -testid=peripheral ${test_args} -rs=456
+#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=9 -testid=peripheral ${test_args} -rs=789
+#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=10 -testid=peripheral ${test_args} -rs=32
+#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=11 -testid=peripheral ${test_args} -rs=532
+#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=12 -testid=peripheral ${test_args} -rs=12
 
-Execute ./bs_2G4_phy_v1 -dump -v=2 -s=${simulation_id} -D=13 -sim_length=1000e6 &
+Execute ./bs_2G4_phy_v1 -dump -v=2 -s=${simulation_id} -D=13 -sim_length=10000e6 &
 
 Execute "./${bsim_central_exe_name}" ${bsim_args} -d=0 -rs=001 -testid=central ${test_args}
+#Execute "./${bsim_central_exe_name}" ${bsim_args} -d=0 -testid=central ${test_args}
 
 for process_id in $process_ids; do
   wait $process_id || let "exit_code=$?"
 done
 
-for i in `seq -w 0 $nr_of_units`; do
-    ${BSIM_OUT_PATH}/components/ext_2G4_phy_v1/dump_post_process/csv2pcap -o \
-    ${BSIM_OUT_PATH}/results/${simulation_id}/Trace_$i.pcap \
-    ${BSIM_OUT_PATH}/results/${simulation_id}/d_2G4_$i.Tx.csv
-
-    ${BSIM_OUT_PATH}/components/ext_2G4_phy_v1/dump_post_process/csv2pcap -o \
-    ${BSIM_OUT_PATH}/results/${simulation_id}/Trace_Rx_$i.pcap \
-    ${BSIM_OUT_PATH}/results/${simulation_id}/d_2G4_$i.Rx.csv
-
-    echo "${BSIM_OUT_PATH}/results/${simulation_id}/Trace_$i.pcap"
-    echo "${BSIM_OUT_PATH}/results/${simulation_id}/Trace_Rx_$i.pcap"
-done
+#for i in `seq -w 0 $nr_of_units`; do
+#    ${BSIM_OUT_PATH}/components/ext_2G4_phy_v1/dump_post_process/csv2pcap -o \
+#    ${BSIM_OUT_PATH}/results/${simulation_id}/Trace_$i.pcap \
+#    ${BSIM_OUT_PATH}/results/${simulation_id}/d_2G4_$i.Tx.csv
+#
+#    ${BSIM_OUT_PATH}/components/ext_2G4_phy_v1/dump_post_process/csv2pcap -o \
+#    ${BSIM_OUT_PATH}/results/${simulation_id}/Trace_Rx_$i.pcap \
+#    ${BSIM_OUT_PATH}/results/${simulation_id}/d_2G4_$i.Rx.csv
+#
+#    echo "${BSIM_OUT_PATH}/results/${simulation_id}/Trace_$i.pcap"
+#    echo "${BSIM_OUT_PATH}/results/${simulation_id}/Trace_Rx_$i.pcap"
+#done
 
 exit $exit_code

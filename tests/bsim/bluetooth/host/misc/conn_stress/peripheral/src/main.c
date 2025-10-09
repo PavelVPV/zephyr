@@ -24,7 +24,7 @@
 #include <zephyr/types.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(peripheral, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(peripheral, LOG_LEVEL_DBG);
 
 #include "bstests.h"
 #include "bs_types.h"
@@ -32,6 +32,8 @@ LOG_MODULE_REGISTER(peripheral, LOG_LEVEL_INF);
 #include "bstests.h"
 #include "bs_pc_backchannel.h"
 #include "argparse.h"
+
+#include "babblekit/testcase.h"
 
 #define TEST_ROUNDS 10
 #define MIN_NOTIFICATIONS 50
@@ -400,7 +402,24 @@ void test_peripheral_main(void)
 	sprintf(name, "per-%d", get_device_nbr());
 	bt_set_name(name);
 
-	err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, NULL, 0, NULL, 0);
+	struct bt_le_adv_param adv_param = {
+		.id = BT_ID_DEFAULT,
+		.sid = 0,
+		.secondary_max_skip = 0,
+		.options = BT_LE_ADV_OPT_CONN | BT_LE_ADV_OPT_SCANNABLE,
+		.interval_min = 0x0020, /* 20 ms */
+		.interval_max = 0x0020, /* 20 ms */
+		.peer = NULL,
+	};
+
+	struct bt_data sd[1];
+
+	sd[0].type = BT_DATA_NAME_COMPLETE;
+	sd[0].data_len = sizeof(CONFIG_BT_DEVICE_NAME) - 1;
+	sd[0].data = CONFIG_BT_DEVICE_NAME;
+
+	err = bt_le_adv_start(&adv_param, sd, 1, sd, 1);
+	//err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, NULL, 0, NULL, 0);
 	if (err) {
 		LOG_ERR("Advertising failed to start (err %d)", err);
 		__ASSERT_NO_MSG(err);
@@ -411,7 +430,8 @@ void test_peripheral_main(void)
 
 	vnd_attr = bt_gatt_find_by_uuid(vnd_svc.attrs, vnd_svc.attr_count, &vnd_enc_uuid.uuid);
 
-	while (true) {
+//	while (true) {
+	for (size_t i = 0; i < 1; i++) {
 		LOG_DBG("Waiting for connection from central..");
 		while (!atomic_test_bit(conn_info.flags, CONN_INFO_CONNECTED)) {
 			k_sleep(K_MSEC(10));
@@ -425,6 +445,7 @@ void test_peripheral_main(void)
 			k_sleep(K_MSEC(10));
 		}
 
+		LOG_DBG("Waiting until MTU exchange..");
 		while (!atomic_test_bit(conn_info.flags, CONN_INFO_MTU_EXCHANGED)) {
 			k_sleep(K_MSEC(10));
 		}
@@ -432,6 +453,9 @@ void test_peripheral_main(void)
 		LOG_INF("Begin sending notifications to central..");
 		while (central_subscription &&
 		       atomic_test_bit(conn_info.flags, CONN_INFO_CONNECTED)) {
+
+			LOG_ERR("Trying to send notification: %d", 
+				atomic_get(&conn_info.tx_notify_counter));
 
 			set_tx_payload(atomic_get(&conn_info.tx_notify_counter));
 			err = bt_gatt_notify(NULL, vnd_attr, tx_data, notification_size);
@@ -453,6 +477,8 @@ void test_peripheral_main(void)
 			}
 		}
 	}
+
+	TEST_PASS("Peripheral tests passed\n");
 }
 
 void test_init(void)
@@ -460,6 +486,7 @@ void test_init(void)
 	extern enum bst_result_t bst_result;
 
 	LOG_INF("Initializing Test");
+	bst_ticker_set_next_tick_absolute(600*1e6);
 	bst_result = Failed;
 }
 
@@ -481,12 +508,23 @@ static void test_args(int argc, char **argv)
 	bs_trace_raw(0, "Notification data size : %d\n", notification_size);
 }
 
+static void test_tick(bs_time_t HW_device_time)
+{
+	if (bst_result != Passed) {
+		TEST_FAIL("Test timeout (not passed after %lu seconds)",
+			  (unsigned long)(HW_device_time / USEC_PER_SEC));
+	}
+
+	bs_trace_silent_exit(0);
+}
+
 static const struct bst_test_instance test_def[] = {
 	{
 		.test_id = "peripheral",
 		.test_descr = "Peripheral Connection Stress",
 		.test_args_f = test_args,
 		.test_pre_init_f = test_init,
+		.test_tick_f = test_tick,
 		.test_main_f = test_peripheral_main
 	},
 	BSTEST_END_MARKER
