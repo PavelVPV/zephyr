@@ -11,16 +11,16 @@ process_ids=""; exit_code=0
 # `wait_for_background_jobs` will terminate the script if there's an error, and
 # this test will fail often. We still want to run the packet conversion scripts,
 # especially if the test was not successful.
-function Execute(){
-  if [ ! -f $1 ]; then
-    echo -e "ERR! \e[91m`pwd`/`basename $1` cannot be found (did you forget to\
- compile it?)\e[39m"
-    exit 1
-  fi
-  timeout 60 $@ & process_ids="$process_ids $!"
-
-  echo "Running $@"
-}
+#function Execute(){
+#  if [ ! -f $1 ]; then
+#    echo -e "ERR! \e[91m`pwd`/`basename $1` cannot be found (did you forget to\
+# compile it?)\e[39m"
+#    exit 1
+#  fi
+#  timeout 60 $@ & process_ids="$process_ids $!"
+#
+#  echo "Running $@"
+#}
 
 test_path="tests_bsim_bluetooth_host_misc_conn_stress"
 bsim_central_exe_name="bs_${BOARD_TS}_${test_path}_central_prj_conf"
@@ -42,28 +42,16 @@ for device in `seq 1 $nr_of_units`; do
     Execute "./${bsim_peripheral_exe_name}" ${bsim_args} \
         -d=$device -rs=$rs -testid=peripheral ${test_args}
 done
-#
-#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=1 -testid=peripheral ${test_args} -rs=42
-#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=2 -testid=peripheral ${test_args} -rs=10
-#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=3 -testid=peripheral ${test_args} -rs=23
-#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=4 -testid=peripheral ${test_args} -rs=7884
-#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=5 -testid=peripheral ${test_args} -rs=230
-#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=6 -testid=peripheral ${test_args} -rs=24
-#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=7 -testid=peripheral ${test_args} -rs=123
-#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=8 -testid=peripheral ${test_args} -rs=456
-#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=9 -testid=peripheral ${test_args} -rs=789
-#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=10 -testid=peripheral ${test_args} -rs=32
-#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=11 -testid=peripheral ${test_args} -rs=532
-#Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=12 -testid=peripheral ${test_args} -rs=12
 
-Execute ./bs_2G4_phy_v1 -dump -v=2 -s=${simulation_id} -D=13 -sim_length=10000e6 &
+Execute ./bs_2G4_phy_v1 -dump -v=2 -s=${simulation_id} -D=13 -sim_length=10000e6
 
 Execute "./${bsim_central_exe_name}" ${bsim_args} -d=0 -rs=001 -testid=central ${test_args}
-#Execute "./${bsim_central_exe_name}" ${bsim_args} -d=0 -testid=central ${test_args}
 
-for process_id in $process_ids; do
-  wait $process_id || let "exit_code=$?"
-done
+wait_for_background_jobs
+
+#for process_id in $_process_ids; do
+#  wait $process_id || let "exit_code=$?"
+#done
 
 #for i in `seq -w 0 $nr_of_units`; do
 #    ${BSIM_OUT_PATH}/components/ext_2G4_phy_v1/dump_post_process/csv2pcap -o \
