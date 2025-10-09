@@ -235,8 +235,6 @@ static uint8_t discover_func(struct bt_conn *conn, const struct bt_gatt_attr *at
 	conn_info_ref = get_connected_conn_info_ref(conn);
 	__ASSERT_NO_MSG(conn_info_ref);
 
-	atomic_clear_bit(conn_info_ref->flags, CONN_INFO_DISCOVER_PAUSED);
-
 	if (conn_info_ref->discover_params.type == BT_GATT_DISCOVER_PRIMARY) {
 		LOG_DBG("Primary Service Found");
 		memcpy(&conn_info_ref->uuid,
@@ -622,6 +620,8 @@ static void subscribe_to_service(struct bt_conn *conn, void *data)
 		if (err != -ENOMEM && err != -ENOTCONN) {
 			__ASSERT(!err, "Subscribe failed (err %d)", err);
 		}
+
+		atomic_clear_bit(conn_info_ref->flags, CONN_INFO_DISCOVER_PAUSED);
 	}
 }
 
