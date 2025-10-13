@@ -621,7 +621,9 @@ static void host_num_completed_packets(struct net_buf *buf,
 		count += c;
 	}
 
-	LOG_DBG("FC: acked: %d", count);
+//	LOG_ERR("FC: acked: %d", count);
+	LOG_ERR("FC: hci_hbuf_sent %u, hci_hbuf_acked %u",
+		hci_hbuf_sent, hci_hbuf_acked);
 	hci_hbuf_acked += count;
 	k_poll_signal_raise(hbuf_signal, 0x0);
 }
@@ -9246,6 +9248,8 @@ void hci_acl_encode(struct node_rx_pdu *node_rx, struct net_buf *buf)
 			LL_ASSERT((hci_hbuf_sent - hci_hbuf_acked) <
 				  hci_hbuf_total);
 			hci_hbuf_sent++;
+			LOG_ERR("hci_hbuf_sent %u, hci_hbuf_acked %u",
+				hci_hbuf_sent, hci_hbuf_acked);
 			/* Note: This requires linear handle values starting
 			 * from 0
 			 */

@@ -679,8 +679,8 @@ static int send_buf(struct bt_conn *conn, struct net_buf *buf,
 		goto error_return;
 	}
 
-	LOG_DBG("conn %p buf %p len %zu buf->len %u cb %p ud %p",
-		conn, buf, len, buf->len, cb, ud);
+	LOG_INF("conn %p handle %d buf %p len %zu buf->len %u cb %p ud %p",
+		conn, conn->handle, buf, len, buf->len, cb, ud);
 
 	/* Acquire the right to send 1 packet to the controller */
 	if (k_sem_take(bt_conn_get_pkts(conn), K_NO_WAIT)) {
@@ -944,7 +944,7 @@ static struct bt_conn *get_conn_ready(void)
 		/* We will get scheduled again when the (view) buffers are freed. If you
 		 * hit this a lot, try increasing `CONFIG_BT_CONN_FRAG_COUNT`
 		 */
-		LOG_DBG("no view bufs");
+		LOG_WRN("no view bufs");
 		return NULL;
 	}
 
@@ -957,21 +957,21 @@ static struct bt_conn *get_conn_ready(void)
 
 		if (cannot_send_to_controller(conn)) {
 			/* When buffers are full, try next connection. */
-			LOG_DBG("no LL bufs for %p", conn);
+			LOG_WRN("no LL bufs for %p", conn);
 			prev = &conn->_conn_ready;
 			continue;
 		}
 
 		if (dont_have_tx_context(conn)) {
 			/* When TX contexts are not available, try next connection. */
-			LOG_DBG("no TX contexts for %p", conn);
+			LOG_WRN("no TX contexts for %p", conn);
 			prev = &conn->_conn_ready;
 			continue;
 		}
 
 		CHECKIF(dont_have_methods(conn)) {
 			/* When a connection is missing mandatory methods, try next connection. */
-			LOG_DBG("conn %p (type %d) is missing mandatory methods", conn, conn->type);
+			LOG_WRN("conn %p (type %d) is missing mandatory methods", conn, conn->type);
 			prev = &conn->_conn_ready;
 			continue;
 		}
@@ -983,7 +983,7 @@ static struct bt_conn *get_conn_ready(void)
 
 			/* Append connection to list if it is connected and still has data */
 			if (conn->has_data(conn) && (conn->state == BT_CONN_CONNECTED)) {
-				LOG_DBG("appending %p to back of TX queue", conn);
+				LOG_WRN("appending %p to back of TX queue", conn);
 				bt_conn_data_ready(conn);
 			}
 
@@ -1025,7 +1025,7 @@ void bt_conn_suspend_tx(bool suspend)
 
 void bt_conn_tx_processor(void)
 {
-	LOG_DBG("start");
+	LOG_INF("start");
 	struct bt_conn *conn;
 	struct net_buf *buf;
 	bt_conn_tx_cb_t cb = NULL;
@@ -1044,7 +1044,7 @@ void bt_conn_tx_processor(void)
 	conn = get_conn_ready();
 
 	if (!conn) {
-		LOG_DBG("no connection wants to do stuff");
+		LOG_WRN("no connection wants to do stuff");
 		return;
 	}
 
@@ -1065,7 +1065,7 @@ void bt_conn_tx_processor(void)
 		 * triggered again, either by the view's destroy callback, or by
 		 * the upper layer when it has more data.
 		 */
-		LOG_DBG("no buf returned");
+		LOG_WRN("no buf returned");
 
 		goto exit;
 	}
@@ -1080,7 +1080,7 @@ void bt_conn_tx_processor(void)
 		LOG_DBG("pop: cb %p userdata %p", cb, ud);
 	}
 
-	LOG_DBG("TX process: conn %p buf %p (%s)",
+	LOG_INF("TX process: conn %p buf %p (%s)",
 		conn, buf, last_buf ? "last" : "frag");
 
 	int err = send_buf(conn, buf, buf_len, cb, ud);

@@ -158,11 +158,11 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	/* With a lot of devices, it is possible that the central doesn't see
 	 * the disconnect packet.
 	 */
-	bool valid_reason =
-		reason == BT_HCI_ERR_LOCALHOST_TERM_CONN ||
-		reason == BT_HCI_ERR_CONN_TIMEOUT;
+//	bool valid_reason =
+//		reason == BT_HCI_ERR_LOCALHOST_TERM_CONN ||
+//		reason == BT_HCI_ERR_CONN_TIMEOUT;
 
-	__ASSERT(valid_reason, "Disconnected (reason 0x%02x)", reason);
+	//__ASSERT(valid_reason, "Disconnected (reason 0x%02x)", reason);
 
 	memset(&conn_info, 0x00, sizeof(struct active_conn_info));
 

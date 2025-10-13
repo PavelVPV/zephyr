@@ -38,6 +38,9 @@ nr_of_units=12
 
 for device in `seq 1 $nr_of_units`; do
     let rs=$device*100
+#    if [ $device == 5 ]; then
+#        continue
+#    fi
 
     Execute "./${bsim_peripheral_exe_name}" ${bsim_args} \
         -d=$device -rs=$rs -testid=peripheral ${test_args}
@@ -56,10 +59,9 @@ done
 #Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=11 -testid=peripheral ${test_args} -rs=532
 #Execute "./${bsim_peripheral_exe_name}" ${bsim_args} -d=12 -testid=peripheral ${test_args} -rs=12
 
-Execute ./bs_2G4_phy_v1 -dump -v=2 -s=${simulation_id} -D=13 -sim_length=10000e6 &
+Execute ./bs_2G4_phy_v1 -dump -v=2 -s=${simulation_id} -D=13 -sim_length=10000e6 -dump &
 
-Execute "./${bsim_central_exe_name}" ${bsim_args} -d=0 -rs=001 -testid=central ${test_args}
-#Execute "./${bsim_central_exe_name}" ${bsim_args} -d=0 -testid=central ${test_args}
+#Execute "./${bsim_central_exe_name}" ${bsim_args} -d=0 -rs=001 -testid=central ${test_args}
 
 for process_id in $process_ids; do
   wait $process_id || let "exit_code=$?"

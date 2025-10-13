@@ -74,7 +74,7 @@
 #include "direction_internal.h"
 #endif /* CONFIG_BT_DF */
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_HCI_CORE_LOG_LEVEL
 LOG_MODULE_REGISTER(bt_hci_core);
 
 #if DT_HAS_CHOSEN(zephyr_bt_hci)
@@ -639,7 +639,7 @@ static void hci_num_completed_packets(struct net_buf *buf)
 		return;
 	}
 
-	LOG_DBG("num_handles %u", evt->num_handles);
+	LOG_INF("num_handles %u", evt->num_handles);
 
 	for (i = 0; i < evt->num_handles; i++) {
 		uint16_t handle, count;
@@ -648,7 +648,7 @@ static void hci_num_completed_packets(struct net_buf *buf)
 		handle = sys_le16_to_cpu(evt->h[i].handle);
 		count = sys_le16_to_cpu(evt->h[i].count);
 
-		LOG_DBG("handle %u count %u", handle, count);
+		LOG_INF("handle %u count %u", handle, count);
 
 		conn = bt_conn_lookup_handle(handle, BT_CONN_TYPE_ALL);
 		if (!conn) {
@@ -1024,7 +1024,7 @@ static void hci_disconn_complete_prio(struct net_buf *buf)
 	uint16_t handle = sys_le16_to_cpu(evt->handle);
 	struct bt_conn *conn;
 
-	LOG_DBG("status 0x%02x %s handle %u reason 0x%02x",
+	LOG_WRN("status 0x%02x %s handle %u reason 0x%02x",
 		evt->status, bt_hci_err_to_str(evt->status), handle, evt->reason);
 
 	if (evt->status) {
@@ -1052,7 +1052,7 @@ static void hci_disconn_complete(struct net_buf *buf)
 	uint16_t handle = sys_le16_to_cpu(evt->handle);
 	struct bt_conn *conn;
 
-	LOG_DBG("status 0x%02x %s handle %u reason 0x%02x",
+	LOG_WRN("status 0x%02x %s handle %u reason 0x%02x",
 		evt->status, bt_hci_err_to_str(evt->status), handle, evt->reason);
 
 	if (evt->status) {
@@ -1429,7 +1429,7 @@ void bt_hci_le_enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 	struct bt_conn *conn;
 	uint8_t id;
 
-	LOG_DBG("status 0x%02x %s handle %u role %u peer %s peer RPA %s",
+	LOG_INF("status 0x%02x %s handle %u role %u peer %s peer RPA %s",
 		evt->status, bt_hci_err_to_str(evt->status), handle,
 		evt->role, bt_addr_le_str(&evt->peer_addr), bt_addr_str(&evt->peer_rpa));
 	LOG_DBG("local RPA %s", bt_addr_str(&evt->local_rpa));
@@ -1456,6 +1456,8 @@ void bt_hci_le_enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 		bt_hci_disconnect(handle, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 		return;
 	}
+
+	LOG_INF("Got connection %p handle %u", conn, handle);
 
 	update_conn(conn, &id_addr, evt);
 
@@ -5016,8 +5018,9 @@ static bool process_pending_cmd(k_timeout_t timeout)
 
 static void tx_processor(struct k_work *item)
 {
-	LOG_DBG("TX process start");
+	LOG_INF("TX process start");
 	if (process_pending_cmd(K_NO_WAIT)) {
+		LOG_INF("Processed pending command");
 		/* If we processed a command, let the scheduler run before
 		 * processing another command (or data).
 		 */
@@ -5035,6 +5038,6 @@ static K_WORK_DEFINE(tx_work, tx_processor);
 
 void bt_tx_irq_raise(void)
 {
-	LOG_DBG("kick TX");
+	LOG_INF("kick TX");
 	k_work_submit(&tx_work);
 }

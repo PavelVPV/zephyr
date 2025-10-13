@@ -62,7 +62,7 @@
 
 #include "hci_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_HCI_DRIVER_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_HCI_DRIVER_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_ctlr_hci_driver);
 
@@ -244,10 +244,12 @@ static inline uint8_t bt_hci_evt_get_flags(uint8_t evt)
 {
 	switch (evt) {
 	case BT_HCI_EVT_DISCONN_COMPLETE:
+		LOG_ERR("BT_HCI_EVT_DISCONN_COMPLETE treated as RECV_PRIO");
 		return BT_HCI_EVT_FLAG_RECV | BT_HCI_EVT_FLAG_RECV_PRIO;
 		/* fallthrough */
 #if defined(CONFIG_BT_CONN) || defined(CONFIG_BT_ISO)
 	case BT_HCI_EVT_NUM_COMPLETED_PACKETS:
+		LOG_ERR("BT_HCI_EVT_NUM_COMPLETED_PACKETS treated as RECV_PRIO");
 #if defined(CONFIG_BT_CONN)
 	case BT_HCI_EVT_DATA_BUF_OVERFLOW:
 		__fallthrough;
@@ -712,12 +714,14 @@ static inline struct net_buf *process_hbuf(struct node_rx_pdu *n)
 
 	/* Return early if this iteration already has a node to process */
 	class = node_rx->hdr.user_meta;
+	LOG_ERR("n: %p, class: %d, hbuf_count: %d", n, class, hbuf_count);
 	if (n) {
 		if (class == HCI_CLASS_EVT_CONNECTION ||
 		    class == HCI_CLASS_EVT_LLCP ||
 		    (class == HCI_CLASS_ACL_DATA && hbuf_count)) {
 			/* node to process later, schedule an iteration */
-			LOG_DBG("FC: signalling");
+			LOG_ERR("FC: signalling");
+			printk("FC: signaling\n");
 			k_poll_signal_raise(&hbuf_signal, 0x0);
 		}
 		return NULL;
@@ -745,12 +749,14 @@ static inline struct net_buf *process_hbuf(struct node_rx_pdu *n)
 		break;
 	}
 
+	LOG_ERR("node_rx %p", node_rx);
 	if (node_rx) {
 		buf = encode_node(node_rx, class);
 		/* Update host buffers after encoding */
 		hbuf_count = hbuf_total - (hci_hbuf_sent - hci_hbuf_acked);
 		/* next node */
 		node_rx = (void *)sys_slist_peek_head(&hbuf_pend);
+		LOG_ERR("class %d, hbuf_count %d, next node %p", class, hbuf_count, node_rx);
 		if (node_rx) {
 			class = node_rx->hdr.user_meta;
 
@@ -760,7 +766,8 @@ static inline struct net_buf *process_hbuf(struct node_rx_pdu *n)
 				/* more to process, schedule an
 				 * iteration
 				 */
-				LOG_DBG("FC: signalling");
+				LOG_ERR("FC: signalling");
+				printk("FC: signaling\n");
 				k_poll_signal_raise(&hbuf_signal, 0x0);
 			}
 		}

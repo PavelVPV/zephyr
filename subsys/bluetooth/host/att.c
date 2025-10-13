@@ -3143,7 +3143,7 @@ static void att_timeout(struct k_work *work)
 	 * for developers. This reduces rare failure conditions to a common one, allowing developers
 	 * to handle unexpected disconnections without needing special cases for ATT timeouts.
 	 */
-	att_disconnect(chan);
+	//att_disconnect(chan);
 }
 
 static struct bt_att_chan *att_get_fixed_chan(struct bt_conn *conn)

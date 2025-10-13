@@ -73,6 +73,7 @@ NET_BUF_POOL_FIXED_DEFINE(discardable_pool, CONFIG_BT_BUF_EVT_DISCARDABLE_COUNT,
 #if defined(CONFIG_BT_HCI_ACL_FLOW_CONTROL)
 static void acl_in_pool_destroy(struct net_buf *buf)
 {
+	LOG_ERR("Schedling bt_hci_host_num_completed_packets");
 	bt_hci_host_num_completed_packets(buf);
 	buf_rx_freed_notify(BT_BUF_ACL_IN);
 }

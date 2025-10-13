@@ -51,7 +51,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_smp);
 
-#define SMP_TIMEOUT K_SECONDS(30)
+#define SMP_TIMEOUT K_SECONDS(60)
 
 #if defined(CONFIG_BT_SIGNING)
 #define SIGN_DIST BT_SMP_DIST_SIGN
