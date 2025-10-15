@@ -4797,7 +4797,12 @@ static bool is_in_pairing_procedure(struct bt_smp *smp)
 	return atomic_test_bit(smp->flags, SMP_FLAG_PAIRING);
 }
 
-static int bt_smp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
+static struct net_buf *pending_buf[CONFIG_BT_MAX_CONN][2];
+static size_t pending_buf_idx_recv[CONFIG_BT_MAX_CONN];
+static size_t pending_buf_idx_proc[CONFIG_BT_MAX_CONN];
+static struct bt_l2cap_chan *pending_chan[CONFIG_BT_MAX_CONN];
+
+static int bt_smp_recv_2(struct bt_l2cap_chan *chan, struct net_buf *buf)
 {
 	struct bt_smp *smp = CONTAINER_OF(chan, struct bt_smp, chan.chan);
 	struct bt_smp_hdr *hdr;
@@ -4856,6 +4861,56 @@ static int bt_smp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 	if (err) {
 		smp_error(smp, err);
 	}
+
+	return 0;
+}
+
+static struct k_work smp_recv_work[CONFIG_BT_MAX_CONN];
+static struct k_work_q smp_workq[CONFIG_BT_MAX_CONN];
+static K_KERNEL_STACK_ARRAY_DEFINE(smp_thread_stack, CONFIG_BT_MAX_CONN, CONFIG_BT_RX_STACK_SIZE);
+
+static void bt_smp_recv_work_handler(struct k_work *work)
+{
+	struct net_buf *buf;
+	uint32_t idx = ARRAY_INDEX(smp_recv_work, work);
+
+	__ASSERT_NO_MSG(pending_buf[idx][pending_buf_idx_proc[idx] % 2]);
+
+	LOG_WRN("bt_smp_recv_work_handler called! conn[%d]:%p", idx,
+		pending_chan[idx]->conn);
+
+	buf = pending_buf[idx][pending_buf_idx_proc[idx] % 2];
+	pending_buf[idx][pending_buf_idx_proc[idx] % 2] = NULL;
+	pending_buf_idx_proc[idx]++;
+
+	bt_smp_recv_2(pending_chan[idx], buf);
+
+	net_buf_unref(buf);
+
+	if (pending_buf[idx][pending_buf_idx_proc[idx] % 2]) {
+		k_work_submit_to_queue(&smp_workq[idx], &smp_recv_work[idx]);
+	}
+}
+
+static int bt_smp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
+{
+	size_t idx;
+
+	idx = bt_conn_index(chan->conn);
+
+	struct bt_smp_hdr *hdr;
+
+	hdr = (struct bt_smp_hdr *)buf->data;
+	LOG_WRN("bt_smp_recv called directly! conn[%d]:%p code 0x%02x len %u", idx, chan->conn,
+		hdr->code, buf->len);
+
+	__ASSERT_NO_MSG(!pending_buf[idx][pending_buf_idx_recv[idx] % 2]);
+
+	pending_buf[idx][pending_buf_idx_recv[idx] % 2] = net_buf_ref(buf);
+	pending_buf_idx_recv[idx]++;
+
+	pending_chan[idx] = chan;
+	k_work_submit_to_queue(&smp_workq[idx], &smp_recv_work[idx]);
 
 	return 0;
 }
@@ -6380,6 +6435,16 @@ int bt_smp_init(void)
 
 	if (!IS_ENABLED(CONFIG_BT_SMP_OOB_LEGACY_PAIR_ONLY)) {
 		bt_pub_key_gen(&pub_key_gen.cb);
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(smp_recv_work); i++) {
+		k_work_queue_init(&smp_workq[i]);
+		k_work_queue_start(&smp_workq[i], smp_thread_stack[i],
+				   CONFIG_BT_RX_STACK_SIZE,
+				   K_PRIO_COOP(CONFIG_BT_RX_PRIO), NULL);
+		k_thread_name_set(&smp_workq[i].thread, "SMP WQ");
+
+		k_work_init(&smp_recv_work[i], bt_smp_recv_work_handler);
 	}
 
 	return smp_self_test();

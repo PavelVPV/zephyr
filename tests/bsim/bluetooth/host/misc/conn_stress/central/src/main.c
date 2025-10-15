@@ -478,7 +478,9 @@ static void security_changed(struct bt_conn *conn, bt_security_t level, enum bt_
 
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
-	__ASSERT(!err, "Security for %s failed", addr);
+	if (err) {
+		__ASSERT(!err, "Security for %s failed", addr);
+	}
 	LOG_INF("Security for %s changed: level %u", addr, level);
 
 	if (err) {
