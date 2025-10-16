@@ -31,6 +31,21 @@ static const struct bt_data sd[] = {
 	BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
 };
 
+static void tx_power_get(struct bt_conn *conn)
+{
+	struct bt_conn_le_tx_power power_level = {0};
+	int err;
+
+	printk("Reading TX power");
+
+	err = bt_conn_le_get_tx_power_level(conn, &power_level);
+	if (err) {
+		printk("Failed to get tx power level (err %d)", err);
+	}
+
+	printk("Tx power level: %d", power_level.current_level);
+}
+
 static void adv_start(struct k_work *work)
 {
 	struct bt_le_adv_param adv_param = {
@@ -110,6 +125,8 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
 	printk("Connected (%u): %s\n", conn_count, addr);
+
+	tx_power_get(conn);
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
@@ -141,6 +158,8 @@ static bool le_param_req(struct bt_conn *conn, struct bt_le_conn_param *param)
 	       addr, param->interval_min, param->interval_max, param->latency,
 	       param->timeout);
 
+	tx_power_get(conn);
+
 	return true;
 }
 
@@ -165,6 +184,8 @@ static void le_phy_updated(struct bt_conn *conn,
 
 	printk("LE PHY Updated: %s Tx 0x%x, Rx 0x%x\n", addr, param->tx_phy,
 	       param->rx_phy);
+
+	tx_power_get(conn);
 }
 #endif /* CONFIG_BT_USER_PHY_UPDATE */
 
@@ -179,6 +200,8 @@ static void le_data_len_updated(struct bt_conn *conn,
 	printk("Data length updated: %s max tx %u (%u us) max rx %u (%u us)\n",
 	       addr, info->tx_max_len, info->tx_max_time, info->rx_max_len,
 	       info->rx_max_time);
+
+	tx_power_get(conn);
 }
 #endif /* CONFIG_BT_USER_DATA_LEN_UPDATE */
 
@@ -196,6 +219,8 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
 		printk("Security failed: %s level %u err %s(%d)\n", addr, level,
 		       bt_security_err_to_str(err), err);
 	}
+
+	tx_power_get(conn);
 }
 
 static void auth_cancel(struct bt_conn *conn)
@@ -205,6 +230,8 @@ static void auth_cancel(struct bt_conn *conn)
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
 	printk("Pairing cancelled: %s\n", addr);
+
+	tx_power_get(conn);
 }
 
 static struct bt_conn_auth_cb auth_callbacks = {

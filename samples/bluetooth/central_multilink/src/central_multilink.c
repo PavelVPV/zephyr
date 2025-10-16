@@ -36,6 +36,21 @@ static uint8_t conn_count_max;
 static uint8_t volatile conn_count;
 static bool volatile is_disconnecting;
 
+static void tx_power_get(struct bt_conn *conn)
+{
+	struct bt_conn_le_tx_power power_level = {0};
+	int err;
+
+	printk("Reading TX power");
+
+	err = bt_conn_le_get_tx_power_level(conn, &power_level);
+	if (err) {
+		printk("Failed to get tx power level (err %d)", err);
+	}
+
+	printk("Tx power level: %d", power_level.current_level);
+}
+
 static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 			 struct net_buf_simple *ad)
 {
@@ -114,6 +129,8 @@ static void mtu_exchange_cb(struct bt_conn *conn, uint8_t err,
 {
 	printk("MTU exchange %u %s (%u)\n", bt_conn_index(conn),
 	       err == 0U ? "successful" : "failed", bt_gatt_get_mtu(conn));
+
+	tx_power_get(conn);
 }
 
 static struct bt_gatt_exchange_params mtu_exchange_params[CONFIG_BT_MAX_CONN];
@@ -135,6 +152,8 @@ static int mtu_exchange(struct bt_conn *conn)
 	} else {
 		printk("Exchange pending...");
 	}
+
+	tx_power_get(conn);
 
 	return err;
 }
@@ -176,6 +195,8 @@ static void connected(struct bt_conn *conn, uint8_t reason)
 #if defined(CONFIG_BT_GATT_CLIENT)
 	mtu_exchange(conn);
 #endif
+
+	tx_power_get(conn);
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
@@ -205,6 +226,8 @@ static bool le_param_req(struct bt_conn *conn, struct bt_le_conn_param *param)
 	       addr, param->interval_min, param->interval_max, param->latency,
 	       param->timeout);
 
+	tx_power_get(conn);
+
 	return true;
 }
 
@@ -217,6 +240,8 @@ static void le_param_updated(struct bt_conn *conn, uint16_t interval,
 
 	printk("LE conn param updated: %s int 0x%04x lat %d to %d\n",
 	       addr, interval, latency, timeout);
+
+	tx_power_get(conn);
 }
 
 #if defined(CONFIG_BT_SMP)
@@ -233,6 +258,8 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
 		printk("Security failed: %s level %u err %d %s\n", addr, level,
 		       err, bt_security_err_to_str(err));
 	}
+
+	tx_power_get(conn);
 }
 #endif
 
@@ -246,6 +273,8 @@ static void le_phy_updated(struct bt_conn *conn,
 
 	printk("LE PHY Updated: %s Tx 0x%x, Rx 0x%x\n", addr, param->tx_phy,
 	       param->rx_phy);
+
+	tx_power_get(conn);
 }
 #endif /* CONFIG_BT_USER_PHY_UPDATE */
 
@@ -260,6 +289,8 @@ static void le_data_len_updated(struct bt_conn *conn,
 	printk("Data length updated: %s max tx %u (%u us) max rx %u (%u us)\n",
 	       addr, info->tx_max_len, info->tx_max_time, info->rx_max_len,
 	       info->rx_max_time);
+
+	tx_power_get(conn);
 }
 #endif /* CONFIG_BT_USER_DATA_LEN_UPDATE */
 
@@ -301,6 +332,8 @@ static void remote_info(struct bt_conn *conn, void *data)
 	uint8_t *actual_count = (void *)data;
 
 	(*actual_count)++;
+
+	tx_power_get(conn);
 }
 
 static void disconnect(struct bt_conn *conn, void *data)
