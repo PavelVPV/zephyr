@@ -22,7 +22,7 @@
 #include <zephyr/types.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(central, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(central, LOG_LEVEL_ERR);
 
 #include "bstests.h"
 #include "bs_types.h"
@@ -73,6 +73,7 @@ enum {
 	CONN_INFO_MTU_EXCHANGED,
 	CONN_INFO_DISCOVERING,
 	CONN_INFO_DISCOVER_PAUSED,
+	CONN_INFO_SUBSCRIPTION_PAUSED,
 	CONN_INFO_SUBSCRIBED,
 
 	/* Total number of flags - must be at the end of the enum */
@@ -213,6 +214,27 @@ static uint8_t notify_func(struct bt_conn *conn, struct bt_gatt_subscribe_params
 	return BT_GATT_ITER_CONTINUE;
 }
 
+static void subscribe_handler(struct bt_conn *conn, uint8_t err,
+			      struct bt_gatt_subscribe_params *params)
+{
+	struct conn_info *conn_info_ref;
+	char addr[BT_ADDR_LE_STR_LEN];
+
+	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+	if (err) {
+		LOG_ERR("[SUBSCRIBED] failed %s err: %d", addr, err);
+		return;
+	}
+
+	conn_info_ref = get_conn_info_ref(conn);
+	__ASSERT_NO_MSG(conn_info_ref);
+
+	atomic_clear_bit(conn_info_ref->flags, CONN_INFO_SUBSCRIPTION_PAUSED);
+
+	LOG_ERR("[SUBSCRIBED] addr %s", addr);
+}
+
 static uint8_t discover_func(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 			     struct bt_gatt_discover_params *params)
 {
@@ -236,6 +258,8 @@ static uint8_t discover_func(struct bt_conn *conn, const struct bt_gatt_attr *at
 
 	conn_info_ref = get_connected_conn_info_ref(conn);
 	__ASSERT_NO_MSG(conn_info_ref);
+
+	atomic_clear_bit(conn_info_ref->flags, CONN_INFO_DISCOVER_PAUSED);
 
 	if (conn_info_ref->discover_params.type == BT_GATT_DISCOVER_PRIMARY) {
 		LOG_DBG("Primary Service Found");
@@ -272,10 +296,14 @@ static uint8_t discover_func(struct bt_conn *conn, const struct bt_gatt_attr *at
 		conn_info_ref->subscribe_params.notify = notify_func;
 		conn_info_ref->subscribe_params.value = BT_GATT_CCC_NOTIFY;
 		conn_info_ref->subscribe_params.ccc_handle = attr->handle;
+		conn_info_ref->subscribe_params.subscribe = subscribe_handler;
 
 		err = bt_gatt_subscribe(conn, &conn_info_ref->subscribe_params);
-		if (err == -ENOMEM || err == -ENOTCONN) {
-			goto retry;
+		LOG_ERR("Subscribe started in discovery cb(err %d)", err);
+		if (err == -ENOMEM || err == -ENOTCONN || err == -EALREADY) {
+			LOG_ERR("subscribe failed, pausing subscription (err %d)", err);
+			atomic_set_bit(conn_info_ref->flags, CONN_INFO_SUBSCRIPTION_PAUSED);
+			return BT_GATT_ITER_STOP;
 		}
 
 		if (err != -EALREADY) {
@@ -396,6 +424,8 @@ static void start_scan(void)
 	struct bt_le_scan_param scan_param = {
 		.type = BT_LE_SCAN_TYPE_ACTIVE,
 		.options = BT_LE_SCAN_OPT_NONE,
+//		.interval = 0x10,
+//		.window = 0x10,
 		.interval = BT_GAP_SCAN_FAST_INTERVAL,
 		.window = BT_GAP_SCAN_FAST_WINDOW,
 	};
@@ -417,10 +447,10 @@ static void connected_cb(struct bt_conn *conn, uint8_t conn_err)
 
 	__ASSERT(conn_err == BT_HCI_ERR_SUCCESS, "Failed to connect to %s (%u)", addr, conn_err);
 
-	LOG_INF("Connection %p established : %s", conn, addr);
+	LOG_ERR("Connection %p established : %s", conn, addr);
 
 	atomic_inc(&conn_count);
-	LOG_DBG("connected to %u devices", atomic_get(&conn_count));
+	LOG_ERR("connected to %u devices", atomic_get(&conn_count));
 
 	conn_info_ref = get_new_conn_info_ref(bt_conn_get_dst(conn));
 	__ASSERT_NO_MSG(conn_info_ref->conn_ref == NULL);
@@ -585,7 +615,8 @@ static void subscribe_to_service(struct bt_conn *conn, void *data)
 	 */
 	if (!atomic_test_bit(conn_info_ref->flags, CONN_INFO_SUBSCRIBED) &&
 	    (!atomic_test_bit(conn_info_ref->flags, CONN_INFO_DISCOVERING) ||
-	     atomic_test_bit(conn_info_ref->flags, CONN_INFO_DISCOVER_PAUSED))) {
+	     atomic_test_bit(conn_info_ref->flags, CONN_INFO_DISCOVER_PAUSED) ||
+	     atomic_test_bit(conn_info_ref->flags, CONN_INFO_SUBSCRIPTION_PAUSED))) {
 		/* If discovery hasn't started yet, load params. If it was
 		 * already started, then not touching the params will resume
 		 * discovery at the attribute it was stopped at.
@@ -601,12 +632,39 @@ static void subscribe_to_service(struct bt_conn *conn, void *data)
 			conn_info_ref->discover_params.start_handle = BT_ATT_FIRST_ATTRIBUTE_HANDLE;
 			conn_info_ref->discover_params.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
 			conn_info_ref->discover_params.type = BT_GATT_DISCOVER_PRIMARY;
-			LOG_INF("start discovery of %s", addr);
+			LOG_ERR("start discovery of %s", addr);
+
+			LOG_ERR("Discovering...");
+			err = bt_gatt_discover(conn, &conn_info_ref->discover_params);
+			LOG_ERR("Discover started (err %d)", err);
+		} else if (atomic_test_bit(conn_info_ref->flags,
+						     CONN_INFO_DISCOVER_PAUSED)) {
+			LOG_ERR("resume discovery of %s", addr);
+
+			LOG_ERR("Discovering...");
+			err = bt_gatt_discover(conn, &conn_info_ref->discover_params);
+			LOG_ERR("Discover started (err %d)", err);
+		} else if (atomic_test_bit(conn_info_ref->flags,
+						     CONN_INFO_SUBSCRIPTION_PAUSED)) {
+			LOG_ERR("resume subscription of %s", addr);
+
+			LOG_ERR("Subscribing...");
+			err = bt_gatt_subscribe(conn, &conn_info_ref->subscribe_params);
+			LOG_ERR("Subscribe started (err %d)", err);
+
+			if (err != -ENOMEM && err != -ENOTCONN && err != -EALREADY) {
+				atomic_set_bit(conn_info_ref->flags, CONN_INFO_SUBSCRIBED);
+
+				char addr[BT_ADDR_LE_STR_LEN];
+
+				bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+				LOG_INF("[SUBSCRIBED] addr %s", addr);
+			}
+
 		} else {
-			LOG_INF("resume discovery of %s", addr);
+			return;
 		}
 
-		err = bt_gatt_discover(conn, &conn_info_ref->discover_params);
 		if (*p_err == 0) {
 			/* Don't overwrite `err` if it was previously set. it is
 			 * cleared by the caller.
@@ -614,11 +672,9 @@ static void subscribe_to_service(struct bt_conn *conn, void *data)
 			*p_err = err;
 		}
 
-		if (err != -ENOMEM && err != -ENOTCONN) {
+		if (err != -ENOMEM && err != -ENOTCONN && err != -EALREADY) {
 			__ASSERT(!err, "Subscribe failed (err %d)", err);
 		}
-
-		atomic_clear_bit(conn_info_ref->flags, CONN_INFO_DISCOVER_PAUSED);
 	}
 }
 

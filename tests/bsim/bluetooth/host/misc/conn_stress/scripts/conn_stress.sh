@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 source ${ZEPHYR_BASE}/tests/bsim/sh_common.source
+#EXECUTE_TIMEOUT=1800
 
 simulation_id="conn_stress"
 
@@ -16,6 +17,9 @@ cd ${BSIM_OUT_PATH}/bin
 
 for device in `seq 1 12`; do
     let rs=$device*100
+#    if [ $device == 2 ]; then
+#        continue
+#    fi
 
     Execute "./${bsim_peripheral_exe_name}" ${bsim_args} \
         -d=$device -rs=$rs -testid=peripheral ${test_args}
@@ -23,6 +27,6 @@ done
 
 Execute "./${bsim_central_exe_name}" ${bsim_args} -d=0 -rs=001 -testid=central ${test_args}
 
-Execute ./bs_2G4_phy_v1 -dump -v=2 -s=${simulation_id} -D=13 -sim_length=10000e6 &
+Execute ./bs_2G4_phy_v1 -dump -v=2 -s=${simulation_id} -D=13 -sim_length=100000e6 &
 
 wait_for_background_jobs
