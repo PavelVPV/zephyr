@@ -10,13 +10,15 @@
 
 static K_SEM_DEFINE(sem_connected, 0, 1);
 
+static struct bt_conn *g_conn;
+
 static void connected_cb(struct bt_conn *conn, uint8_t err)
 {
 	TEST_ASSERT(conn);
 	TEST_ASSERT(err == 0, "Expected success");
 
+	g_conn = conn;
 	k_sem_give(&sem_connected);
-	bt_conn_unref(conn);
 }
 
 static struct bt_conn_cb conn_cb = {
@@ -46,6 +48,9 @@ static void test_peripheral_dummy(void)
 
 	err = k_sem_take(&sem_connected, K_FOREVER);
 	TEST_ASSERT(err == 0, "Failed getting connected timeout", err);
+
+	k_sleep(K_SECONDS(10));
+	bt_conn_unref(g_conn);
 
 	TEST_PASS("Passed");
 }

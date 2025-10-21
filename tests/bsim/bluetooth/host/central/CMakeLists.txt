@@ -15,6 +15,7 @@ target_link_libraries(app PRIVATE babblekit)
 zephyr_include_directories(
   ${BSIM_COMPONENTS_PATH}/libUtilv1/src/
   ${BSIM_COMPONENTS_PATH}/libPhyComv1/src/
+  ${ZEPHYR_BASE}/subsys/bluetooth/host/
   )
 
 add_subdirectory(${ZEPHYR_BASE}/tests/bluetooth/common/testlib testlib)
