@@ -629,7 +629,7 @@ void bt_hci_read_remote_features_complete(struct net_buf *buf)
 	struct bt_hci_cp_read_remote_ext_features *cp;
 	struct bt_conn *conn;
 
-	LOG_DBG("status 0x%02x handle %u", evt->status, handle);
+	LOG_INF("Remote features: status 0x%02x handle %u", evt->status, handle);
 
 	conn = bt_conn_lookup_handle(handle, BT_CONN_TYPE_BR);
 	if (!conn) {

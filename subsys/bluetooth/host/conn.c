@@ -1754,6 +1754,7 @@ static int do_phy_update(struct bt_conn *conn)
 		 * a PHY update procedure.
 		 */
 		if (conn->le.phy.tx_phy == phy && conn->le.phy.rx_phy == phy) {
+			LOG_WRN("Preferred PHY 0x%02x already in use", phy);
 			return 0;
 		}
 	}
@@ -1806,22 +1807,28 @@ static void perform_auto_initiated_procedures(struct bt_conn *conn, void *unused
 
 	if (!atomic_test_bit(conn->flags, BT_CONN_LE_FEATURES_EXCHANGED) &&
 	    can_initiate_feature_exchange(conn)) {
+		LOG_INF("Initiating LE feature exchange");
 		err = bt_hci_le_read_remote_features(conn);
 		if (err) {
 			LOG_ERR("Failed read remote features (%d)", err);
 		}
 		if (conn->state != BT_CONN_CONNECTED) {
+			LOG_WRN("Connection %p disconnected before LE feature exchange complete",
+				conn);
 			return;
 		}
 	}
 
 	if (IS_ENABLED(CONFIG_BT_REMOTE_VERSION) &&
 	    !atomic_test_bit(conn->flags, BT_CONN_AUTO_VERSION_INFO)) {
+		LOG_INF("Initiating remote version info read");
 		err = bt_hci_read_remote_version(conn);
 		if (err) {
 			LOG_ERR("Failed read remote version (%d)", err);
 		}
 		if (conn->state != BT_CONN_CONNECTED) {
+			LOG_WRN("Connection %p disconnected before remote version read complete",
+				conn);
 			return;
 		}
 	}
@@ -1829,12 +1836,15 @@ static void perform_auto_initiated_procedures(struct bt_conn *conn, void *unused
 	if (IS_ENABLED(CONFIG_BT_PHY_UPDATE) &&
 	    (!IS_ENABLED(CONFIG_BT_AUTO_PHY_CENTRAL_NONE) ||
 	     !IS_ENABLED(CONFIG_BT_AUTO_PHY_PERIPHERAL_NONE))) {
+		LOG_INF("Initiating PHY update");
 		err = do_phy_update(conn);
 		if (err) {
 			LOG_ERR("Failed LE Set PHY (%d)", err);
 		}
 
 		if (conn->state != BT_CONN_CONNECTED) {
+			LOG_WRN("Connection %p disconnected before PHY update complete",
+				conn);
 			return;
 		}
 	}
@@ -1846,16 +1856,20 @@ static void perform_auto_initiated_procedures(struct bt_conn *conn, void *unused
 	    bt_drv_quirk_no_auto_dle()) {
 		uint16_t tx_octets, tx_time;
 
+		LOG_INF("Initiating data length update");
+
 		err = bt_hci_le_read_max_data_len(&tx_octets, &tx_time);
 		if (!err) {
 			err = bt_le_set_data_len(conn, tx_octets, tx_time);
 			if (err) {
 				LOG_ERR("Failed to set data len (%d)", err);
 			}
+		} else {
+			LOG_ERR("Failed to read max data len (%d)", err);
 		}
 	}
 
-	LOG_DBG("[%p] Successfully ran auto-initiated procedures", conn);
+	LOG_INF("[%p] Successfully ran auto-initiated procedures", conn);
 }
 
 /* Executes procedures after a connection is established:
@@ -4021,6 +4035,10 @@ int bt_conn_le_conn_update(struct bt_conn *conn,
 {
 	struct hci_cp_le_conn_update *conn_update;
 	struct net_buf *buf;
+
+	LOG_INF("Update conn %p params (%d-%d %d %d)", conn,
+		param->interval_min, param->interval_max,
+		param->latency, param->timeout);
 
 	buf = bt_hci_cmd_alloc(K_FOREVER);
 	if (!buf) {

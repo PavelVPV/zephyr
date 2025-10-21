@@ -596,6 +596,7 @@ static struct net_buf *smp_create_pdu(struct bt_smp *smp, uint8_t op, size_t len
 	 */
 	buf = bt_l2cap_create_pdu_timeout(NULL, 0, timeout);
 	if (!buf) {
+		LOG_ERR("Failed to allocate buffer for SMP PDU 0x%02x", op);
 		/* If it was not possible to allocate a buffer within the
 		 * timeout marked it as timed out.
 		 */

@@ -1785,6 +1785,9 @@ static void le_remote_feat_complete(struct net_buf *buf)
 		return;
 	}
 
+	LOG_INF("Remote features received for handle %u status 0x%02x %s", handle,
+		evt->status, bt_hci_err_to_str(evt->status));
+
 	if (!evt->status) {
 		memcpy(conn->le.features, evt->features,
 		       sizeof(conn->le.features));
@@ -1918,7 +1921,7 @@ static void le_phy_update_complete(struct net_buf *buf)
 		return;
 	}
 
-	LOG_DBG("PHY updated: status: 0x%02x %s, tx: %u, rx: %u",
+	LOG_INF("PHY updated: status: 0x%02x %s, tx: %u, rx: %u",
 		evt->status, bt_hci_err_to_str(evt->status), evt->tx_phy,
 		evt->rx_phy);
 
@@ -2012,6 +2015,11 @@ static void le_conn_param_req(struct net_buf *buf)
 	param.latency = sys_le16_to_cpu(evt->latency);
 	param.timeout = sys_le16_to_cpu(evt->timeout);
 
+	LOG_INF("Conn Param Req: handle %u "
+		"interval_min 0x%04x interval_max 0x%04x latency 0x%04x timeout 0x%04x",
+		handle, param.interval_min, param.interval_max,
+		param.latency, param.timeout);
+
 	conn = bt_conn_lookup_handle(handle, BT_CONN_TYPE_LE);
 	if (!conn) {
 		LOG_ERR("Unable to lookup conn for handle %u", handle);
@@ -2020,8 +2028,10 @@ static void le_conn_param_req(struct net_buf *buf)
 	}
 
 	if (!bt_conn_le_param_req(conn, &param)) {
+		LOG_WRN("Rejecting invalid connection parameters");
 		le_conn_param_neg_reply(handle, BT_HCI_ERR_INVALID_LL_PARAM);
 	} else {
+		LOG_WRN("Accepting connection parameters");
 		le_conn_param_req_reply(handle, &param);
 	}
 
@@ -2036,7 +2046,7 @@ static void le_conn_update_complete(struct net_buf *buf)
 
 	handle = sys_le16_to_cpu(evt->handle);
 
-	LOG_DBG("status 0x%02x %s, handle %u",
+	LOG_INF("Conn Update Complete: status 0x%02x %s, handle %u",
 		evt->status, bt_hci_err_to_str(evt->status), handle);
 
 	conn = bt_conn_lookup_handle(handle, BT_CONN_TYPE_LE);
@@ -2423,6 +2433,10 @@ static void bt_hci_evt_read_remote_version_complete(struct net_buf *buf)
 		LOG_ERR("No connection for handle %u", handle);
 		return;
 	}
+
+	LOG_INF("Remote version info: status 0x%02x %s, version 0x%02x, manufacturer 0x%04x, subversion 0x%04x",
+		evt->status, bt_hci_err_to_str(evt->status), evt->version,
+		sys_le16_to_cpu(evt->manufacturer), sys_le16_to_cpu(evt->subversion));
 
 	if (!evt->status) {
 		conn->rv.version = evt->version;
@@ -3028,7 +3042,7 @@ static void hci_le_meta_event(struct net_buf *buf)
 
 	evt = net_buf_pull_mem(buf, sizeof(*evt));
 
-	LOG_DBG("subevent 0x%02x", evt->subevent);
+	LOG_INF("subevent 0x%02x", evt->subevent);
 
 	handle_event(evt->subevent, buf, meta_events, ARRAY_SIZE(meta_events));
 }
@@ -3155,7 +3169,7 @@ static void hci_event(struct net_buf *buf)
 	struct bt_hci_evt_hdr *hdr;
 
 	hdr = net_buf_pull_mem(buf, sizeof(*hdr));
-	LOG_DBG("event 0x%02x", hdr->evt);
+	LOG_INF("event 0x%02x", hdr->evt);
 
 	if (hdr->evt == BT_HCI_EVT_LE_META_EVENT) {
 		struct bt_hci_evt_le_meta_event *le_evt;
@@ -4385,6 +4399,8 @@ static int bt_recv_unsafe(struct net_buf *buf)
 
 		hdr = (void *)(buf->data + 1);
 
+		LOG_INF("bt_recv_unsafe: evt: 0x%02x", hdr->evt);
+
 		if (hdr->evt == BT_HCI_EVT_LE_META_EVENT) {
 			struct bt_hci_evt_le_meta_event *le_evt;
 
@@ -4395,6 +4411,8 @@ static int bt_recv_unsafe(struct net_buf *buf)
 			}
 
 			le_evt = (struct bt_hci_evt_le_meta_event *)&buf->data[sizeof(*hdr) + 1];
+
+			LOG_INF("bt_recv_unsafe: subevt: 0x%02x", le_evt->subevent);
 
 			evt_flags = bt_hci_le_subevent_get_flags(le_evt->subevent);
 		} else {

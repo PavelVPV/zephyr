@@ -38,6 +38,7 @@ static bool volatile is_disconnecting;
 
 static void tx_power_get(struct bt_conn *conn)
 {
+#if 0
 	struct bt_conn_le_tx_power power_level = {0};
 	int err;
 
@@ -49,6 +50,8 @@ static void tx_power_get(struct bt_conn *conn)
 	}
 
 	printk("Tx power level: %d", power_level.current_level);
+#else
+#endif
 }
 
 static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
