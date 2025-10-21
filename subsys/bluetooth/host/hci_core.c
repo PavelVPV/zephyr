@@ -4396,8 +4396,18 @@ static int bt_recv_unsafe(struct net_buf *buf)
 
 			le_evt = (struct bt_hci_evt_le_meta_event *)&buf->data[sizeof(*hdr) + 1];
 
+			/* Printk has been used because otherwise a rescheduling occurs inside
+			 * LOG_INF and this changes the test's timing.
+			 */
+			printk("LE Subevent 0x%02x\n", le_evt->subevent);
+
 			evt_flags = bt_hci_le_subevent_get_flags(le_evt->subevent);
 		} else {
+			/* Printk has been used because otherwise a rescheduling occurs inside
+			 * LOG_INF and this changes the test's timing.
+			 */
+			printk("Event 0x%02x\n", hdr->evt);
+
 			evt_flags = bt_hci_evt_get_flags(hdr->evt);
 		}
 
