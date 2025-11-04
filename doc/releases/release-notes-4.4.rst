@@ -41,6 +41,13 @@ The following sections provide detailed lists of changes by component.
 Security Vulnerability Related
 ******************************
 
+The following CVEs are addressed by this release:
+
+* :cve:`2025-59438` `Padding oracle through timing of cipher error reporting
+    <https://mbed-tls.readthedocs.io/en/latest/security-advisories/mbedtls-security-advisory-2025-10-invalid-padding-error/>`_
+* :cve:`2025-54764` `Side channel in RSA key generation and operations (SSBleed, M-Step)
+    <https://mbed-tls.readthedocs.io/en/latest/security-advisories/mbedtls-security-advisory-2025-10-ssbleed-mstep/>`_
+
 API Changes
 ***********
 
@@ -99,6 +106,11 @@ New Samples
 
 Libraries / Subsystems
 **********************
+
+* Updated Mbed TLS from version 3.6.4 to version 3.6.5. Release notes for this
+  release can be found at the following link:
+
+  * https://github.com/Mbed-TLS/mbedtls/releases/tag/mbedtls-3.6.5
 
 Other notable changes
 *********************
