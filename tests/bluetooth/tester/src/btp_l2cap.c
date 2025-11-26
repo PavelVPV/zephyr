@@ -33,7 +33,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, CONFIG_BTTESTER_LOG_LEVEL);
 #define DATA_MTU_INITIAL (2 * L2CAP_MPS)
 
 /* CHANNELS cannot be greater than 0x7f. */
-#define CHANNELS 2
+#define CHANNELS 3
 #define SERVERS 1
 
 NET_BUF_POOL_FIXED_DEFINE(data_pool, CHANNELS, BT_L2CAP_SDU_BUF_SIZE(DATA_MTU),
@@ -406,21 +406,28 @@ static uint8_t connect(const void *cmd, uint16_t cmd_len,
 	int err;
 
 	if (cp->num == 0 || cp->num > CHANNELS || mtu > DATA_MTU_INITIAL) {
+		LOG_ERR("Invalid parameters: num=%d, mtu=%d, mtu_initial=%d", cp->num, mtu, DATA_MTU_INITIAL);
+		k_sleep(K_SECONDS(1));
 		return BTP_STATUS_FAILED;
 	}
 
 	if (cp->address.type == BTP_BR_ADDRESS_TYPE) {
+		LOG_ERR("BR/EDR connection requested");
 		return br_connect(cp, rp, rsp_len);
 	}
 
 	conn = bt_conn_lookup_addr_le(BT_ID_DEFAULT, &cp->address);
 	if (!conn) {
+		LOG_ERR("Unknown connection");
+		k_sleep(K_SECONDS(1));
 		return BTP_STATUS_FAILED;
 	}
 
 	for (i = 0U; i < cp->num; i++) {
 		chan = get_free_channel();
 		if (!chan) {
+			LOG_ERR("No free channels");
+			k_sleep(K_SECONDS(1));
 			goto fail;
 		}
 		chan->le.chan.ops = &l2cap_ops;
@@ -436,16 +443,23 @@ static uint8_t connect(const void *cmd, uint16_t cmd_len,
 		bt_l2cap_chan_give_credits(&chan->le.chan, 1);
 	}
 
+	LOG_WRN("num: %d, ecfc: %d", cp->num, ecfc);
+
 	if (cp->num == 1 && !ecfc) {
+		LOG_WRN("Single channel connection without ECFC");
 		err = bt_l2cap_chan_connect(conn, &chan->le.chan, psm);
 		if (err < 0) {
+			LOG_ERR("bt_l2cap_chan_connect failed: %d", err);
+			k_sleep(K_SECONDS(1));
 			goto fail;
 		}
 	} else if (ecfc) {
 #if defined(CONFIG_BT_L2CAP_ECRED)
+		LOG_WRN("Multiple channel connection with ECFC");
 		err = bt_l2cap_ecred_chan_connect(conn, allocated_channels,
 							psm);
 		if (err < 0) {
+			k_sleep(K_SECONDS(1));
 			goto fail;
 		}
 #else
@@ -453,6 +467,7 @@ static uint8_t connect(const void *cmd, uint16_t cmd_len,
 #endif
 	} else {
 		LOG_ERR("Invalid 'num' parameter value");
+		k_sleep(K_SECONDS(1));
 		goto fail;
 	}
 
@@ -467,6 +482,8 @@ fail:
 			channels[BT_L2CAP_LE_CHAN(allocated_channels[i])->ident].in_use = false;
 		}
 	}
+	LOG_ERR("Connection failed");
+	k_sleep(K_SECONDS(1));
 	return BTP_STATUS_FAILED;
 }
 

@@ -68,7 +68,7 @@ LOG_MODULE_REGISTER(bt_l2cap, CONFIG_BT_L2CAP_LOG_LEVEL);
 #define L2CAP_LE_PSM_IS_DYN(_psm) \
 	(_psm >= L2CAP_LE_PSM_DYN_START && _psm <= L2CAP_LE_PSM_DYN_END)
 
-#define L2CAP_CONN_TIMEOUT	K_SECONDS(40)
+#define L2CAP_CONN_TIMEOUT	K_SECONDS(1)//40)
 #define L2CAP_DISC_TIMEOUT	K_SECONDS(2)
 /** @brief Local L2CAP RTX (Response Timeout eXpired)
  *
@@ -554,6 +554,9 @@ static int l2cap_le_conn_req(struct bt_l2cap_le_chan *ch)
 	if (!buf) {
 		return -ENOMEM;
 	}
+
+	LOG_WRN("L2CAP LE Connection Request Ident: %d, PSM 0x%04x CID 0x%04x MTU %u MPS %u",
+		ident, ch->psm, ch->rx.cid, ch->rx.mtu, ch->rx.mps);
 
 	/* TODO Ident handling/setting should ideally be done in l2cap_chan_send_req after the
 	 * request is successfully sent on the channel but will require special considerations for
@@ -2127,8 +2130,8 @@ static void le_conn_rsp(struct bt_l2cap *l2cap, uint8_t ident,
 	credits = sys_le16_to_cpu(rsp->credits);
 	result = sys_le16_to_cpu(rsp->result);
 
-	LOG_DBG("dcid 0x%04x mtu %u mps %u credits %u result 0x%04x", dcid, mtu, mps, credits,
-		result);
+	LOG_WRN("ident %d dcid 0x%04x mtu %u mps %u credits %u result 0x%04x", ident, dcid, mtu,
+		mps, credits, result);
 
 	/* Keep the channel in case of security errors */
 	if (result == BT_L2CAP_LE_SUCCESS ||
@@ -2144,6 +2147,8 @@ static void le_conn_rsp(struct bt_l2cap *l2cap, uint8_t ident,
 		return;
 	}
 
+	LOG_WRN("chan %p, rx.cid 0x%04x", chan, chan->rx.cid);
+
 	/* Cancel RTX work */
 	k_work_cancel_delayable(&chan->rtx_work);
 
@@ -2157,7 +2162,7 @@ static void le_conn_rsp(struct bt_l2cap *l2cap, uint8_t ident,
 		 * v6.0, Vol 3.A.4.23. Valid credit range is from 0 to UINT16_MAX, thus no credit
 		 * validation is needed.
 		 */
-		if ((!L2CAP_LE_CID_IS_DYN(dcid) ||
+		if ((//!L2CAP_LE_CID_IS_DYN(dcid) ||
 		     !IN_RANGE(mtu, L2CAP_LE_MIN_MTU, BT_L2CAP_MAX_MTU) ||
 		     !IN_RANGE(mps, L2CAP_LE_MIN_MPS, BT_L2CAP_MAX_MPS))) {
 			LOG_WRN("Invalid conn rsp params: dcid 0x%04x mtu %u mps %u. "
