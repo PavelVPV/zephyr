@@ -70,10 +70,14 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 	.disconnected = disconnected,
 };
 
+static int num_requests;
+
 static ssize_t read_test_chrc(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
 			      uint16_t len, uint16_t offset)
 {
-	printk("Read short\n");
+	num_requests++;
+	printk("Read short: %d\n", num_requests);
+	k_sleep(K_MSEC(1000));
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, (void *)chrc_data,
 				 sizeof(chrc_data));
 }
@@ -141,12 +145,16 @@ static void short_notify(enum bt_att_chan_opt opt)
 	};
 	int err;
 
+#if defined(CONFIG_BT_EATT)
 	params.chan_opt = opt;
+#endif
 
 	do {
+		printk("Sending notification\n");
 		err = bt_gatt_notify_cb(g_conn, &params);
 
 		if (err == -ENOMEM) {
+			printk("No memory error: %d\n", err);
 			k_sleep(K_MSEC(10));
 		} else if (err) {
 			TEST_FAIL("Short notify failed (err %d)", err);
@@ -167,7 +175,9 @@ static void long_notify(enum bt_att_chan_opt opt)
 	};
 	int err;
 
+#if defined(CONFIG_BT_EATT)
 	params.chan_opt = opt;
+#endif
 
 	do {
 		err = bt_gatt_notify_cb(g_conn, &params);
@@ -205,10 +215,12 @@ static void setup(void)
 
 	WAIT_FOR_FLAG(flag_is_connected);
 
+#if defined(CONFIG_BT_EATT)
 	while (bt_eatt_count(g_conn) < CONFIG_BT_EATT_MAX) {
 		k_sleep(K_MSEC(100));
 	}
 	printk("EATT connected\n");
+#endif
 
 	WAIT_FOR_FLAG(flag_short_subscribe);
 	WAIT_FOR_FLAG(flag_long_subscribe);
@@ -278,6 +290,56 @@ static void test_main_mixed(void)
 	TEST_PASS("GATT server passed");
 }
 
+static void setup_short_only(void)
+{
+	int err;
+	const struct bt_data ad[] = {
+		BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
+	};
+
+	err = bt_enable(NULL);
+	if (err != 0) {
+		TEST_FAIL("Bluetooth init failed (err %d)", err);
+		return;
+	}
+
+	printk("Bluetooth initialized\n");
+
+	err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), NULL, 0);
+	if (err != 0) {
+		TEST_FAIL("Advertising failed to start (err %d)", err);
+		return;
+	}
+
+	printk("Advertising successfully started\n");
+
+	WAIT_FOR_FLAG(flag_is_connected);
+#if 0
+	while (bt_eatt_count(g_conn) < CONFIG_BT_EATT_MAX) {
+		k_sleep(K_MSEC(100));
+	}
+	printk("EATT connected\n");
+#endif
+	WAIT_FOR_FLAG(flag_short_subscribe);
+}
+
+static void test_main_req(void)
+{
+	setup_short_only();
+
+	printk("Before sending notifications\n");
+	for (int i = 0; i < NOTIFICATION_COUNT; i++) {
+		short_notify(BT_ATT_CHAN_OPT_NONE);
+		printk("Notification scheduled\n");
+	}
+
+	while (num_notifications_sent < NOTIFICATION_COUNT || num_requests < REQUESTS_COUNT) {
+		k_sleep(K_MSEC(100));
+	}
+
+	TEST_PASS("GATT server passed");
+}
+
 static const struct bst_test_instance test_gatt_server[] = {
 	{
 		.test_id = "gatt_server_none",
@@ -294,6 +356,10 @@ static const struct bst_test_instance test_gatt_server[] = {
 	{
 		.test_id = "gatt_server_mixed",
 		.test_main_f = test_main_mixed,
+	},
+	{
+		.test_id = "gatt_server_req",
+		.test_main_f = test_main_req,
 	},
 	BSTEST_END_MARKER,
 };

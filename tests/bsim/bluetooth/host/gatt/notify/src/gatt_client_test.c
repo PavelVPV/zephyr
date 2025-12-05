@@ -171,7 +171,9 @@ static void gatt_discover(enum bt_att_chan_opt opt)
 	discover_params.start_handle = BT_ATT_FIRST_ATTRIBUTE_HANDLE;
 	discover_params.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
 	discover_params.type = BT_GATT_DISCOVER_PRIMARY;
+#if defined(CONFIG_BT_EATT)
 	discover_params.chan_opt = opt;
+#endif
 
 	err = bt_gatt_discover(g_conn, &discover_params);
 	if (err != 0) {
@@ -180,6 +182,56 @@ static void gatt_discover(enum bt_att_chan_opt opt)
 
 	WAIT_FOR_FLAG(flag_discover_complete);
 	printk("Discover complete\n");
+}
+
+static K_THREAD_STACK_DEFINE(req_thread_stack, 1024);
+static struct k_thread req_thread_data;
+static int num_requests;
+static K_SEM_DEFINE(req_sem, 0, 1);
+
+static uint8_t read_cb(struct bt_conn *conn, uint8_t err,
+		       struct bt_gatt_read_params *params, const void *data,
+		       uint16_t length)
+{
+	if (err) {
+		printk("Read failed: %d\n", err);
+		return 0;
+	}
+
+	num_requests++;
+
+	printk("Request %d received\n", num_requests);
+	k_sem_give(&req_sem);
+
+	return BT_GATT_ITER_STOP;
+}
+
+static void req_thread(void *p1, void *p2, void *p3)
+{
+	printk("start req thread\n");
+
+	static struct bt_gatt_read_params params = {
+		.func = read_cb,
+		.handle_count = 1,
+	};
+
+	params.single.handle = chrc_handle;
+
+	for (int i = 0; i < REQUESTS_COUNT; i++) {
+		int err = bt_gatt_read(g_conn, &params);
+
+		if (err) {
+			printk("Failed to send read request: %d\n", err);
+//			k_sleep(K_MSEC(100));
+		} else {
+//			err = k_sem_take(&req_sem, K_SECONDS(32));
+			if (err) {
+				TEST_FAIL("Failed to receive request response: %d", err);
+			}
+		}
+	}
+
+	printk("All requests sent\n");
 }
 
 static void test_short_subscribed(struct bt_conn *conn, uint8_t err,
@@ -257,7 +309,9 @@ static void gatt_subscribe_short(enum bt_att_chan_opt opt)
 	int err;
 
 	sub_params_short.value_handle = chrc_handle;
+#if defined(CONFIG_BT_EATT)
 	sub_params_short.chan_opt = opt;
+#endif
 	err = bt_gatt_subscribe(g_conn, &sub_params_short);
 	if (err < 0) {
 		TEST_FAIL("Failed to subscribe");
@@ -271,7 +325,9 @@ static void gatt_unsubscribe_short(enum bt_att_chan_opt opt)
 	int err;
 
 	sub_params_short.value_handle = chrc_handle;
+#if defined(CONFIG_BT_EATT)
 	sub_params_short.chan_opt = opt;
+#endif
 	err = bt_gatt_unsubscribe(g_conn, &sub_params_short);
 	if (err < 0) {
 		TEST_FAIL("Failed to unsubscribe");
@@ -286,7 +342,9 @@ static void gatt_subscribe_long(enum bt_att_chan_opt opt)
 
 	UNSET_FLAG(flag_long_subscribed);
 	sub_params_long.value_handle = long_chrc_handle;
+#if defined(CONFIG_BT_EATT)
 	sub_params_long.chan_opt = opt;
+#endif
 	err = bt_gatt_subscribe(g_conn, &sub_params_long);
 	if (err < 0) {
 		TEST_FAIL("Failed to subscribe");
@@ -301,7 +359,9 @@ static void gatt_unsubscribe_long(enum bt_att_chan_opt opt)
 
 	UNSET_FLAG(flag_long_subscribed);
 	sub_params_long.value_handle = long_chrc_handle;
+#if defined(CONFIG_BT_EATT)
 	sub_params_long.chan_opt = opt;
+#endif
 	err = bt_gatt_unsubscribe(g_conn, &sub_params_long);
 	if (err < 0) {
 		TEST_FAIL("Failed to unsubscribe");
@@ -335,9 +395,11 @@ static void setup(void)
 
 	WAIT_FOR_FLAG(flag_is_encrypted);
 
+#if defined(CONFIG_BT_EATT)
 	while (bt_eatt_count(g_conn) < CONFIG_BT_EATT_MAX) {
 		k_sleep(K_MSEC(10));
 	}
+#endif
 
 	printk("EATT connected\n");
 }
@@ -445,6 +507,61 @@ static void test_main_mixed(void)
 	TEST_PASS("GATT client Passed");
 }
 
+static void setup_no_eatt(void)
+{
+	int err;
+
+	err = bt_enable(NULL);
+	if (err != 0) {
+		TEST_FAIL("Bluetooth discover failed (err %d)", err);
+	}
+
+	err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, device_found);
+	if (err != 0) {
+		TEST_FAIL("Scanning failed to start (err %d)", err);
+	}
+
+	printk("Scanning successfully started\n");
+
+	WAIT_FOR_FLAG(flag_is_connected);
+
+	err = bt_conn_set_security(g_conn, BT_SECURITY_L2);
+	if (err) {
+		TEST_FAIL("Starting encryption procedure failed (%d)", err);
+	}
+
+	WAIT_FOR_FLAG(flag_is_encrypted);
+}
+
+
+static void test_main_req(void)
+{
+	setup_no_eatt();
+
+	gatt_discover(BT_ATT_CHAN_OPT_NONE);
+	gatt_subscribe_short(BT_ATT_CHAN_OPT_NONE);
+	WAIT_FOR_FLAG(flag_short_subscribed);
+	printk("Subscribed\n");
+
+	k_thread_create(&req_thread_data, req_thread_stack, K_THREAD_STACK_SIZEOF(req_thread_stack),
+			req_thread, NULL, NULL, NULL, K_PRIO_PREEMPT(0), 0, K_NO_WAIT);
+	k_thread_name_set(&req_thread_data, "req thread");
+	k_thread_priority_set(k_current_get(), K_PRIO_PREEMPT(0));
+	printk("Thread started\n");
+
+	while (num_notifications < NOTIFICATION_COUNT || num_requests < REQUESTS_COUNT) {
+		k_sleep(K_MSEC(100));
+	}
+
+	gatt_unsubscribe_short(BT_ATT_CHAN_OPT_NONE);
+	WAIT_FOR_FLAG(flag_short_subscribed);
+
+	printk("Unsubscribed\n");
+
+	TEST_PASS("GATT client Passed");
+
+}
+
 static const struct bst_test_instance test_vcs[] = {
 	{
 		.test_id = "gatt_client_none",
@@ -461,6 +578,10 @@ static const struct bst_test_instance test_vcs[] = {
 	{
 		.test_id = "gatt_client_mixed",
 		.test_main_f = test_main_mixed,
+	},
+	{
+		.test_id = "gatt_client_req",
+		.test_main_f = test_main_req,
 	},
 	BSTEST_END_MARKER,
 };
