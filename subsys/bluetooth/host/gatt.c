@@ -3864,10 +3864,16 @@ static void gatt_discover_next(struct bt_conn *conn, uint16_t last_handle,
 	}
 
 discover:
+	int err;
+
+	err = bt_gatt_discover(conn, params);
+
 	/* Discover next range */
-	if (!bt_gatt_discover(conn, params)) {
+	if (err == 0) {
 		return;
 	}
+
+	LOG_WRN("Discover failed (err %d)", err);
 
 done:
 	params->func(conn, NULL, params);

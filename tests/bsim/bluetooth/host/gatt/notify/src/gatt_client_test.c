@@ -228,6 +228,11 @@ static volatile size_t num_notifications;
 uint8_t test_notify(struct bt_conn *conn, struct bt_gatt_subscribe_params *params, const void *data,
 		    uint16_t length)
 {
+	if (!data) {
+		printk("Notification with NULL data\n");
+		return BT_GATT_ITER_STOP;
+	}
+
 	printk("Received notification #%u with length %d\n", num_notifications++, length);
 
 	return BT_GATT_ITER_CONTINUE;

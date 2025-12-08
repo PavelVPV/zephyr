@@ -189,6 +189,7 @@ static struct bt_att_req cancel;
 static k_tid_t att_handle_rsp_thread;
 
 static struct bt_att_tx_meta_data tx_meta_data_storage[CONFIG_BT_ATT_TX_COUNT];
+static struct bt_att_tx_meta_data notify_meta_data_storage[CONFIG_BT_ATT_NOTIFY_COUNT];
 
 static struct bt_att_tx_meta_data *att_get_tx_meta_data(const struct net_buf *buf);
 static void att_on_sent_cb(struct bt_att_tx_meta_data *meta);
@@ -357,14 +358,25 @@ NET_BUF_POOL_DEFINE(att_pool, CONFIG_BT_ATT_TX_COUNT,
 		    BT_L2CAP_SDU_BUF_SIZE(BT_ATT_BUF_SIZE),
 		    CONFIG_BT_CONN_TX_USER_DATA_SIZE, att_tx_destroy);
 
+NET_BUF_POOL_DEFINE(att_notif_pool, CONFIG_BT_ATT_NOTIFY_COUNT,
+		    BT_L2CAP_SDU_BUF_SIZE(BT_ATT_BUF_SIZE),
+		    CONFIG_BT_CONN_TX_USER_DATA_SIZE, att_tx_destroy);
+
 static struct bt_att_tx_meta_data *att_get_tx_meta_data(const struct net_buf *buf)
 {
-	__ASSERT_NO_MSG(net_buf_pool_get(buf->pool_id) == &att_pool);
+	//__ASSERT_NO_MSG(net_buf_pool_get(buf->pool_id) == &att_pool);
+
+	if (net_buf_pool_get(buf->pool_id) == &att_pool) {
+		return &tx_meta_data_storage[net_buf_id((struct net_buf *)buf)];
+	} else if (net_buf_pool_get(buf->pool_id) == &att_notif_pool) {
+		return &notify_meta_data_storage[net_buf_id((struct net_buf *)buf)];
+	} else {
+		__ASSERT_NO_MSG(false);
+	}
 
 	/* Metadata lifetime is implicitly tied to the buffer lifetime.
 	 * Treat it as part of the buffer itself.
 	 */
-	return &tx_meta_data_storage[net_buf_id((struct net_buf *)buf)];
 }
 
 static int bt_att_chan_send(struct bt_att_chan *chan, struct net_buf *buf);
@@ -785,6 +797,7 @@ static struct net_buf *bt_att_chan_create_pdu(struct bt_att_chan *chan, uint8_t 
 	struct net_buf *buf;
 	struct bt_att_tx_meta_data *data;
 	k_timeout_t timeout;
+	struct net_buf_pool *pool = &att_pool;
 
 	if (len + sizeof(op) > bt_att_mtu(chan)) {
 		LOG_WRN("ATT MTU exceeded, max %u, wanted %zu", bt_att_mtu(chan),
@@ -798,6 +811,10 @@ static struct net_buf *bt_att_chan_create_pdu(struct bt_att_chan *chan, uint8_t 
 		/* Use a timeout only when responding/confirming */
 		timeout = BT_ATT_TIMEOUT;
 		break;
+	case ATT_NOTIFICATION:
+		/* NOTE: If K_NO_WAIT needed, remove `fallthrough`, change timeout and add break */
+		pool = &att_notif_pool;
+		/* fallthrough */
 	default: {
 		k_tid_t current_thread = k_current_get();
 
@@ -814,7 +831,7 @@ static struct net_buf *bt_att_chan_create_pdu(struct bt_att_chan *chan, uint8_t 
 	}
 
 	/* This will reserve headspace for lower layers */
-	buf = bt_l2cap_create_pdu_timeout(&att_pool, 0, timeout);
+	buf = bt_l2cap_create_pdu_timeout(pool, 0, timeout);
 	if (!buf) {
 		LOG_DBG("Unable to allocate buffer for op 0x%02x", op);
 		return NULL;
