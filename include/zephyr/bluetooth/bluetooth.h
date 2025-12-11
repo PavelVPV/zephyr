@@ -1324,6 +1324,43 @@ int bt_le_adv_update_data(const struct bt_data *ad, size_t ad_len,
  */
 int bt_le_adv_stop(void);
 
+/** Advertising states. */
+enum bt_le_adv_state {
+	/** The advertising set has been created but not enabled. */
+	BT_LE_ADV_STATE_DISABLED,
+
+	/** The advertising set is enabled. */
+	BT_LE_ADV_STATE_ENABLED,
+};
+
+/** @brief Advertising set info structure. */
+struct bt_le_adv_info {
+	/** Local identity handle. */
+	uint8_t                    id;
+
+	/** Currently selected Transmit Power (dBM). */
+	int8_t                     tx_power;
+
+	/** Advertising Set ID */
+	uint8_t                    sid;
+
+	/** Current local advertising address used. */
+	const bt_addr_le_t         *addr;
+
+	/** Advertising state. */
+	enum bt_le_adv_state adv_state;
+};
+
+/*
+ * @brief Get advertising set info
+ *
+ * @param info Advertising set info object. The values in this object are only valid on success.
+ *
+ * @retval 0 Success.
+ * @retval -EINVAL advertising set is not created or @p info is NULL.
+*/
+int bt_le_adv_get_info(struct bt_le_adv_info *info);
+
 /**
  * @brief Create advertising set.
  *

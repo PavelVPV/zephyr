@@ -1361,6 +1361,37 @@ int bt_le_adv_stop(void)
 	return 0;
 }
 
+int bt_le_adv_get_info(struct bt_le_adv_info *info)
+{
+	struct bt_le_ext_adv *adv;
+	int err;
+
+	adv = bt_le_adv_lookup_legacy();
+
+	if (!atomic_test_bit(adv->flags, BT_ADV_CREATED)) {
+		LOG_DBG("Advertising set %p is not created", adv);
+		return -EINVAL;
+	}
+
+	if (info == NULL) {
+		LOG_DBG("info is NULL");
+		return -EINVAL;
+	}
+
+	info->id = adv->id;
+	info->sid = adv->sid;
+	info->tx_power = adv->tx_power;
+	info->addr = &adv->random_addr;
+
+	if (atomic_test_bit(adv->flags, BT_ADV_ENABLED)) {
+		info->adv_state = BT_LE_ADV_STATE_ENABLED;
+	} else {
+		info->adv_state = BT_LE_ADV_STATE_DISABLED;
+	}
+
+	return 0;
+}
+
 #if defined(CONFIG_BT_EXT_ADV)
 int bt_le_ext_adv_get_info(const struct bt_le_ext_adv *adv,
 			   struct bt_le_ext_adv_info *info)
