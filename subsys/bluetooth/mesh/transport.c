@@ -35,7 +35,7 @@
 #include "transport.h"
 #include "va.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_TRANS_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_TRANS_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_transport);
 
@@ -115,6 +115,7 @@ static struct seg_rx {
 } seg_rx[CONFIG_BT_MESH_RX_SEG_MSG_COUNT];
 
 K_MEM_SLAB_DEFINE(segs, BT_MESH_APP_SEG_SDU_MAX, CONFIG_BT_MESH_SEG_BUFS, 4);
+K_MEM_SLAB_DEFINE(tx_segs, 32, CONFIG_BT_MESH_SEG_BUFS, 4);
 
 static int send_unseg(struct bt_mesh_net_tx *tx, struct net_buf_simple *sdu,
 		      const struct bt_mesh_send_cb *cb, void *cb_data,
@@ -195,7 +196,7 @@ bool bt_mesh_tx_in_progress(void)
 
 static void seg_tx_done(struct seg_tx *tx, uint8_t seg_idx)
 {
-	k_mem_slab_free(&segs, (void *)tx->seg[seg_idx]);
+	k_mem_slab_free(&tx_segs, (void *)tx->seg[seg_idx]);
 	tx->seg[seg_idx] = NULL;
 	tx->nack_count--;
 }
@@ -344,7 +345,7 @@ static void seg_tx_buf_build(struct seg_tx *tx, uint8_t seg_o,
 			     struct net_buf_simple *buf)
 {
 	uint16_t seq_zero = tx->seq_auth & TRANS_SEQ_ZERO_MASK;
-	uint8_t len = MIN(seg_len(tx->ctl), tx->len - (seg_len(tx->ctl) * seg_o));
+	uint8_t len = MIN(tx->seg_n == (seg_o - 1) ? 15 : seg_len(tx->ctl), tx->len - (seg_len(tx->ctl) * seg_o));
 
 	net_buf_simple_add_u8(buf, tx->hdr);
 	net_buf_simple_add_u8(buf, (tx->aszmic << 7) | seq_zero >> 6);
@@ -424,6 +425,7 @@ static void seg_tx_send_unacked(struct seg_tx *tx)
 
 		LOG_DBG("Sending %u/%u", tx->seg_o, tx->seg_n);
 
+		LOG_HEXDUMP_DBG(seg->b.data, seg->b.len, "transport seg:");
 		err = bt_mesh_net_send(&net_tx, seg, &seg_sent_cb, tx);
 		if (err) {
 			LOG_DBG("Sending segment failed");
@@ -518,7 +520,7 @@ static int send_seg(struct bt_mesh_net_tx *net_tx, struct net_buf_simple *sdu,
 
 	tx->src = net_tx->src;
 	tx->dst = net_tx->ctx->addr;
-	tx->seg_n = (sdu->len - 1) / seg_len(!!ctl_op);
+	tx->seg_n = (sdu->len - 1) / (sdu->len == 15 ? 15 : seg_len(!!ctl_op));
 	tx->seg_o = 0;
 	tx->len = sdu->len;
 	tx->nack_count = tx->seg_n + 1;
@@ -555,14 +557,14 @@ static int send_seg(struct bt_mesh_net_tx *net_tx, struct net_buf_simple *sdu,
 		uint16_t len;
 		int err;
 
-		err = k_mem_slab_alloc(&segs, &buf, BUF_TIMEOUT);
+		err = k_mem_slab_alloc(&tx_segs, &buf, BUF_TIMEOUT);
 		if (err) {
 			LOG_ERR("Out of segment buffers");
 			seg_tx_reset(tx);
 			return -ENOBUFS;
 		}
 
-		len = MIN(sdu->len, seg_len(!!ctl_op));
+		len = MIN(sdu->len, tx->seg_n == (seg_o - 1) ? 15 : seg_len(!!ctl_op));
 		memcpy(buf, net_buf_simple_pull_mem(sdu, len), len);
 
 		LOG_DBG("seg %u: %s", seg_o, bt_hex(buf, len));
@@ -572,7 +574,7 @@ static int send_seg(struct bt_mesh_net_tx *net_tx, struct net_buf_simple *sdu,
 		if (IS_ENABLED(CONFIG_BT_MESH_FRIEND)) {
 			enum bt_mesh_friend_pdu_type type;
 
-			NET_BUF_SIMPLE_DEFINE(seg, 16);
+			NET_BUF_SIMPLE_DEFINE(seg, 19);
 			seg_tx_buf_build(tx, seg_o, &seg);
 
 			if (seg_o == tx->seg_n) {
@@ -588,7 +590,7 @@ static int send_seg(struct bt_mesh_net_tx *net_tx, struct net_buf_simple *sdu,
 				/* PDUs for a specific Friend should only go
 				 * out through the Friend Queue.
 				 */
-				k_mem_slab_free(&segs, buf);
+				k_mem_slab_free(&tx_segs, buf);
 				tx->seg[seg_o] = NULL;
 			}
 
@@ -1508,6 +1510,12 @@ found_rx:
 		return -EALREADY;
 	}
 
+	LOG_ERR("buf len %u seg len %u", buf->len, seg_len(rx->ctl));
+	if (buf->len > seg_len(rx->ctl)) {
+		LOG_ERR("Incorrect segment size for message type 2");
+		return -EINVAL;
+	}
+
 	/* All segments, except the last one, must either have 8 bytes of
 	 * payload (for 64bit Net MIC) or 12 bytes of payload (for 32bit
 	 * Net MIC).
@@ -1527,7 +1535,7 @@ found_rx:
 		}
 	} else {
 		if (buf->len != seg_len(rx->ctl)) {
-			LOG_ERR("Incorrect segment size for message type");
+			LOG_ERR("3213 Incorrect segment size for message type");
 			return -EINVAL;
 		}
 	}
@@ -1541,6 +1549,8 @@ found_rx:
 		LOG_DBG("ack delay %u", ACK_DELAY(rx->seg_n));
 		k_work_reschedule(&rx->ack, K_MSEC(ACK_DELAY(rx->seg_n)));
 	}
+
+	__ASSERT_NO_MSG(buf->len <= seg_len(rx->ctl));
 
 	/* Allocated segment here */
 	err = k_mem_slab_alloc(&segs, &rx->seg[seg_o], K_NO_WAIT);

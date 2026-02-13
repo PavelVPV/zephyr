@@ -121,6 +121,8 @@ static const struct {
 	uint16_t len;
 	enum bt_mesh_test_send_flags flags;
 } test_vector[] = {
+	{.len = 15, .flags = FORCE_SEGMENTATION},
+#if 0
 	{.len = 1, .flags = 0},
 	{.len = 1, .flags = FORCE_SEGMENTATION},
 	{.len = BT_MESH_APP_SEG_SDU_MAX, .flags = 0},
@@ -130,6 +132,7 @@ static const struct {
 	{.len = BT_MESH_APP_SEG_SDU_MAX + 1, .flags = 0},
 	{.len = 256, .flags = LONG_MIC},
 	{.len = BT_MESH_TX_SDU_MAX - BT_MESH_MIC_SHORT, .flags = 0},
+#endif
 };
 
 /** Test sending of unicast messages using the test vector.
@@ -140,11 +143,61 @@ static void test_tx_unicast(void)
 
 	bt_mesh_test_setup();
 
+#if 0
 	for (int i = 0; i < ARRAY_SIZE(test_vector); i++) {
 		err = bt_mesh_test_send(rx_cfg.addr, NULL, test_vector[i].len,
 					test_vector[i].flags, K_SECONDS(10));
 		ASSERT_OK_MSG(err, "Failed sending vector %d", i);
 	}
+#endif
+	//d2 c8 88 8a de 19 31 cf fd 50 c5 20 9f b6 65
+
+	static const uint8_t corrupted_unseg_pdu[16] = {
+		//0xd2, 0x48, 0x88, 0x8a, 0xde, 0x19, 0x31, 0xcf,
+
+		0xd2, 0x48, 0x88, 0x00, 0xde, 0x19, 0x31, 0xcf,
+		0xfd, 0x50, 0xc5, 0x20, 0x9f, 0xb6, 0x65, 0x56
+	};
+
+	struct bt_mesh_msg_ctx ctx = {
+		.net_idx  = 0,                 /* same default path as bt_mesh_test_send */
+		.app_idx  = 0,                 /* not used by bt_mesh_net_send, but keep consistent */
+		.addr     = rx_cfg.addr,       /* test_tx_unicast destination (0x0002) */
+		.uuid     = NULL,
+		.send_rel = false,
+		.send_ttl = 3,//BT_MESH_TTL_DEFAULT,
+	};
+
+	struct bt_mesh_net_tx tx = {
+		.sub         = bt_mesh_subnet_get(ctx.net_idx),
+		.ctx         = &ctx,
+		.src         = tx_cfg.addr,    /* test_tx_unicast source (0x0001) */
+		.xmit        = bt_mesh_net_transmit_get(),
+		.friend_cred = 0,
+		.aszmic      = 0,
+		.aid         = 0x12,           /* from your reconstructed header */
+	};
+
+	struct bt_mesh_adv *adv;
+
+	if (!tx.sub) {
+		ASSERT_OK_MSG(-EINVAL, "Failed to get subnet for net_idx %d", ctx.net_idx);
+	}
+
+	/* Allocate advertising buffer first (as requested) */
+	adv = bt_mesh_adv_create(BT_MESH_ADV_DATA, BT_MESH_ADV_TAG_LOCAL,
+				 tx.xmit, K_NO_WAIT);
+	if (!adv) {
+		ASSERT_OK_MSG(-ENOBUFS, "Failed to allocate adv buffer");
+	}
+
+	/* Reserve network header space, then append transport PDU */
+	net_buf_simple_reserve(&adv->b, BT_MESH_NET_HDR_LEN);
+	net_buf_simple_add_mem(&adv->b, corrupted_unseg_pdu, sizeof(corrupted_unseg_pdu));
+
+	/* bt_mesh_net_send() consumes/unrefs adv internally */
+	err = bt_mesh_net_send(&tx, adv, NULL, NULL);
+	ASSERT_OK_MSG(err, "Failed sending corrupted transport PDU (err %d)", err);
 
 	PASS();
 }

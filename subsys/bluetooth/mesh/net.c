@@ -38,7 +38,7 @@
 #include "sar_cfg_internal.h"
 #include "brg_cfg.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_NET_LOG_LEVEL
+#define LOG_LEVEL 4//CONFIG_BT_MESH_NET_LOG_LEVEL
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_mesh_net);
 

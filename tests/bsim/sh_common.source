@@ -13,6 +13,7 @@ BOARD="${BOARD:-nrf52_bsim/native}"
 BOARD_TS="${BOARD//\//_}"
 
 function run_in_background(){
+  echo -e "\e[92mRunning in background: $@\e[39m"
   "$@" & _process_ids="$_process_ids $!"
 }
 
