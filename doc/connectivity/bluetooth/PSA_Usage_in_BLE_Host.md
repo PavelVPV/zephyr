@@ -340,6 +340,113 @@ int bt_rand(void *buf, size_t len)
 
 ---
 
+## Where AES is Used in BLE Operations
+
+The BLE host uses **AES-128 encryption** (via PSA Crypto API) in multiple critical security operations. All AES operations use the **ECB mode** as specified by the Bluetooth Core Specification.
+
+### 1. **Pairing and Key Generation** (Security Toolbox Functions)
+
+#### e() Function - Core Encryption Primitive
+**Location:** [crypto_psa.c - `bt_encrypt_le()`](https://github.com/PavelVPV/zephyr/blob/05b84df99688864910186370334889aebbb1505b/subsys/bluetooth/host/crypto_psa.c#L66-L116)
+
+The `e()` function is the fundamental encryption primitive defined in Bluetooth Core Specification Vol 3, Part H. It's used for:
+
+- **STK (Short Term Key) generation** in LE Legacy Pairing
+  - Encrypts random values during pairing
+  - Derives temporary encryption key
+  
+- **LTK (Long Term Key) generation** in LE Secure Connections
+  - Part of key derivation functions (f5, f6)
+  - Used to generate session encryption keys
+  
+- **Confirm value generation** during pairing
+  - Computes c1 confirm values in Legacy Pairing
+  - Ensures both devices have the same passkey/OOB data
+
+**PSA Operation:**
+```c
+psa_import_key()        // Import 128-bit AES key
+psa_cipher_encrypt()    // AES-128 ECB encryption
+psa_destroy_key()       // Destroy key handle
+```
+
+#### ah() Function - Address Resolution
+**Location:** Used with IRK for Resolvable Private Address (RPA) generation
+
+**Purpose:**
+- **RPA Generation** - Creates privacy-preserving Bluetooth addresses
+- **RPA Resolution** - Verifies if an RPA belongs to a known device
+
+**How it works:**
+1. Takes IRK (Identity Resolving Key) as AES key
+2. Encrypts random value using AES-128-ECB
+3. Produces 24-bit hash used in RPA
+
+**PSA Operation:** Same as e() - AES-128 ECB encryption
+
+### 2. **Link Layer Encryption** (CCM Mode)
+
+**Location:** [aes_ccm.c](https://github.com/PavelVPV/zephyr/blob/05b84df99688864910186370334889aebbb1505b/subsys/bluetooth/host/aes_ccm.c) - `bt_ccm_encrypt()` / `bt_ccm_decrypt()`
+
+**Purpose:** Encrypt/decrypt actual Bluetooth LE packet data during an established encrypted connection
+
+**Uses:**
+- **Session Key Encryption** - Protect data packets on encrypted links
+- **MIC (Message Integrity Check)** - Authenticate packet data
+
+**Mode:** AES-CCM (Counter with CBC-MAC) - combines encryption and authentication
+- Based on AES-128 in CTR mode for encryption
+- Based on AES-128 in CBC mode for authentication
+
+**Note:** While CCM uses AES underneath, it may use different PSA APIs (`psa_aead_encrypt/decrypt`) depending on configuration.
+
+### 3. **GATT Database Hashing** (AES-CMAC)
+
+**Location:** [gatt.c - database hash functions](https://github.com/PavelVPV/zephyr/blob/05b84df99688864910186370334889aebbb1505b/subsys/bluetooth/host/gatt.c#L780)
+
+**Purpose:** Generate a 128-bit hash of the GATT database for the GATT Caching feature (Bluetooth 5.1+)
+
+**How it works:**
+1. Uses AES-CMAC (Cipher-based MAC) algorithm
+2. Key: All-zeros 128-bit key (per BLE specification)
+3. Input: All GATT attribute handles, UUIDs, and properties
+4. Output: 128-bit database hash
+
+**PSA Operations:**
+```c
+psa_import_key()           // Import zero key for CMAC
+psa_mac_sign_setup()       // Setup CMAC operation
+psa_mac_update()           // Hash each attribute incrementally
+psa_mac_sign_finish()      // Finalize 128-bit hash
+psa_destroy_key()          // Cleanup
+```
+
+**Purpose:** Client can verify GATT database hasn't changed since last connection, avoiding full service discovery.
+
+### 4. **Key Derivation Functions** (LE Secure Connections)
+
+When using LE Secure Connections, several cryptographic functions use AES-128:
+
+- **f4()** - Confirm value generation function
+- **f5()** - LTK and MacKey generation from DHKey
+- **f6()** - Check value generation for numeric comparison
+
+These functions are implemented using combinations of AES-128-CMAC operations.
+
+### Summary: AES Usage by Operation Type
+
+| Operation | AES Algorithm | PSA Function | Input Key | Purpose |
+|-----------|---------------|--------------|-----------|---------|
+| **Pairing e()** | AES-128 ECB | `psa_cipher_encrypt()` | Temporary pairing key | STK/LTK/Confirm generation |
+| **RPA ah()** | AES-128 ECB | `psa_cipher_encrypt()` | IRK | Privacy address generation |
+| **Link Encryption** | AES-128 CCM | `psa_aead_encrypt/decrypt()` | Session key | Packet encryption/auth |
+| **GATT Hash** | AES-128 CMAC | `psa_mac_sign_finish()` | Zero key | Database integrity |
+| **LESC f4/f5/f6** | AES-128 CMAC | `psa_mac_sign_finish()` | Various | Key derivation |
+
+**Key Point:** All AES operations are **ephemeral** - the AES key is imported into PSA, used once for the operation, then the PSA key handle is immediately destroyed. The actual key material (LTK, IRK, etc.) remains in RAM or flash as raw bytes, NOT as PSA key IDs.
+
+---
+
 ## Key Lifecycle and Usage
 
 ### ECC Keys (LESC Pairing)
@@ -465,16 +572,33 @@ Notes:
 
 ### Key Storage Locations
 
-| Key Type | Temporary Storage (RAM) | Persistent Storage (Flash) | PSA Role |
-|----------|-------------------------|---------------------------|----------|
-| **ECC Private Key** | `ecc.private_key_be[32]` (ecc.c) | ❌ Never stored (regenerated) | Generate/import/export only |
-| **ECC Public Key** | `pub_key[64]` (ecc.c) | ❌ Never stored (regenerated) | Generate/export only |
-| **LTK (Long Term Key)** | `struct bt_keys::ltk` (keys.c) | ✅ `bt/keys/<addr>/ltk` | Used transiently for encryption |
-| **IRK (Identity Resolving Key)** | `struct bt_keys::irk` (keys.c) | ✅ `bt/keys/<addr>/irk` | Used for RPA resolution |
-| **CSRK (Connection Signature Resolving Key)** | `struct bt_keys::remote_csrk` (keys.c) | ✅ `bt/keys/<addr>/csrk` | Used for data signing |
-| **DH Key (Shared Secret)** | `ecc.dhkey_be[32]` (ecc.c, transient) | ❌ Never stored (ephemeral) | Computed via ECDH |
+| Key Type | Temporary Storage (RAM) | Persistent Storage (Flash) | Storage Format | PSA Role |
+|----------|-------------------------|---------------------------|----------------|----------|
+| **ECC Private Key** | `ecc.private_key_be[32]` (ecc.c) | ❌ Never stored (regenerated) | N/A | Generate/import/export only |
+| **ECC Public Key** | `pub_key[64]` (ecc.c) | ❌ Never stored (regenerated) | N/A | Generate/export only |
+| **LTK (Long Term Key)** | `struct bt_keys::ltk` (keys.c) | ✅ `bt/keys/<addr>/ltk` | **Raw bytes (plaintext)** | Used transiently for encryption |
+| **IRK (Identity Resolving Key)** | `struct bt_keys::irk` (keys.c) | ✅ `bt/keys/<addr>/irk` | **Raw bytes (plaintext)** | Used for RPA resolution |
+| **CSRK (Connection Signature Resolving Key)** | `struct bt_keys::remote_csrk` (keys.c) | ✅ `bt/keys/<addr>/csrk` | **Raw bytes (plaintext)** | Used for data signing |
+| **DH Key (Shared Secret)** | `ecc.dhkey_be[32]` (ecc.c, transient) | ❌ Never stored (ephemeral) | N/A | Computed via ECDH |
 
-**Important:** PSA acts as a **transient key processor** - keys are imported for specific operations then destroyed. Long-term storage is handled by the Settings subsystem.
+#### Storage Format Details
+
+**What is stored in flash (when `CONFIG_BT_SETTINGS` is enabled):**
+- **LTK**: 16-byte raw key value + 8-byte random + 2-byte EDIV (total: 26 bytes) - stored as **plaintext binary data**
+- **IRK**: 16-byte raw key value - stored as **plaintext binary data**
+- **CSRK**: 16-byte raw key value + 4-byte counter (total: 20 bytes) - stored as **plaintext binary data**
+
+**What is NOT stored:**
+- **PSA key IDs** - These are transient handles that only exist during crypto operations in RAM
+- **ECC private/public keys** - Regenerated for each pairing session
+- **DH shared secrets** - Used once and discarded
+
+**Important Notes:**
+1. **PSA acts as a transient key processor** - Keys are imported from flash/RAM as raw bytes, processed through PSA for crypto operations, then the PSA key handle is destroyed. The raw key bytes remain in RAM (`struct bt_keys`) or flash (Settings storage).
+
+2. **Keys are stored as plaintext** - The Settings subsystem stores the raw key bytes directly to flash without encryption. This is a **security risk** and requires additional protection mechanisms (see Security Considerations below).
+
+3. **No PSA persistent storage** - PSA Crypto API does not provide key persistence. All persistent storage is handled by the Zephyr Settings subsystem which stores raw binary data.
 
 ---
 
@@ -553,6 +677,30 @@ config BT_SETTINGS
 - `BT_KEYS_OVERWRITE_OLDEST` - Overwrite oldest keys when storage full
 
 ### Security Considerations
+
+#### ⚠️ Critical Security Warning: Plaintext Key Storage
+
+**Keys are stored as PLAINTEXT in flash when `CONFIG_BT_SETTINGS` is enabled!**
+
+The Bluetooth stack stores sensitive cryptographic keys (LTK, IRK, CSRK) directly to flash memory as **raw binary data without encryption**. This means:
+
+1. **Physical Access Risk** - Anyone with physical access to the device can read flash memory and extract pairing keys
+2. **Firmware Update Risk** - Keys may be accessible during firmware update process
+3. **Debug Access Risk** - Debug interfaces (JTAG, SWD) can dump flash contents
+4. **Side-Channel Risk** - Keys in plaintext flash may be vulnerable to power analysis attacks
+
+**What is stored in plaintext:**
+- **LTK (Long Term Key)** - 16-byte encryption key + metadata (26 bytes total)
+- **IRK (Identity Resolving Key)** - 16-byte privacy key
+- **CSRK (Connection Signature Resolving Key)** - 16-byte signing key + counter (20 bytes total)
+- Device addresses and pairing metadata
+
+**What is NOT stored:**
+- PSA key handles/IDs (these are transient and only exist during crypto operations)
+- ECC private keys (regenerated for each pairing)
+- Temporary session keys
+
+#### Security Recommendations
 
 **Without Secure Storage:**
 - Keys lost on reboot → **No bonding support**
