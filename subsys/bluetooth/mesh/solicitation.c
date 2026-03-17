@@ -179,7 +179,7 @@ static bool sol_pdu_decrypt(struct bt_mesh_subnet *sub, void *data)
 }
 #endif
 
-void bt_mesh_sol_recv(struct net_buf_simple *buf, uint8_t uuid_list_len)
+void bt_mesh_sol_recv(struct net_buf_simple *buf)
 {
 #if CONFIG_BT_MESH_OD_PRIV_PROXY_SRV
 	uint8_t type;
@@ -189,6 +189,7 @@ void bt_mesh_sol_recv(struct net_buf_simple *buf, uint8_t uuid_list_len)
 	uint8_t svc_data_type;
 	bool sol_uuid_found = false;
 	bool svc_data_found = false;
+	uint8_t uuid_list_len;
 
 	if (bt_mesh_gatt_proxy_get() == BT_MESH_GATT_PROXY_ENABLED ||
 	    bt_mesh_priv_gatt_proxy_get() == BT_MESH_GATT_PROXY_ENABLED ||
@@ -197,7 +198,11 @@ void bt_mesh_sol_recv(struct net_buf_simple *buf, uint8_t uuid_list_len)
 		return;
 	}
 
-	/* Get rid of ad_type that was checked in bt_mesh_scan_cb */
+	if (buf->len < 2) {
+		return;
+	}
+
+	uuid_list_len = net_buf_simple_pull_u8(buf);
 	type = net_buf_simple_pull_u8(buf);
 	if (type != BT_DATA_UUID16_SOME && type != BT_DATA_UUID16_ALL) {
 		LOG_DBG("Invalid type 0x%x, expected 0x%x or 0x%x",

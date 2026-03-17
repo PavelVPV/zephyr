@@ -322,6 +322,8 @@ static void bt_mesh_scan_cb(const bt_addr_le_t *addr, int8_t rssi,
 		struct net_buf_simple_state state;
 		uint8_t len, type;
 
+		net_buf_simple_save(buf, &state);
+
 		len = net_buf_simple_pull_u8(buf);
 		/* Check for early termination */
 		if (len == 0U) {
@@ -332,8 +334,6 @@ static void bt_mesh_scan_cb(const bt_addr_le_t *addr, int8_t rssi,
 			LOG_WRN("AD malformed");
 			return;
 		}
-
-		net_buf_simple_save(buf, &state);
 
 		type = net_buf_simple_pull_u8(buf);
 
@@ -355,9 +355,7 @@ static void bt_mesh_scan_cb(const bt_addr_le_t *addr, int8_t rssi,
 			/* Fall through */
 		case BT_DATA_UUID16_ALL:
 			if (IS_ENABLED(CONFIG_BT_MESH_OD_PRIV_PROXY_SRV)) {
-				/* Restore buffer with Solicitation PDU */
-				net_buf_simple_restore(buf, &state);
-				bt_mesh_sol_recv(buf, len - 1);
+				bt_mesh_sol_recv(buf);
 			}
 			break;
 		default:
@@ -365,7 +363,7 @@ static void bt_mesh_scan_cb(const bt_addr_le_t *addr, int8_t rssi,
 		}
 
 		net_buf_simple_restore(buf, &state);
-		net_buf_simple_pull(buf, len);
+		net_buf_simple_pull(buf, len + 1 /* ad_len */);
 	}
 }
 
