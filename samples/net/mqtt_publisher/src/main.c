@@ -54,7 +54,7 @@ static APP_BMEM struct mqtt_client client_ctx;
 static APP_BMEM struct sockaddr_storage broker;
 
 #if defined(CONFIG_SOCKS)
-static APP_BMEM struct sockaddr socks5_proxy;
+static APP_BMEM struct net_sockaddr_storage socks5_proxy;
 #endif
 
 static APP_BMEM struct pollfd fds[1];
@@ -402,8 +402,8 @@ static void client_init(struct mqtt_client *client)
 #endif
 
 #if defined(CONFIG_SOCKS)
-	mqtt_client_set_proxy(client, &socks5_proxy,
-			      socks5_proxy.sa_family == AF_INET ?
+	mqtt_client_set_proxy(client, net_sad(&socks5_proxy),
+			      socks5_proxy.ss_family == AF_INET ?
 			      sizeof(struct sockaddr_in) :
 			      sizeof(struct sockaddr_in6));
 #endif
