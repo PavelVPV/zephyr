@@ -109,7 +109,7 @@ static int start_tcp_proto(struct sample_data *data, sa_family_t family,
 	}
 
 	if (IS_ENABLED(CONFIG_SOCKS)) {
-		struct sockaddr proxy_addr;
+		struct net_sockaddr_storage proxy_addr;
 		socklen_t proxy_addrlen;
 
 		if (family == AF_INET) {
