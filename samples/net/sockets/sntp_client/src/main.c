@@ -40,6 +40,10 @@ int dns_query(const char *host, uint16_t port, int family, int socktype,
 		return rv;
 	}
 	/* Store the first result */
+	if (res->ai_addrlen > sizeof(*addr)) {
+		freeaddrinfo(res);
+		return -EINVAL;
+	}
 	memcpy(addr, res->ai_addr, res->ai_addrlen);
 	*addrlen = res->ai_addrlen;
 	/* Free the allocated memory */
