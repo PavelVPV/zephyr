@@ -111,7 +111,7 @@ static int process_udp(struct data *data)
 {
 	int ret = 0;
 	int received;
-	struct sockaddr client_addr;
+	struct net_sockaddr_storage client_addr;
 	socklen_t client_addr_len;
 
 	LOG_INF("Waiting for UDP packets on port %d (%s)...",
@@ -121,7 +121,7 @@ static int process_udp(struct data *data)
 		client_addr_len = sizeof(client_addr);
 		received = recvfrom(data->udp.sock, data->udp.recv_buffer,
 				    sizeof(data->udp.recv_buffer), 0,
-				    &client_addr, &client_addr_len);
+				    (struct sockaddr *)&client_addr, &client_addr_len);
 
 		if (received < 0) {
 			/* Socket error */
@@ -134,7 +134,7 @@ static int process_udp(struct data *data)
 		}
 
 		ret = sendto(data->udp.sock, data->udp.recv_buffer, received, 0,
-			     &client_addr, client_addr_len);
+			     (struct sockaddr *)&client_addr, client_addr_len);
 		if (ret < 0) {
 			LOG_ERR("UDP (%s): Failed to send %d", data->proto,
 				errno);

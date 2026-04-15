@@ -229,7 +229,7 @@ static int process_tcp(struct data *data)
 {
 	int client;
 	int slot;
-	struct sockaddr_in client_addr;
+	struct net_sockaddr_storage client_addr;
 	socklen_t client_addr_len = sizeof(client_addr);
 
 	LOG_INF("Waiting for TCP connection on port %d (%s)...",
@@ -256,7 +256,7 @@ static int process_tcp(struct data *data)
 #define MAX_NAME_LEN sizeof("tcp6[xxx]")
 
 #if defined(CONFIG_NET_IPV6)
-	if (client_addr.sin_family == AF_INET6) {
+	if (client_addr.ss_family == AF_INET6) {
 		tcp6_handler_in_use[slot] = true;
 
 		k_thread_create(
@@ -280,7 +280,7 @@ static int process_tcp(struct data *data)
 #endif
 
 #if defined(CONFIG_NET_IPV4)
-	if (client_addr.sin_family == AF_INET) {
+	if (client_addr.ss_family == AF_INET) {
 		tcp4_handler_in_use[slot] = true;
 
 		k_thread_create(
