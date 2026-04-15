@@ -13,6 +13,7 @@ LOG_MODULE_REGISTER(net_sntp_client_sample, LOG_LEVEL_DBG);
 #include <zephyr/net/sntp.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <string.h>
 
 #include "net_sample_common.h"
 
@@ -21,8 +22,8 @@ static void sntp_service_handler(struct net_socket_service_event *pev);
 
 NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_sntp_async, sntp_service_handler, 1);
 
-int dns_query(const char *host, uint16_t port, int family, int socktype, struct sockaddr *addr,
-			  socklen_t *addrlen)
+int dns_query(const char *host, uint16_t port, int family, int socktype,
+	      struct net_sockaddr_storage *addr, socklen_t *addrlen)
 {
 	struct addrinfo hints = {
 		.ai_family = family,
@@ -39,14 +40,26 @@ int dns_query(const char *host, uint16_t port, int family, int socktype, struct 
 		return rv;
 	}
 	/* Store the first result */
-	*addr = *res->ai_addr;
+	memcpy(addr, res->ai_addr, res->ai_addrlen);
 	*addrlen = res->ai_addrlen;
 	/* Free the allocated memory */
 	freeaddrinfo(res);
 	/* Store the port */
-	net_sin(addr)->sin_port = htons(port);
+	if (addr->ss_family == AF_INET) {
+		net_sin(net_sad(addr))->sin_port = htons(port);
+	} else if (addr->ss_family == AF_INET6) {
+		net_sin6(net_sad(addr))->sin6_port = htons(port);
+	}
 	/* Print the found address */
-	inet_ntop(addr->sa_family, &net_sin(addr)->sin_addr, addr_str, sizeof(addr_str));
+	if (addr->ss_family == AF_INET) {
+		inet_ntop(addr->ss_family, &net_sin(net_sad(addr))->sin_addr,
+			  addr_str, sizeof(addr_str));
+	} else if (addr->ss_family == AF_INET6) {
+		inet_ntop(addr->ss_family, &net_sin6(net_sad(addr))->sin6_addr,
+			  addr_str, sizeof(addr_str));
+	} else {
+		return -EAFNOSUPPORT;
+	}
 	LOG_INF("%s -> %s", host, addr_str);
 	return 0;
 }
@@ -77,7 +90,7 @@ static void do_sntp(int family)
 	char *family_str = family == AF_INET ? "IPv4" : "IPv6";
 	struct sntp_time s_time;
 	struct sntp_ctx ctx;
-	struct sockaddr addr;
+	struct net_sockaddr_storage addr;
 	socklen_t addrlen;
 	int rv;
 
@@ -89,7 +102,7 @@ static void do_sntp(int family)
 		return;
 	}
 
-	rv = sntp_init(&ctx, &addr, addrlen);
+	rv = sntp_init(&ctx, net_sad(&addr), addrlen);
 	if (rv < 0) {
 		LOG_ERR("Failed to init SNTP %s ctx: %d", family_str, rv);
 		goto end;
@@ -106,7 +119,7 @@ static void do_sntp(int family)
 
 	sntp_close(&ctx);
 
-	rv = sntp_init_async(&ctx, &addr, addrlen, &service_sntp_async);
+	rv = sntp_init_async(&ctx, net_sad(&addr), addrlen, &service_sntp_async);
 	if (rv < 0) {
 		LOG_ERR("Failed to initialise SNTP context (%d)", rv);
 		goto end;
