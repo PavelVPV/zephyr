@@ -126,19 +126,20 @@ static int do_work(void)
 
 static void process_thread(void)
 {
-	struct sockaddr bcaddr = {0};
+	struct net_sockaddr_storage bcaddr = {0};
 	int err;
 	bool success;
 
 	LOG_DBG("Parsing Broadcast Address " CONFIG_NET_SAMPLE_MQTT_SN_BROADCAST_ADDRESS);
 	success = net_ipaddr_parse(CONFIG_NET_SAMPLE_MQTT_SN_BROADCAST_ADDRESS,
-				   strlen(CONFIG_NET_SAMPLE_MQTT_SN_BROADCAST_ADDRESS), &bcaddr);
+				   strlen(CONFIG_NET_SAMPLE_MQTT_SN_BROADCAST_ADDRESS),
+				   net_sad(&bcaddr));
 	__ASSERT(success, "net_ipaddr_parse() failed");
 
 	LOG_INF("Waiting for connection...");
 	LOG_HEXDUMP_DBG(&bcaddr, sizeof(bcaddr), " broadcast address");
 
-	err = mqtt_sn_transport_udp_init(&tp, &bcaddr, sizeof((bcaddr)));
+	err = mqtt_sn_transport_udp_init(&tp, net_sad(&bcaddr), sizeof((bcaddr)));
 	__ASSERT(err == 0, "mqtt_sn_transport_udp_init() failed %d", err);
 
 	err = mqtt_sn_client_init(&mqtt_client, &client_id, &tp.tp, evt_cb, tx_buf, sizeof(tx_buf),
@@ -147,17 +148,18 @@ static void process_thread(void)
 
 	if (IS_ENABLED(CONFIG_NET_SAMPLE_MQTT_SN_STATIC_GATEWAY)) {
 		LOG_INF("Adding predefined Gateway");
-		struct sockaddr gwaddr = {0};
+		struct net_sockaddr_storage gwaddr = {0};
 
 		LOG_DBG("Parsing Gateway address %s", SAMPLE_GW_ADDRESS);
-		success = net_ipaddr_parse(SAMPLE_GW_ADDRESS, strlen(SAMPLE_GW_ADDRESS), &gwaddr);
+		success = net_ipaddr_parse(SAMPLE_GW_ADDRESS, strlen(SAMPLE_GW_ADDRESS),
+					   net_sad(&gwaddr));
 		__ASSERT(success, "net_ipaddr_parse() failed");
 		struct mqtt_sn_data gwaddr_data = {.data = (uint8_t *)&gwaddr,
 						   .size = sizeof(gwaddr)};
 		/* Reduce size to allow this to work with smaller values for
 		 * CONFIG_MQTT_SN_LIB_MAX_ADDR_SIZE.
 		 */
-		switch (gwaddr.sa_family) {
+		switch (gwaddr.ss_family) {
 		case AF_INET:
 			gwaddr_data.size = sizeof(struct sockaddr_in);
 			break;
