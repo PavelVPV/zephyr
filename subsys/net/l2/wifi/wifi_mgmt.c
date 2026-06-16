@@ -421,6 +421,7 @@ static struct k_work_q wifi_mgmt_wq;
  */
 struct wifi_mgmt_deferred_op {
 	struct k_work work;
+	struct k_work_sync sync;
 	struct k_sem done;
 	const struct wifi_mgmt_ops *api;
 	const struct device *dev;
@@ -452,6 +453,9 @@ static int wifi_mgmt_run_deferred(struct wifi_mgmt_deferred_op *op)
 {
 	int ret;
 
+	k_work_init(&op->work, wifi_mgmt_deferred_handler);
+	k_sem_init(&op->done, 0, 1);
+
 	/* If a driver/supplicant callback running on the workqueue issues a
 	 * nested connect/disconnect request, run it inline: submitting to the
 	 * single-threaded workqueue from its own thread would self-deadlock.
@@ -460,9 +464,6 @@ static int wifi_mgmt_run_deferred(struct wifi_mgmt_deferred_op *op)
 		wifi_mgmt_deferred_handler(&op->work);
 		return op->result;
 	}
-
-	k_work_init(&op->work, wifi_mgmt_deferred_handler);
-	k_sem_init(&op->done, 0, 1);
 
 	k_work_submit_to_queue(&wifi_mgmt_wq, &op->work);
 
@@ -474,12 +475,12 @@ static int wifi_mgmt_run_deferred(struct wifi_mgmt_deferred_op *op)
 		 * running once this frame is gone: synchronously cancel/flush it
 		 * first. op->result was not set, so report the wait error.
 		 */
-		struct k_work_sync sync;
 
-		k_work_cancel_sync(&op->work, &sync);
+		k_work_cancel_sync(&op->work, &op->sync);
 		return ret;
 	}
 
+	k_work_flush(&op->work, &op->sync);
 	return op->result;
 }
 

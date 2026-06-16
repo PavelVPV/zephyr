@@ -25,6 +25,7 @@ LOG_MODULE_REGISTER(net_test, NET_LOG_LEVEL);
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/wifi_nm.h>
+#include <zephyr/sys/atomic.h>
 
 #if NET_LOG_LEVEL >= LOG_LEVEL_DBG
 #define DBG(fmt, ...) printk(fmt, ##__VA_ARGS__)
@@ -70,8 +71,54 @@ static int wifi_scan(const struct device *dev, struct net_if *iface,
 	return 0;
 }
 
+/* State recorded by the connect/disconnect mocks below, used to verify the
+ * CONFIG_WIFI_MGMT_DEFER_OPS hand-off.
+ */
+static k_tid_t connect_ran_on;
+static k_tid_t disconnect_ran_on;
+static atomic_t connect_calls;
+static atomic_t disconnect_calls;
+static int connect_rc;
+static int disconnect_rc;
+static uint8_t connect_ssid_len;
+static bool reenter_disconnect;
+
+static int wifi_connect_mock(const struct device *dev, struct net_if *iface,
+			     struct wifi_connect_req_params *params)
+{
+	ARG_UNUSED(dev);
+
+	connect_ran_on = k_current_get();
+	connect_ssid_len = params->ssid_length;
+	atomic_inc(&connect_calls);
+
+	if (reenter_disconnect) {
+		/* Issue a nested request from within the op. When deferral is
+		 * enabled this runs on the workqueue thread, so the re-entrancy
+		 * guard must execute it inline instead of self-deadlocking.
+		 */
+		reenter_disconnect = false;
+		(void)net_mgmt(NET_REQUEST_WIFI_DISCONNECT, iface, NULL, 0);
+	}
+
+	return connect_rc;
+}
+
+static int wifi_disconnect_mock(const struct device *dev, struct net_if *iface)
+{
+	ARG_UNUSED(dev);
+	ARG_UNUSED(iface);
+
+	disconnect_ran_on = k_current_get();
+	atomic_inc(&disconnect_calls);
+
+	return disconnect_rc;
+}
+
 static struct wifi_mgmt_ops wifi_mgmt_api = {
 	.scan		= wifi_scan,
+	.connect	= wifi_connect_mock,
+	.disconnect	= wifi_disconnect_mock,
 };
 
 static struct net_wifi_mgmt_offload api_funcs = {
@@ -183,5 +230,143 @@ ZTEST(net_wifi, test_wifi_nm_managed)
 	zassert_true(wifi_nm_op_called, "Scan callback not called");
 }
 
+
+/* Put the Wi-Fi iface into the offload path (no managed NM iface) and admin-up,
+ * so NET_REQUEST_WIFI_CONNECT/DISCONNECT reach the device's mock ops.
+ */
+static struct net_if *prepare_wifi_iface(void)
+{
+	struct net_if *iface = net_if_get_first_wifi();
+
+#ifdef CONFIG_WIFI_NM
+	struct wifi_nm_instance *nm = wifi_nm_get_instance("test");
+
+	if (wifi_nm_get_instance_iface(iface)) {
+		(void)wifi_nm_unregister_mgd_iface(nm, iface);
+	}
+#endif /* CONFIG_WIFI_NM */
+
+	if (!net_if_is_admin_up(iface)) {
+		zassert_equal(net_if_up(iface), 0, "Failed to bring Wi-Fi iface up");
+	}
+
+	return iface;
+}
+
+static struct wifi_connect_req_params valid_connect_params(void)
+{
+	struct wifi_connect_req_params params = {
+		.ssid = (const uint8_t *)"zephyr",
+		.ssid_length = 6,
+		.security = WIFI_SECURITY_TYPE_NONE,
+		.channel = WIFI_CHANNEL_ANY,
+	};
+
+	return params;
+}
+
+/* The connect op is invoked, its parameters survive the hand-off, and (when
+ * deferral is enabled) it runs on the Wi-Fi management workqueue rather than
+ * the calling thread.
+ */
+ZTEST(net_wifi, test_wifi_connect_deferred)
+{
+	struct net_if *iface = prepare_wifi_iface();
+	struct wifi_connect_req_params params = valid_connect_params();
+	int ret;
+
+	atomic_clear(&connect_calls);
+	connect_ran_on = NULL;
+	connect_ssid_len = 0;
+	connect_rc = 0;
+
+	ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &params, sizeof(params));
+	zassert_equal(ret, 0, "connect should return the op result (got %d)", ret);
+	zassert_equal(atomic_get(&connect_calls), 1, "connect op should be called once");
+	zassert_equal(connect_ssid_len, params.ssid_length,
+		      "connect params should survive the hand-off");
+#if defined(CONFIG_WIFI_MGMT_DEFER_OPS)
+	zassert_not_equal(connect_ran_on, k_current_get(),
+			  "deferred connect should run on the Wi-Fi management workqueue");
+#endif
+}
+
+/* The op return code is propagated back through net_mgmt(). */
+ZTEST(net_wifi, test_wifi_connect_result_propagation)
+{
+	struct net_if *iface = prepare_wifi_iface();
+	struct wifi_connect_req_params params = valid_connect_params();
+	int ret;
+
+	atomic_clear(&connect_calls);
+	connect_rc = -EIO;
+
+	ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &params, sizeof(params));
+	zassert_equal(ret, -EIO, "connect should propagate the op error (got %d)", ret);
+	zassert_equal(atomic_get(&connect_calls), 1, "connect op should be called once");
+}
+
+/* Argument validation stays synchronous in the caller's context: an invalid
+ * request is rejected without ever reaching (or deferring to) the op.
+ */
+ZTEST(net_wifi, test_wifi_connect_invalid_params_sync)
+{
+	struct net_if *iface = prepare_wifi_iface();
+	struct wifi_connect_req_params params = valid_connect_params();
+	int ret;
+
+	atomic_clear(&connect_calls);
+	connect_rc = 0;
+	params.ssid_length = 0; /* invalid */
+
+	ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &params, sizeof(params));
+	zassert_equal(ret, -EINVAL, "invalid params should be rejected (got %d)", ret);
+	zassert_equal(atomic_get(&connect_calls), 0,
+		      "op must not be reached for invalid params");
+}
+
+/* The disconnect op is invoked and (when deferral is enabled) runs on the
+ * Wi-Fi management workqueue.
+ */
+ZTEST(net_wifi, test_wifi_disconnect_deferred)
+{
+	struct net_if *iface = prepare_wifi_iface();
+	int ret;
+
+	atomic_clear(&disconnect_calls);
+	disconnect_ran_on = NULL;
+	disconnect_rc = 0;
+
+	ret = net_mgmt(NET_REQUEST_WIFI_DISCONNECT, iface, NULL, 0);
+	zassert_equal(ret, 0, "disconnect should return the op result (got %d)", ret);
+	zassert_equal(atomic_get(&disconnect_calls), 1, "disconnect op should be called once");
+#if defined(CONFIG_WIFI_MGMT_DEFER_OPS)
+	zassert_not_equal(disconnect_ran_on, k_current_get(),
+			  "deferred disconnect should run on the Wi-Fi management workqueue");
+#endif
+}
+
+/* A nested request issued from within an op (i.e. from the workqueue thread
+ * when deferral is enabled) is handled inline by the re-entrancy guard and does
+ * not dead-lock the single-threaded workqueue.
+ */
+ZTEST(net_wifi, test_wifi_connect_reentrant_disconnect)
+{
+	struct net_if *iface = prepare_wifi_iface();
+	struct wifi_connect_req_params params = valid_connect_params();
+	int ret;
+
+	atomic_clear(&connect_calls);
+	atomic_clear(&disconnect_calls);
+	connect_rc = 0;
+	disconnect_rc = 0;
+	reenter_disconnect = true;
+
+	ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &params, sizeof(params));
+	zassert_equal(ret, 0, "outer connect should complete (got %d)", ret);
+	zassert_equal(atomic_get(&connect_calls), 1, "connect op should be called once");
+	zassert_equal(atomic_get(&disconnect_calls), 1,
+		      "nested disconnect should have run inline");
+}
 
 ZTEST_SUITE(net_wifi, NULL, NULL, NULL, NULL, NULL);
