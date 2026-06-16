@@ -697,7 +697,18 @@ static int wifi_disconnect(uint64_t mgmt_request, struct net_if *iface,
 		return -ENETDOWN;
 	}
 
+#if defined(CONFIG_WIFI_MGMT_DEFER_OPS)
+	struct wifi_mgmt_deferred_op op = {
+		.api = wifi_mgmt_api,
+		.dev = dev,
+		.iface = iface,
+		.is_connect = false,
+	};
+
+	return wifi_mgmt_run_deferred(&op);
+#else
 	return wifi_mgmt_api->disconnect(dev, iface);
+#endif
 }
 
 NET_MGMT_REGISTER_REQUEST_HANDLER(NET_REQUEST_WIFI_DISCONNECT, wifi_disconnect);
