@@ -290,6 +290,12 @@ Other notable changes
 
   * Removed the ``samples/net/wifi/test_certs/rsa2k`` enterprise test
     certificates (DES-encrypted private keys). Use ``rsa2k_no_des`` instead.
+  * Added :kconfig:option:`CONFIG_WIFI_MGMT_DEFER_OPS`, which runs the
+    ``NET_REQUEST_WIFI_CONNECT`` and ``NET_REQUEST_WIFI_DISCONNECT`` driver
+    calls on a dedicated Wi-Fi management workqueue instead of the caller's
+    context. The request return value and the result events are unchanged;
+    the option lets the stacks of threads that issue connect/disconnect
+    (application, shell, Connection Manager) be reduced.
 
 ..
   Any more descriptive subsystem or driver changes. Do you really want to write
