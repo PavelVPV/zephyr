@@ -15,6 +15,7 @@ LOG_MODULE_REGISTER(net_wifi_mgmt, CONFIG_NET_L2_WIFI_MGMT_LOG_LEVEL);
 #include <string.h>
 #include <stdio.h>
 #include <zephyr/toolchain.h>
+#include <zephyr/init.h>
 #include <zephyr/net/net_core.h>
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_log.h>
@@ -409,6 +410,96 @@ static const struct wifi_mgmt_ops *const get_wifi_api(struct net_if *iface)
 	return off_api ? off_api->wifi_mgmt_api : NULL;
 }
 
+#if defined(CONFIG_WIFI_MGMT_DEFER_OPS)
+static K_THREAD_STACK_DEFINE(wifi_mgmt_wq_stack, CONFIG_WIFI_MGMT_WQ_STACK_SIZE);
+static struct k_work_q wifi_mgmt_wq;
+
+/* Context for a connect/disconnect operation deferred to wifi_mgmt_wq.
+ * The instance lives on the caller's stack; the caller blocks on @done until
+ * the workqueue has run the operation, so the (transient) connect parameters
+ * remain valid for the duration and no copy is required.
+ */
+struct wifi_mgmt_deferred_op {
+	struct k_work work;
+	struct k_sem done;
+	const struct wifi_mgmt_ops *api;
+	const struct device *dev;
+	struct net_if *iface;
+	struct wifi_connect_req_params *params; /* NULL for disconnect */
+	bool is_connect;
+	int result;
+};
+
+static void wifi_mgmt_deferred_handler(struct k_work *work)
+{
+	struct wifi_mgmt_deferred_op *op =
+		CONTAINER_OF(work, struct wifi_mgmt_deferred_op, work);
+
+	if (op->is_connect) {
+		op->result = op->api->connect(op->dev, op->iface, op->params);
+	} else {
+		op->result = op->api->disconnect(op->dev, op->iface);
+	}
+
+	k_sem_give(&op->done);
+}
+
+/* Run a Wi-Fi management connect/disconnect on the dedicated workqueue and
+ * block until it completes. This keeps the deep driver/supplicant call chain
+ * off the caller's stack while preserving the synchronous return value.
+ */
+static int wifi_mgmt_run_deferred(struct wifi_mgmt_deferred_op *op)
+{
+	int ret;
+
+	/* If a driver/supplicant callback running on the workqueue issues a
+	 * nested connect/disconnect request, run it inline: submitting to the
+	 * single-threaded workqueue from its own thread would self-deadlock.
+	 */
+	if (k_current_get() == &wifi_mgmt_wq.thread) {
+		wifi_mgmt_deferred_handler(&op->work);
+		return op->result;
+	}
+
+	k_work_init(&op->work, wifi_mgmt_deferred_handler);
+	k_sem_init(&op->done, 0, 1);
+
+	k_work_submit_to_queue(&wifi_mgmt_wq, &op->work);
+
+	ret = k_sem_take(&op->done, K_FOREVER);
+	if (ret != 0) {
+		/* The wait was aborted (for example the semaphore was reset)
+		 * before the operation completed. The work item references op,
+		 * which lives on the caller's stack, so it must not run or keep
+		 * running once this frame is gone: synchronously cancel/flush it
+		 * first. op->result was not set, so report the wait error.
+		 */
+		struct k_work_sync sync;
+
+		k_work_cancel_sync(&op->work, &sync);
+		return ret;
+	}
+
+	return op->result;
+}
+
+static int wifi_mgmt_wq_init(void)
+{
+	struct k_work_queue_config cfg = {
+		.name = "wifi_mgmt_wq",
+	};
+
+	k_work_queue_init(&wifi_mgmt_wq);
+	k_work_queue_start(&wifi_mgmt_wq, wifi_mgmt_wq_stack,
+			   K_THREAD_STACK_SIZEOF(wifi_mgmt_wq_stack),
+			   CONFIG_WIFI_MGMT_WQ_PRIORITY, &cfg);
+
+	return 0;
+}
+
+SYS_INIT(wifi_mgmt_wq_init, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
+#endif /* CONFIG_WIFI_MGMT_DEFER_OPS */
+
 static int wifi_connect(uint64_t mgmt_request, struct net_if *iface,
 			void *data, size_t len)
 {
@@ -522,7 +613,19 @@ static int wifi_connect(uint64_t mgmt_request, struct net_if *iface,
 	roaming_params.is_11r_used = params->ft_used;
 #endif
 
+#if defined(CONFIG_WIFI_MGMT_DEFER_OPS)
+	struct wifi_mgmt_deferred_op op = {
+		.api = wifi_mgmt_api,
+		.dev = dev,
+		.iface = iface,
+		.params = params,
+		.is_connect = true,
+	};
+
+	return wifi_mgmt_run_deferred(&op);
+#else
 	return wifi_mgmt_api->connect(dev, iface, params);
+#endif
 }
 
 NET_MGMT_REGISTER_REQUEST_HANDLER(NET_REQUEST_WIFI_CONNECT, wifi_connect);

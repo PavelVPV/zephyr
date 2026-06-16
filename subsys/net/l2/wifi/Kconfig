@@ -190,3 +190,42 @@ config WIFI_MGMT_BSS_MAX_IDLE_TIME
 	  equal to true, then the non-S1G AP may choose the non-AP STA’s
 	  preferred maximum idle period. The non-S1G AP indicates its chosen
 	  value to the non-S1G STA in the (Re)Association Response frame.
+
+config WIFI_MGMT_DEFER_OPS
+	bool "Defer Wi-Fi connect and disconnect to a dedicated workqueue"
+	depends on MULTITHREADING
+	help
+	  When enabled, the NET_REQUEST_WIFI_CONNECT and NET_REQUEST_WIFI_DISCONNECT
+	  management request handlers validate their arguments in the caller's
+	  context, but run the underlying (potentially stack-heavy) driver and
+	  supplicant connect/disconnect calls on a dedicated Wi-Fi management
+	  workqueue.
+
+	  The calling thread blocks until the operation completes and still
+	  receives its return code, so the behavior observed by callers is
+	  unchanged. The benefit is that the deep supplicant call chain no longer
+	  runs on the caller's stack (application thread, shell thread, or
+	  Connection Manager threads), allowing those stacks to be reduced. The
+	  connection result itself continues to be delivered asynchronously through
+	  the NET_EVENT_WIFI_CONNECT_RESULT and NET_EVENT_WIFI_DISCONNECT_RESULT
+	  events.
+
+if WIFI_MGMT_DEFER_OPS
+
+config WIFI_MGMT_WQ_STACK_SIZE
+	int "Wi-Fi management workqueue stack size"
+	default 4096
+	help
+	  Stack size of the Wi-Fi management workqueue that runs the connect and
+	  disconnect operations. It must be large enough to accommodate the driver
+	  and supplicant connect/disconnect call chain that previously ran on the
+	  calling thread's stack.
+
+config WIFI_MGMT_WQ_PRIORITY
+	int "Wi-Fi management workqueue thread priority"
+	default 5
+	help
+	  Thread priority of the Wi-Fi management workqueue. A positive value
+	  selects a preemptible priority.
+
+endif # WIFI_MGMT_DEFER_OPS
