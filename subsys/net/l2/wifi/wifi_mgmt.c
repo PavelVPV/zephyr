@@ -415,14 +415,14 @@ static K_THREAD_STACK_DEFINE(wifi_mgmt_wq_stack, CONFIG_WIFI_MGMT_WQ_STACK_SIZE)
 static struct k_work_q wifi_mgmt_wq;
 
 /* Context for a connect/disconnect operation deferred to wifi_mgmt_wq.
- * The instance lives on the caller's stack; the caller blocks on @done until
- * the workqueue has run the operation, so the (transient) connect parameters
- * remain valid for the duration and no copy is required.
+ * The instance lives on the caller's stack; the caller blocks in
+ * wifi_mgmt_run_deferred() until the workqueue has finished the operation, so
+ * the (transient) connect parameters remain valid for the duration and no copy
+ * is required.
  */
 struct wifi_mgmt_deferred_op {
 	struct k_work work;
 	struct k_work_sync sync;
-	struct k_sem done;
 	const struct wifi_mgmt_ops *api;
 	const struct device *dev;
 	struct net_if *iface;
@@ -441,8 +441,6 @@ static void wifi_mgmt_deferred_handler(struct k_work *work)
 	} else {
 		op->result = op->api->disconnect(op->dev, op->iface);
 	}
-
-	k_sem_give(&op->done);
 }
 
 /* Run a Wi-Fi management connect/disconnect on the dedicated workqueue and
@@ -451,10 +449,7 @@ static void wifi_mgmt_deferred_handler(struct k_work *work)
  */
 static int wifi_mgmt_run_deferred(struct wifi_mgmt_deferred_op *op)
 {
-	int ret;
-
 	k_work_init(&op->work, wifi_mgmt_deferred_handler);
-	k_sem_init(&op->done, 0, 1);
 
 	/* If a driver/supplicant callback running on the workqueue issues a
 	 * nested connect/disconnect request, run it inline: submitting to the
@@ -467,20 +462,16 @@ static int wifi_mgmt_run_deferred(struct wifi_mgmt_deferred_op *op)
 
 	k_work_submit_to_queue(&wifi_mgmt_wq, &op->work);
 
-	ret = k_sem_take(&op->done, K_FOREVER);
-	if (ret != 0) {
-		/* The wait was aborted (for example the semaphore was reset)
-		 * before the operation completed. The work item references op,
-		 * which lives on the caller's stack, so it must not run or keep
-		 * running once this frame is gone: synchronously cancel/flush it
-		 * first. op->result was not set, so report the wait error.
-		 */
-
-		k_work_cancel_sync(&op->work, &op->sync);
-		return ret;
-	}
-
+	/* Block until the workqueue has *finalized* the work item, not merely
+	 * until the handler returned. work_queue_main() clears K_WORK_RUNNING and
+	 * finalizes the item after the handler returns, so signalling completion
+	 * from the handler (e.g. a semaphore) and returning on that would let the
+	 * workqueue keep touching op->work after this stack frame - on which op
+	 * lives - is gone. k_work_flush() waits for that finalization; once it
+	 * returns, op->result is set and op is safe to destroy.
+	 */
 	k_work_flush(&op->work, &op->sync);
+
 	return op->result;
 }
 
