@@ -68,7 +68,7 @@ class Nrf7120PdkBinaryRunner(ZephyrBinaryRunner):
     def __init__(self, cfg, dev_id=None, speed=1000, erase_timeout=10,
                  mram_waitstates=6, reset=True, dry_run=False, hex_files=None,
                  startup=None, remote_jlink=None, tunnel_port=19020,
-                 remote_ip=None):
+                 remote_ip=None, vtor_address=None):
         super().__init__(cfg)
         self.dev_id = dev_id
         self.speed = speed
@@ -81,6 +81,7 @@ class Nrf7120PdkBinaryRunner(ZephyrBinaryRunner):
         self.remote_jlink = remote_jlink
         self.tunnel_port = tunnel_port
         self.remote_ip = remote_ip
+        self.vtor_address = vtor_address
 
     @classmethod
     def name(cls):
@@ -117,6 +118,16 @@ class Nrf7120PdkBinaryRunner(ZephyrBinaryRunner):
                             help='connect to a J-Link Remote Server reachable '
                                  'by IP (default port 19020), e.g. '
                                  '192.168.1.10 or 192.168.1.10:19020')
+        parser.add_argument('--vtor-address', type=lambda value: int(value, 0),
+                            default=None,
+                            help='address of the vector table to start the '
+                                 'CPU from (e.g. the mcuboot/application '
+                                 'partition address). Overrides the value '
+                                 'normally derived from CONFIG_FLASH_BASE_ADDRESS '
+                                 '+ CONFIG_FLASH_LOAD_OFFSET. Required when '
+                                 'CONFIG_FLASH_LOAD_OFFSET is not available '
+                                 '(e.g. boards using zephyr,mapped-partition, '
+                                 'where that Kconfig symbol does not exist)')
         parser.set_defaults(reset=True)
 
     @classmethod
@@ -129,7 +140,8 @@ class Nrf7120PdkBinaryRunner(ZephyrBinaryRunner):
                    startup=getattr(args, 'nrf7120_pdk_startup', None),
                    remote_jlink=args.remote_jlink,
                    tunnel_port=args.tunnel_port,
-                   remote_ip=args.remote_ip)
+                   remote_ip=args.remote_ip,
+                   vtor_address=args.vtor_address)
 
     @classmethod
     def args_from_previous_runner(cls, previous_runner, args):
@@ -160,10 +172,19 @@ class Nrf7120PdkBinaryRunner(ZephyrBinaryRunner):
         if IntelHex is None:
             raise RuntimeError('Python dependency intelhex is required')
 
-        vtor = (self.build_conf.get('CONFIG_FLASH_BASE_ADDRESS', 0) +
-                self.build_conf.get('CONFIG_FLASH_LOAD_OFFSET', 0))
-        if vtor == 0:
-            return
+        if self.vtor_address is not None:
+            vtor = self.vtor_address
+        else:
+            if 'CONFIG_FLASH_LOAD_OFFSET' not in self.build_conf:
+                raise RuntimeError(
+                    'CONFIG_FLASH_LOAD_OFFSET is not available for '
+                    f'{hex_file} (likely a board using '
+                    'zephyr,mapped-partition, where this Kconfig symbol '
+                    'does not exist); pass --vtor-address explicitly')
+            vtor = (self.build_conf.get('CONFIG_FLASH_BASE_ADDRESS', 0) +
+                    self.build_conf.get('CONFIG_FLASH_LOAD_OFFSET', 0))
+            if vtor == 0:
+                return
 
         image = IntelHex()
         image.loadfile(hex_file, format='hex')
