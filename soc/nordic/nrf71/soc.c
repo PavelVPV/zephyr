@@ -328,7 +328,7 @@ static void wifi_setup(void)
 #endif
 #endif
 
-void soc_early_init_hook(void)
+int nordicsemi_nrf71_init(void)
 {
 #if defined(CONFIG_HAS_NORDIC_RAM_CTRL) && !defined(CONFIG_TRUSTED_EXECUTION_NONSECURE)
 	nrfx_ram_ctrl_retention_enable_all_set(false);
@@ -353,6 +353,7 @@ void soc_early_init_hook(void)
 
 	if (ret != 0) {
 		LOG_ERR("WICR programming failed: %d", ret);
+		return ret;
 	}
 #endif
 
@@ -382,6 +383,12 @@ void soc_early_init_hook(void)
 #elif defined(NRF_ICACHE)
 	nrf_cache_enable(NRF_ICACHE);
 #endif
+	return 0;
+}
+
+void soc_early_init_hook(void)
+{
+	(void)nordicsemi_nrf71_init();
 }
 
 void arch_busy_wait(uint32_t time_us)
